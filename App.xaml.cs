@@ -128,22 +128,56 @@ public partial class App : System.Windows.Application
     [STAThread]
     public static void Main(string[] args)
     {
-        App app = new App();
-        app.InitializeComponent();
-        app.Run();
+        AppDomain.CurrentDomain.UnhandledException += (s, ev) =>
+        {
+            try
+            {
+                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MicMute");
+                Directory.CreateDirectory(p);
+                File.WriteAllText(Path.Combine(p, "crash_log.txt"), ev.ExceptionObject?.ToString() ?? "Unknown exception");
+            }
+            catch { }
+        };
+
+        try
+        {
+            App app = new App();
+            app.InitializeComponent();
+            app.Run();
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MicMute");
+                Directory.CreateDirectory(p);
+                File.WriteAllText(Path.Combine(p, "crash_log.txt"), ex.ToString());
+            }
+            catch { }
+        }
     }
 
     public void InitializeComponent()
     {
     }
 
+    private const int HWND_BROADCAST = 0xFFFF;
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    private static extern int RegisterWindowMessage(string lpString);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    private static readonly int WM_SHOWME = RegisterWindowMessage("MICMUTE_SHOW_WINDOW_MSG_7FA5D9E0");
+
     protected override void OnStartup(StartupEventArgs e)
     {
         _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
         if (!createdNew)
         {
-            System.Windows.MessageBox.Show("Mic Mute is already running.", "Mic Mute", MessageBoxButton.OK, MessageBoxImage.Asterisk);
-            Shutdown();
+            PostMessage((IntPtr)HWND_BROADCAST, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+            Environment.Exit(0);
             return;
         }
 
@@ -324,6 +358,9 @@ public partial class App : System.Windows.Application
             _mainWindow.Show();
             _mainWindow.WindowState = WindowState.Normal;
             _mainWindow.Activate();
+            _mainWindow.Focus();
+            _mainWindow.Topmost = true;
+            _mainWindow.Topmost = false;
         }
     }
 

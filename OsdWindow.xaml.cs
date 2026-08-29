@@ -79,7 +79,9 @@ public partial class OsdWindow : Window
                     string xaml = sr.ReadToEnd();
                     xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
                     root = (Window)XamlReader.Parse(xaml);
-                    this.Content = root.Content;
+                    var content = root.Content;
+                    root.Content = null;
+                    this.Content = content;
                     this.Resources = root.Resources;
                     this.Width = root.Width;
                     this.Height = root.Height;
@@ -97,12 +99,13 @@ public partial class OsdWindow : Window
             }
         }
 
-        if (root == null) return;
+        FrameworkElement? scope = this.Content as FrameworkElement;
+        if (scope == null) return;
 
-        borderPanel = (Border)root.FindName("borderPanel");
-        pathActive = (Grid)root.FindName("pathActive");
-        pathMuted = (Grid)root.FindName("pathMuted");
-        tbStatus = (TextBlock)root.FindName("tbStatus");
+        borderPanel = (Border)scope.FindName("borderPanel");
+        pathActive = (Grid)scope.FindName("pathActive");
+        pathMuted = (Grid)scope.FindName("pathMuted");
+        tbStatus = (TextBlock)scope.FindName("tbStatus");
         if (borderPanel != null)
         {
             osdShadow = (DropShadowEffect)borderPanel.Effect;
