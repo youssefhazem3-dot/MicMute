@@ -810,7 +810,6 @@ public partial class MainWindow : Window
         using (FolderBrowserDialog fbd = new FolderBrowserDialog())
         {
             fbd.Description = "Select preferred folder to store MicMute settings and cache:";
-            fbd.UseDescriptionForTitle = true;
             fbd.SelectedPath = SettingsManager.GetDataFolderPath();
             if (fbd.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrWhiteSpace(fbd.SelectedPath))
             {

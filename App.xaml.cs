@@ -129,6 +129,23 @@ public partial class App : System.Windows.Application
     [STAThread]
     public static void Main(string[] args)
     {
+        AppDomain.CurrentDomain.AssemblyResolve += (sender, resolveArgs) =>
+        {
+            string? simpleName = new System.Reflection.AssemblyName(resolveArgs.Name).Name;
+            if (string.IsNullOrEmpty(simpleName)) return null;
+            string resourceName = simpleName + ".dll";
+            using (Stream? stream = typeof(App).Assembly.GetManifestResourceStream(resourceName))
+            {
+                if (stream != null)
+                {
+                    byte[] assemblyData = new byte[stream.Length];
+                    stream.Read(assemblyData, 0, assemblyData.Length);
+                    return System.Reflection.Assembly.Load(assemblyData);
+                }
+            }
+            return null;
+        };
+
         AppDomain.CurrentDomain.UnhandledException += (s, ev) =>
         {
             try

@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
+using System.Windows.Input;
 
 namespace MicMute;
 
@@ -11,10 +11,82 @@ public static class SettingsManager
     private static readonly string AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
     private static readonly string LocationPointerFile = Path.Combine(DefaultAppDataFolder, "location.txt");
 
-    private static readonly JsonSerializerOptions SerializerOptions = new JsonSerializerOptions
+    private static string Escape(string s) => s?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
+    private static string Unescape(string s) => s?.Replace("\\\"", "\"").Replace("\\\\", "\\") ?? "";
+
+    private static string Serialize(AppSettings s)
     {
-        WriteIndented = true
-    };
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("{");
+        sb.AppendLine($"  \"SelectedDeviceId\": \"{Escape(s.SelectedDeviceId)}\",");
+        sb.AppendLine($"  \"Hotkey\": {(int)s.Hotkey},");
+        sb.AppendLine($"  \"HotkeyModifiers\": {(int)s.HotkeyModifiers},");
+        sb.AppendLine($"  \"RunOnStartup\": {(s.RunOnStartup ? "true" : "false")},");
+        sb.AppendLine($"  \"StartMinimized\": {(s.StartMinimized ? "true" : "false")},");
+        sb.AppendLine($"  \"EnableOsd\": {(s.EnableOsd ? "true" : "false")},");
+        sb.AppendLine($"  \"OsdDuration\": {s.OsdDuration.ToString(System.Globalization.CultureInfo.InvariantCulture)},");
+        sb.AppendLine($"  \"LightMode\": {(s.LightMode ? "true" : "false")},");
+        sb.AppendLine($"  \"CustomDataPath\": \"{Escape(s.CustomDataPath)}\",");
+        sb.AppendLine($"  \"UsePortableMode\": {(s.UsePortableMode ? "true" : "false")}");
+        sb.Append("}");
+        return sb.ToString();
+    }
+
+    private static AppSettings Deserialize(string json)
+    {
+        string selectedDeviceId = "";
+        Key hotkey = Key.F1;
+        ModifierKeys hotkeyModifiers = ModifierKeys.None;
+        bool runOnStartup = false;
+        bool startMinimized = true;
+        bool enableOsd = true;
+        double osdDuration = 1.5;
+        bool lightMode = false;
+        string customDataPath = "";
+        bool usePortableMode = false;
+
+        foreach (var rawLine in json.Split(new[] { '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = rawLine.Split(new[] { ':' }, 2);
+            if (parts.Length != 2) continue;
+            string key = parts[0].Trim(' ', '\t', '"', '{', '}');
+            string val = parts[1].Trim(' ', '\t', '"', '{', '}');
+
+            switch (key)
+            {
+                case "SelectedDeviceId": selectedDeviceId = Unescape(val); break;
+                case "Hotkey":
+                    if (int.TryParse(val, out int hk)) hotkey = (Key)hk;
+                    else if (Enum.TryParse<Key>(val, true, out var ek)) hotkey = ek;
+                    break;
+                case "HotkeyModifiers":
+                    if (int.TryParse(val, out int hm)) hotkeyModifiers = (ModifierKeys)hm;
+                    else if (Enum.TryParse<ModifierKeys>(val, true, out var em)) hotkeyModifiers = em;
+                    break;
+                case "RunOnStartup": bool.TryParse(val, out runOnStartup); break;
+                case "StartMinimized": bool.TryParse(val, out startMinimized); break;
+                case "EnableOsd": bool.TryParse(val, out enableOsd); break;
+                case "OsdDuration": double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out osdDuration); break;
+                case "LightMode": bool.TryParse(val, out lightMode); break;
+                case "CustomDataPath": customDataPath = Unescape(val); break;
+                case "UsePortableMode": bool.TryParse(val, out usePortableMode); break;
+            }
+        }
+
+        return new AppSettings
+        {
+            SelectedDeviceId = selectedDeviceId,
+            Hotkey = hotkey,
+            HotkeyModifiers = hotkeyModifiers,
+            RunOnStartup = runOnStartup,
+            StartMinimized = startMinimized,
+            EnableOsd = enableOsd,
+            OsdDuration = osdDuration,
+            LightMode = lightMode,
+            CustomDataPath = customDataPath,
+            UsePortableMode = usePortableMode
+        };
+    }
 
     public static string GetDataFolderPath()
     {
@@ -57,7 +129,7 @@ public static class SettingsManager
             string filePath = GetSettingsFilePath();
             if (File.Exists(filePath))
             {
-                AppSettings? appSettings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(filePath));
+                AppSettings? appSettings = Deserialize(File.ReadAllText(filePath));
                 if (appSettings != null)
                 {
                     return appSettings;
@@ -83,7 +155,7 @@ public static class SettingsManager
                 Directory.CreateDirectory(folderPath);
             }
             string filePath = Path.Combine(folderPath, "settings.json");
-            string contents = JsonSerializer.Serialize(settings, SerializerOptions);
+            string contents = Serialize(settings);
             File.WriteAllText(filePath, contents);
         }
         catch
