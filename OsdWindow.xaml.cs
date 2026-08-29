@@ -79,9 +79,7 @@ public partial class OsdWindow : Window
                     string xaml = sr.ReadToEnd();
                     xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
                     root = (Window)XamlReader.Parse(xaml);
-                    var content = root.Content;
-                    root.Content = null;
-                    this.Content = content;
+
                     this.Resources = root.Resources;
                     this.Width = root.Width;
                     this.Height = root.Height;
@@ -95,20 +93,21 @@ public partial class OsdWindow : Window
                     this.WindowStartupLocation = root.WindowStartupLocation;
                     this.SnapsToDevicePixels = root.SnapsToDevicePixels;
                     this.UseLayoutRounding = root.UseLayoutRounding;
+
+                    borderPanel = (Border)root.FindName("borderPanel");
+                    pathActive = (Grid)root.FindName("pathActive");
+                    pathMuted = (Grid)root.FindName("pathMuted");
+                    tbStatus = (TextBlock)root.FindName("tbStatus");
+                    if (borderPanel != null)
+                    {
+                        osdShadow = (DropShadowEffect)borderPanel.Effect;
+                    }
+
+                    var content = root.Content;
+                    root.Content = null;
+                    this.Content = content;
                 }
             }
-        }
-
-        FrameworkElement? scope = this.Content as FrameworkElement;
-        if (scope == null) return;
-
-        borderPanel = (Border)scope.FindName("borderPanel");
-        pathActive = (Grid)scope.FindName("pathActive");
-        pathMuted = (Grid)scope.FindName("pathMuted");
-        tbStatus = (TextBlock)scope.FindName("tbStatus");
-        if (borderPanel != null)
-        {
-            osdShadow = (DropShadowEffect)borderPanel.Effect;
         }
     }
 

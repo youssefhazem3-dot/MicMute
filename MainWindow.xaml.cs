@@ -91,9 +91,7 @@ public partial class MainWindow : Window
                     xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
                     xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
                     root = (Window)XamlReader.Parse(xaml);
-                    var content = root.Content;
-                    root.Content = null;
-                    this.Content = content;
+                    
                     this.Resources = root.Resources;
                     this.Width = root.Width;
                     if (!double.IsNaN(root.Height)) this.Height = root.Height;
@@ -105,44 +103,47 @@ public partial class MainWindow : Window
                     this.WindowStartupLocation = root.WindowStartupLocation;
                     this.SnapsToDevicePixels = root.SnapsToDevicePixels;
                     this.UseLayoutRounding = root.UseLayoutRounding;
+
+                    // Bind all controls from root before detaching content
+                    btnStateToggle = (System.Windows.Controls.Button)root.FindName("btnStateToggle");
+                    tbStatusText = (TextBlock)root.FindName("tbStatusText");
+                    statusGlow = (DropShadowEffect)root.FindName("statusGlow");
+                    cbDevices = (System.Windows.Controls.ComboBox)root.FindName("cbDevices");
+                    borderHotkey = (Border)root.FindName("borderHotkey");
+                    glowHotkey = (DropShadowEffect)root.FindName("glowHotkey");
+                    tbHotkey = (TextBlock)root.FindName("tbHotkey");
+                    btnRecordHotkey = (System.Windows.Controls.Button)root.FindName("btnRecordHotkey");
+                    cbEnableOsd = (System.Windows.Controls.CheckBox)root.FindName("cbEnableOsd");
+                    sliderOsdDuration = (Slider)root.FindName("sliderOsdDuration");
+                    txtOsdDuration = (System.Windows.Controls.TextBox)root.FindName("txtOsdDuration");
+                    cbStartup = (System.Windows.Controls.CheckBox)root.FindName("cbStartup");
+                    cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
+                    cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
+                    tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
+                    borderWarning = (Border)root.FindName("borderWarning");
+                    tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
+
+                    // Event hooks
+                    var titleBar = (Border)root.FindName("borderTitleBar");
+                    if (titleBar != null) titleBar.MouseLeftButtonDown += TitleBar_MouseLeftButtonDown;
+                    var btnMin = (System.Windows.Controls.Button)root.FindName("btnMinimize");
+                    if (btnMin != null) btnMin.Click += MinimizeButton_Click;
+                    var btnCls = (System.Windows.Controls.Button)root.FindName("btnClose");
+                    if (btnCls != null) btnCls.Click += CloseButton_Click;
+                    var btnOpenFolder = (System.Windows.Controls.Button)root.FindName("btnOpenFolder");
+                    if (btnOpenFolder != null) btnOpenFolder.Click += BtnOpenDataFolder_Click;
+                    var btnChangeFolder = (System.Windows.Controls.Button)root.FindName("btnChangeFolder");
+                    if (btnChangeFolder != null) btnChangeFolder.Click += BtnChangeDataFolder_Click;
+                    var btnResetData = (System.Windows.Controls.Button)root.FindName("btnResetData");
+                    if (btnResetData != null) btnResetData.Click += BtnResetSettings_Click;
+
+                    // Now safely detach content and attach to this Window
+                    var content = root.Content;
+                    root.Content = null;
+                    this.Content = content;
                 }
             }
         }
-
-        FrameworkElement? scope = this.Content as FrameworkElement;
-        if (scope == null) return;
-
-        btnStateToggle = (System.Windows.Controls.Button)scope.FindName("btnStateToggle");
-        tbStatusText = (TextBlock)scope.FindName("tbStatusText");
-        statusGlow = (DropShadowEffect)scope.FindName("statusGlow");
-        cbDevices = (System.Windows.Controls.ComboBox)scope.FindName("cbDevices");
-        borderHotkey = (Border)scope.FindName("borderHotkey");
-        glowHotkey = (DropShadowEffect)scope.FindName("glowHotkey");
-        tbHotkey = (TextBlock)scope.FindName("tbHotkey");
-        btnRecordHotkey = (System.Windows.Controls.Button)scope.FindName("btnRecordHotkey");
-        cbEnableOsd = (System.Windows.Controls.CheckBox)scope.FindName("cbEnableOsd");
-        sliderOsdDuration = (Slider)scope.FindName("sliderOsdDuration");
-        txtOsdDuration = (System.Windows.Controls.TextBox)scope.FindName("txtOsdDuration");
-        cbStartup = (System.Windows.Controls.CheckBox)scope.FindName("cbStartup");
-        cbStartMinimized = (System.Windows.Controls.CheckBox)scope.FindName("cbStartMinimized");
-        cbLightMode = (System.Windows.Controls.CheckBox)scope.FindName("cbLightMode");
-        tbStoragePath = (TextBlock)scope.FindName("tbStoragePath");
-        borderWarning = (Border)scope.FindName("borderWarning");
-        tbWarningMessage = (TextBlock)scope.FindName("tbWarningMessage");
-
-        // Event hooks
-        var titleBar = (Border)scope.FindName("borderTitleBar");
-        if (titleBar != null) titleBar.MouseLeftButtonDown += TitleBar_MouseLeftButtonDown;
-        var btnMin = (System.Windows.Controls.Button)scope.FindName("btnMinimize");
-        if (btnMin != null) btnMin.Click += MinimizeButton_Click;
-        var btnCls = (System.Windows.Controls.Button)scope.FindName("btnClose");
-        if (btnCls != null) btnCls.Click += CloseButton_Click;
-        var btnOpenFolder = (System.Windows.Controls.Button)scope.FindName("btnOpenFolder");
-        if (btnOpenFolder != null) btnOpenFolder.Click += BtnOpenDataFolder_Click;
-        var btnChangeFolder = (System.Windows.Controls.Button)scope.FindName("btnChangeFolder");
-        if (btnChangeFolder != null) btnChangeFolder.Click += BtnChangeDataFolder_Click;
-        var btnResetData = (System.Windows.Controls.Button)scope.FindName("btnResetData");
-        if (btnResetData != null) btnResetData.Click += BtnResetSettings_Click;
 
         if (btnStateToggle != null) btnStateToggle.Click += BtnStateToggle_Click;
         if (cbDevices != null) cbDevices.SelectionChanged += CbDevices_SelectionChanged;
