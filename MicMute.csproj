@@ -12,6 +12,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MicMute</RootNamespace>
     <AssemblyName>MicMute</AssemblyName>
+
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
