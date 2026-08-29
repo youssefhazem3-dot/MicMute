@@ -1,4 +1,4 @@
-﻿<Window x:Class="MicMute.MainWindow"
+<Window x:Class="MicMute.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Mic Mute"
@@ -609,7 +609,7 @@
                 <Grid>
                     <!-- Left: App Icon & Title -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0">
-                        <Image Source="app.ico" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Image x:Name="imgAppIcon" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
                         <TextBlock Text="Mic Mute"
                                    Foreground="{DynamicResource TitleTextBrush}"
                                    FontFamily="Segoe UI"

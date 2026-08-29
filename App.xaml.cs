@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
+using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
@@ -168,6 +169,12 @@ public partial class App : System.Windows.Application
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     private static readonly int WM_SHOWME = RegisterWindowMessage("MICMUTE_SHOW_WINDOW_MSG_7FA5D9E0");
 
@@ -359,8 +366,12 @@ public partial class App : System.Windows.Application
             _mainWindow.WindowState = WindowState.Normal;
             _mainWindow.Activate();
             _mainWindow.Focus();
-            _mainWindow.Topmost = true;
-            _mainWindow.Topmost = false;
+            var handle = new WindowInteropHelper(_mainWindow).Handle;
+            if (handle != IntPtr.Zero)
+            {
+                ShowWindow(handle, 9); // SW_RESTORE
+                SetForegroundWindow(handle);
+            }
         }
     }
 

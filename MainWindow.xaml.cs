@@ -56,6 +56,12 @@ public partial class MainWindow : Window
     public static readonly int WM_SHOWME = RegisterWindowMessage("MICMUTE_SHOW_WINDOW_MSG_7FA5D9E0");
 
     [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -137,6 +143,24 @@ public partial class MainWindow : Window
                     var btnResetData = (System.Windows.Controls.Button)root.FindName("btnResetData");
                     if (btnResetData != null) btnResetData.Click += BtnResetSettings_Click;
 
+                    var imgIcon = (System.Windows.Controls.Image)root.FindName("imgAppIcon");
+                    if (imgIcon != null)
+                    {
+                        try
+                        {
+                            using (Stream? iconStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.app.ico"))
+                            {
+                                if (iconStream != null)
+                                {
+                                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(iconStream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                                    imgIcon.Source = decoder.Frames[0];
+                                    this.Icon = decoder.Frames[0];
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
                     // Now safely detach content and attach to this Window
                     var content = root.Content;
                     root.Content = null;
@@ -200,8 +224,8 @@ public partial class MainWindow : Window
             this.WindowState = WindowState.Normal;
             this.Activate();
             this.Focus();
-            this.Topmost = true;
-            this.Topmost = false;
+            ShowWindow(hwnd, 9); // SW_RESTORE
+            SetForegroundWindow(hwnd);
             handled = true;
         }
         return IntPtr.Zero;
