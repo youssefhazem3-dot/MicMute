@@ -1,0 +1,62 @@
+<Window x:Class="MicMute.OsdWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OSD"
+        Width="140"
+        Height="140"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ShowActivated="False"
+        WindowStartupLocation="Manual"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
+    <Grid>
+        <Border x:Name="borderPanel"
+                Background="#E50F141C"
+                BorderBrush="#94A3B8"
+                BorderThickness="1.5"
+                CornerRadius="70">
+            <Border.Effect>
+                <DropShadowEffect x:Name="osdShadow"
+                                  BlurRadius="18"
+                                  ShadowDepth="0"
+                                  Opacity="0.45"
+                                  Color="#94A3B8" />
+            </Border.Effect>
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="64" Height="64">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Active Microphone Icon in Neutral White-Grey / Slate aesthetic -->
+                    <Grid x:Name="pathActive" Width="40" Height="40" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Path Fill="#E2E8F0"
+                              Stretch="Uniform"
+                              Width="32"
+                              Height="32"
+                              Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                    </Grid>
+                    <!-- Muted Microphone Icon with Red Alert styling -->
+                    <Grid x:Name="pathMuted" Width="40" Height="40" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Path Fill="#EF4444"
+                              Stretch="Uniform"
+                              Width="32"
+                              Height="32"
+                              Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                        <Line X1="5" Y1="5" X2="35" Y2="35" Stroke="#0F141C" StrokeThickness="4.0" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        <Line X1="5" Y1="5" X2="35" Y2="35" Stroke="#EF4444" StrokeThickness="2.0" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                    </Grid>
+                    <TextBlock x:Name="tbStatus"
+                               Text="MUTED"
+                               Foreground="#EF4444"
+                               FontSize="10.5"
+                               FontFamily="Segoe UI"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               Margin="0,3,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

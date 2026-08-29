@@ -1,0 +1,9 @@
+bin/
+obj/
+publish/
+*.dll
+*.exe
+*.runtimeconfig.json
+!app.ico
+.vs/
+*.user
