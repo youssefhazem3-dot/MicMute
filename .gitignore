@@ -7,3 +7,10 @@ publish/
 !app.ico
 .vs/
 *.user
+
+# Untracked AI / Session Artifacts
+handoff.md
+codebase_graph.md
+codebase_graph.json
+.graph/
+.handoff/
