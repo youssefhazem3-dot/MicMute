@@ -18,9 +18,17 @@ public partial class OsdWindow : Window
     private static OsdWindow? _instance;
     private static CancellationTokenSource? _cts;
 
+    private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_SHOWWINDOW = 0x0040;
+
     private const int GWL_EXSTYLE = -20;
-    private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WS_EX_TOPMOST = 0x00000008;
+    private const int WS_EX_TRANSPARENT = 0x00000020;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_NOACTIVATE = 0x08000000;
 
     internal Border borderPanel = null!;
     internal Grid pathActive = null!;
@@ -28,6 +36,9 @@ public partial class OsdWindow : Window
     internal TextBlock tbStatus = null!;
     internal DropShadowEffect osdShadow = null!;
     private bool _contentLoaded;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
     private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
@@ -115,8 +126,9 @@ public partial class OsdWindow : Window
     {
         base.OnSourceInitialized(e);
         IntPtr handle = new WindowInteropHelper(this).Handle;
-        IntPtr dwNewLong = new IntPtr(GetWindowLong(handle, GWL_EXSTYLE).ToInt64() | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
-        SetWindowLong(handle, GWL_EXSTYLE, dwNewLong);
+        long exStyle = GetWindowLong(handle, GWL_EXSTYLE).ToInt64();
+        exStyle |= WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT;
+        SetWindowLong(handle, GWL_EXSTYLE, new IntPtr(exStyle));
     }
 
     public static void WarmUp()
@@ -146,11 +158,35 @@ public partial class OsdWindow : Window
             _instance = new OsdWindow();
         }
         _instance.UpdateState(isMuted);
+
+        IntPtr handle = new WindowInteropHelper(_instance).EnsureHandle();
+        _instance.PositionOnActiveScreen();
+
         if (!_instance.IsVisible)
         {
             _instance.Show();
         }
+
+        // Forcefully re-assert HWND_TOPMOST above full-screen games
+        SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
         _instance.BeginFadeSequence(durationSeconds, _cts.Token);
+    }
+
+    private void PositionOnActiveScreen()
+    {
+        try
+        {
+            var screen = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
+            var bounds = screen.Bounds;
+            Left = bounds.Left + (bounds.Width - Width) / 2.0;
+            Top = bounds.Top + (bounds.Height - Height) / 2.0;
+        }
+        catch
+        {
+            Left = (SystemParameters.PrimaryScreenWidth - Width) / 2.0;
+            Top = (SystemParameters.PrimaryScreenHeight - Height) / 2.0;
+        }
     }
 
     private void UpdateState(bool isMuted)
@@ -179,14 +215,15 @@ public partial class OsdWindow : Window
     {
         try
         {
-            Left = (SystemParameters.PrimaryScreenWidth - Width) / 2.0;
-            Top = (SystemParameters.PrimaryScreenHeight - Height) / 2.0;
-            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 0.92, TimeSpan.FromSeconds(0.1));
+            IntPtr handle = new WindowInteropHelper(this).Handle;
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 0.95, TimeSpan.FromSeconds(0.08));
             BeginAnimation(OpacityProperty, fadeIn);
 
             await Task.Delay(TimeSpan.FromSeconds(durationSeconds), token);
 
-            DoubleAnimation fadeOut = new DoubleAnimation(0.92, 0.0, TimeSpan.FromSeconds(0.22));
+            DoubleAnimation fadeOut = new DoubleAnimation(0.95, 0.0, TimeSpan.FromSeconds(0.20));
             fadeOut.Completed += delegate
             {
                 if (!token.IsCancellationRequested)

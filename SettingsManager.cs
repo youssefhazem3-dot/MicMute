@@ -28,7 +28,8 @@ public static class SettingsManager
         sb.AppendLine($"  \"LightMode\": {(s.LightMode ? "true" : "false")},");
         sb.AppendLine($"  \"CustomDataPath\": \"{Escape(s.CustomDataPath)}\",");
         sb.AppendLine($"  \"UsePortableMode\": {(s.UsePortableMode ? "true" : "false")},");
-        sb.AppendLine($"  \"RunAsAdmin\": {(s.RunAsAdmin ? "true" : "false")}");
+        sb.AppendLine($"  \"RunAsAdmin\": {(s.RunAsAdmin ? "true" : "false")},");
+        sb.AppendLine($"  \"PlaySoundFeedback\": {(s.PlaySoundFeedback ? "true" : "false")}");
         sb.Append("}");
         return sb.ToString();
     }
@@ -46,6 +47,7 @@ public static class SettingsManager
         string customDataPath = "";
         bool usePortableMode = false;
         bool runAsAdmin = false;
+        bool playSoundFeedback = false;
 
         foreach (var rawLine in json.Split(new[] { '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -73,6 +75,7 @@ public static class SettingsManager
                 case "CustomDataPath": customDataPath = Unescape(val); break;
                 case "UsePortableMode": bool.TryParse(val, out usePortableMode); break;
                 case "RunAsAdmin": bool.TryParse(val, out runAsAdmin); break;
+                case "PlaySoundFeedback": bool.TryParse(val, out playSoundFeedback); break;
             }
         }
 
@@ -88,7 +91,8 @@ public static class SettingsManager
             LightMode = lightMode,
             CustomDataPath = customDataPath,
             UsePortableMode = usePortableMode,
-            RunAsAdmin = runAsAdmin
+            RunAsAdmin = runAsAdmin,
+            PlaySoundFeedback = playSoundFeedback
         };
     }
 

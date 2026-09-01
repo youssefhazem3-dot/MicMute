@@ -25,4 +25,6 @@ public sealed record AppSettings
     public bool UsePortableMode { get; init; }
 
     public bool RunAsAdmin { get; init; }
+
+    public bool PlaySoundFeedback { get; init; }
 }

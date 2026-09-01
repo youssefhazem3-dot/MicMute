@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     internal System.Windows.Controls.CheckBox cbStartMinimized = null!;
     internal System.Windows.Controls.CheckBox cbLightMode = null!;
     internal System.Windows.Controls.CheckBox cbRunAsAdmin = null!;
+    internal System.Windows.Controls.CheckBox cbSoundFeedback = null!;
     internal TextBlock tbStoragePath = null!;
     internal Border borderWarning = null!;
     internal TextBlock tbWarningMessage = null!;
@@ -134,6 +135,7 @@ public partial class MainWindow : Window
                     cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
                     cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
                     cbRunAsAdmin = (System.Windows.Controls.CheckBox)root.FindName("cbRunAsAdmin");
+                    cbSoundFeedback = (System.Windows.Controls.CheckBox)root.FindName("cbSoundFeedback");
                     tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
                     borderWarning = (Border)root.FindName("borderWarning");
                     tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
@@ -214,6 +216,11 @@ public partial class MainWindow : Window
             cbRunAsAdmin.Checked += CbRunAsAdmin_Checked;
             cbRunAsAdmin.Unchecked += CbRunAsAdmin_Unchecked;
         }
+        if (cbSoundFeedback != null)
+        {
+            cbSoundFeedback.Checked += CbSoundFeedback_Checked;
+            cbSoundFeedback.Unchecked += CbSoundFeedback_Unchecked;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -280,6 +287,10 @@ public partial class MainWindow : Window
         if (cbRunAsAdmin != null)
         {
             cbRunAsAdmin.IsChecked = AdminManager.IsRunAsAdminConfigured() || appSettings.RunAsAdmin;
+        }
+        if (cbSoundFeedback != null)
+        {
+            cbSoundFeedback.IsChecked = appSettings.PlaySoundFeedback;
         }
         SetLightMode(appSettings.LightMode);
         DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
@@ -376,7 +387,10 @@ public partial class MainWindow : Window
 
     private void AudioController_MuteStateChanged(object? sender, MuteStateChangedEventArgs e)
     {
-        AudioFeedback.Play(e.IsMuted);
+        if (SettingsManager.Load().PlaySoundFeedback)
+        {
+            AudioFeedback.Play(e.IsMuted);
+        }
         Dispatcher.BeginInvoke((Action)delegate
         {
             UpdateMuteStateUI(e.IsMuted);
@@ -713,6 +727,18 @@ public partial class MainWindow : Window
         if (!_isInitialized) return;
         AdminManager.SetRunAsAdmin(false);
         SettingsManager.Save(SettingsManager.Load() with { RunAsAdmin = false });
+    }
+
+    private void CbSoundFeedback_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_isInitialized) return;
+        SettingsManager.Save(SettingsManager.Load() with { PlaySoundFeedback = true });
+    }
+
+    private void CbSoundFeedback_Unchecked(object sender, RoutedEventArgs e)
+    {
+        if (!_isInitialized) return;
+        SettingsManager.Save(SettingsManager.Load() with { PlaySoundFeedback = false });
     }
 
     private void SetLightMode(bool isLight)

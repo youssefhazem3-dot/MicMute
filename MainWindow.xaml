@@ -885,6 +885,26 @@
                                       Checked="CbRunAsAdmin_Checked"
                                       Unchecked="CbRunAsAdmin_Unchecked" />
                         </Grid>
+
+                        <Separator Background="{DynamicResource BorderBrush}" Margin="0,10,0,10" />
+
+                        <!-- Audio Chime Feedback Option -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Sound Effects (Audio Chime)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
+                                <TextBlock Text="Play acoustic click when muting and unmuting" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <CheckBox x:Name="cbSoundFeedback"
+                                      Grid.Column="1"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      VerticalAlignment="Center"
+                                      Checked="CbSoundFeedback_Checked"
+                                      Unchecked="CbSoundFeedback_Unchecked" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 
