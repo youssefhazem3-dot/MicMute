@@ -23,4 +23,6 @@ public sealed record AppSettings
     public string CustomDataPath { get; init; } = string.Empty;
 
     public bool UsePortableMode { get; init; }
+
+    public bool RunAsAdmin { get; init; }
 }

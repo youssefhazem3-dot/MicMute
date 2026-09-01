@@ -42,9 +42,11 @@ public partial class MainWindow : Window
     internal System.Windows.Controls.CheckBox cbStartup = null!;
     internal System.Windows.Controls.CheckBox cbStartMinimized = null!;
     internal System.Windows.Controls.CheckBox cbLightMode = null!;
+    internal System.Windows.Controls.CheckBox cbRunAsAdmin = null!;
     internal TextBlock tbStoragePath = null!;
     internal Border borderWarning = null!;
     internal TextBlock tbWarningMessage = null!;
+    internal System.Windows.Controls.Image imgAppIcon = null!;
 
     private const int WM_DEVICECHANGE = 0x0219;
     private const int WM_NCLBUTTONDOWN = 0x00A1;
@@ -66,6 +68,12 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint msg, uint action, IntPtr pChangeFilterStruct);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ChangeWindowMessageFilter(uint msg, uint action);
 
     public MainWindow(AudioController audioController)
     {
@@ -125,6 +133,7 @@ public partial class MainWindow : Window
                     cbStartup = (System.Windows.Controls.CheckBox)root.FindName("cbStartup");
                     cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
                     cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
+                    cbRunAsAdmin = (System.Windows.Controls.CheckBox)root.FindName("cbRunAsAdmin");
                     tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
                     borderWarning = (Border)root.FindName("borderWarning");
                     tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
@@ -144,6 +153,7 @@ public partial class MainWindow : Window
                     if (btnResetData != null) btnResetData.Click += BtnResetSettings_Click;
 
                     var imgIcon = (System.Windows.Controls.Image)root.FindName("imgAppIcon");
+                    imgAppIcon = imgIcon;
                     if (imgIcon != null)
                     {
                         try
@@ -199,12 +209,23 @@ public partial class MainWindow : Window
             cbLightMode.Checked += CbLightMode_Checked;
             cbLightMode.Unchecked += CbLightMode_Unchecked;
         }
+        if (cbRunAsAdmin != null)
+        {
+            cbRunAsAdmin.Checked += CbRunAsAdmin_Checked;
+            cbRunAsAdmin.Unchecked += CbRunAsAdmin_Unchecked;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
         WindowInteropHelper windowInteropHelper = new WindowInteropHelper(this);
+        try
+        {
+            ChangeWindowMessageFilter((uint)WM_SHOWME, 1);
+            ChangeWindowMessageFilterEx(windowInteropHelper.Handle, (uint)WM_SHOWME, 1, IntPtr.Zero);
+        }
+        catch { }
         HwndSource.FromHwnd(windowInteropHelper.Handle)?.AddHook(HwndMessageHook);
         _hotkeyManager = new HotkeyManager(windowInteropHelper.Handle);
         _hotkeyManager.HotkeyPressed += HotkeyManager_HotkeyPressed;
@@ -256,9 +277,24 @@ public partial class MainWindow : Window
         sliderOsdDuration.Value = appSettings.OsdDuration;
         txtOsdDuration.Text = $"{appSettings.OsdDuration:F1}";
         cbLightMode.IsChecked = appSettings.LightMode;
+        if (cbRunAsAdmin != null)
+        {
+            cbRunAsAdmin.IsChecked = AdminManager.IsRunAsAdminConfigured() || appSettings.RunAsAdmin;
+        }
         SetLightMode(appSettings.LightMode);
         DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
         tbStoragePath.Text = SettingsManager.GetDataFolderPath();
+
+        if (AdminManager.IsRunningAsAdmin())
+        {
+            imgAppIcon.ToolTip = "Mic Mute (Administrator - Game Mode Active)";
+            tbStatusText.ToolTip = "Administrator Mode Active: In-game hotkeys enabled for Valorant";
+        }
+        else
+        {
+            imgAppIcon.ToolTip = "Mic Mute (Standard User)";
+            tbStatusText.ToolTip = "Tip: Enable 'Run as Administrator' below to use hotkeys inside Valorant";
+        }
 
         if (StartupManager.IsStartupEnabled() != appSettings.RunOnStartup)
         {
@@ -648,6 +684,34 @@ public partial class MainWindow : Window
                 LightMode = false
             });
         }
+    }
+
+    private void CbRunAsAdmin_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_isInitialized) return;
+        AdminManager.SetRunAsAdmin(true);
+        SettingsManager.Save(SettingsManager.Load() with { RunAsAdmin = true });
+
+        if (!AdminManager.IsRunningAsAdmin())
+        {
+            var res = System.Windows.MessageBox.Show(
+                "Run as Administrator has been enabled for Valorant and in-game hotkey support.\n\nWould you like to restart MicMute as Administrator now to apply it immediately?",
+                "Restart as Administrator",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res == MessageBoxResult.Yes)
+            {
+                AdminManager.RestartAsAdmin();
+            }
+        }
+    }
+
+    private void CbRunAsAdmin_Unchecked(object sender, RoutedEventArgs e)
+    {
+        if (!_isInitialized) return;
+        AdminManager.SetRunAsAdmin(false);
+        SettingsManager.Save(SettingsManager.Load() with { RunAsAdmin = false });
     }
 
     private void SetLightMode(bool isLight)

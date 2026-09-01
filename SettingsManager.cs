@@ -27,7 +27,8 @@ public static class SettingsManager
         sb.AppendLine($"  \"OsdDuration\": {s.OsdDuration.ToString(System.Globalization.CultureInfo.InvariantCulture)},");
         sb.AppendLine($"  \"LightMode\": {(s.LightMode ? "true" : "false")},");
         sb.AppendLine($"  \"CustomDataPath\": \"{Escape(s.CustomDataPath)}\",");
-        sb.AppendLine($"  \"UsePortableMode\": {(s.UsePortableMode ? "true" : "false")}");
+        sb.AppendLine($"  \"UsePortableMode\": {(s.UsePortableMode ? "true" : "false")},");
+        sb.AppendLine($"  \"RunAsAdmin\": {(s.RunAsAdmin ? "true" : "false")}");
         sb.Append("}");
         return sb.ToString();
     }
@@ -44,6 +45,7 @@ public static class SettingsManager
         bool lightMode = false;
         string customDataPath = "";
         bool usePortableMode = false;
+        bool runAsAdmin = false;
 
         foreach (var rawLine in json.Split(new[] { '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -70,6 +72,7 @@ public static class SettingsManager
                 case "LightMode": bool.TryParse(val, out lightMode); break;
                 case "CustomDataPath": customDataPath = Unescape(val); break;
                 case "UsePortableMode": bool.TryParse(val, out usePortableMode); break;
+                case "RunAsAdmin": bool.TryParse(val, out runAsAdmin); break;
             }
         }
 
@@ -84,7 +87,8 @@ public static class SettingsManager
             OsdDuration = osdDuration,
             LightMode = lightMode,
             CustomDataPath = customDataPath,
-            UsePortableMode = usePortableMode
+            UsePortableMode = usePortableMode,
+            RunAsAdmin = runAsAdmin
         };
     }
 

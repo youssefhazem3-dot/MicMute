@@ -860,6 +860,31 @@
                                       Checked="CbLightMode_Checked"
                                       Unchecked="CbLightMode_Unchecked" />
                         </Grid>
+
+                        <Separator Background="{DynamicResource BorderBrush}" Margin="0,10,0,10" />
+
+                        <!-- Run as Administrator / Game Mode Option -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
+                                    <Border Background="#1E3A8A" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="VALORANT / GAMES" Foreground="#60A5FA" FontSize="9" FontWeight="Bold" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Enables hotkeys over games and elevated windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <CheckBox x:Name="cbRunAsAdmin"
+                                      Grid.Column="1"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      VerticalAlignment="Center"
+                                      Checked="CbRunAsAdmin_Checked"
+                                      Unchecked="CbRunAsAdmin_Unchecked" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 
