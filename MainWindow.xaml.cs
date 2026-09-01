@@ -376,6 +376,7 @@ public partial class MainWindow : Window
 
     private void AudioController_MuteStateChanged(object? sender, MuteStateChangedEventArgs e)
     {
+        AudioFeedback.Play(e.IsMuted);
         Dispatcher.BeginInvoke((Action)delegate
         {
             UpdateMuteStateUI(e.IsMuted);
