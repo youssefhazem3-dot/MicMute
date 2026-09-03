@@ -67,20 +67,16 @@ public static class AdminManager
                 string exePath = GetExecutablePath();
                 if (enable)
                 {
-                    key.SetValue(exePath, "~ RUNASADMIN");
-
-                    string rootPath = @"e:\MicMute\MicMute.exe";
-                    string pubPath = @"e:\MicMute\publish\MicMute.exe";
-                    if (File.Exists(rootPath)) key.SetValue(rootPath, "~ RUNASADMIN");
-                    if (File.Exists(pubPath)) key.SetValue(pubPath, "~ RUNASADMIN");
+                    string existing = key.GetValue(exePath) as string ?? string.Empty;
+                    if (!existing.Contains("RUNASADMIN", StringComparison.OrdinalIgnoreCase))
+                        key.SetValue(exePath, (string.IsNullOrWhiteSpace(existing) ? "~" : existing) + " RUNASADMIN");
                 }
                 else
                 {
-                    key.DeleteValue(exePath, throwOnMissingValue: false);
-                    string rootPath = @"e:\MicMute\MicMute.exe";
-                    string pubPath = @"e:\MicMute\publish\MicMute.exe";
-                    key.DeleteValue(rootPath, throwOnMissingValue: false);
-                    key.DeleteValue(pubPath, throwOnMissingValue: false);
+                    string existing = key.GetValue(exePath) as string ?? string.Empty;
+                    string remaining = System.Text.RegularExpressions.Regex.Replace(existing, @"\bRUNASADMIN\b", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+                    if (remaining.Length == 0 || remaining == "~") key.DeleteValue(exePath, throwOnMissingValue: false);
+                    else key.SetValue(exePath, remaining);
                 }
             }
         }
@@ -94,14 +90,17 @@ public static class AdminManager
         try
         {
             string exePath = GetExecutablePath();
+            SettingsManager.Flush();
             var startInfo = new ProcessStartInfo
             {
                 FileName = exePath,
                 UseShellExecute = true,
-                Verb = "runas"
+                Verb = "runas",
+                Arguments = UiBehavior.BuildRestartArguments(Environment.ProcessId, showWindow: true)
             };
 
-            Process.Start(startInfo);
+            using Process? replacement = Process.Start(startInfo);
+            if (replacement == null) return false;
             System.Windows.Application.Current.Shutdown();
             return true;
         }

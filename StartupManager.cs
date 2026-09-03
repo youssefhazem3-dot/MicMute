@@ -15,13 +15,13 @@ public static class StartupManager
 	{
 		try
 		{
-			using RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", writable: true);
+			using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", writable: true);
 			if (registryKey != null)
 			{
 				if (runOnStartup)
 				{
 					string text = Process.GetCurrentProcess().MainModule?.FileName ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MicMute.exe");
-					string value = "\"" + text + "\" --minimized";
+                    string value = "\"" + text + "\"";
 					registryKey.SetValue("MicMute", value);
 				}
 				else if (registryKey.GetValue("MicMute") != null)
@@ -39,7 +39,7 @@ public static class StartupManager
 	{
 		try
 		{
-			using RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", writable: false);
+			using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", writable: false);
 			if (registryKey == null)
 			{
 				return false;

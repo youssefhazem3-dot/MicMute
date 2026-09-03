@@ -1,34 +1,22 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace MicMute;
 
 public class HotkeyManager : IDisposable
 {
-    private const int WM_HOTKEY = 0x0312;
     private const int WM_INPUT = 0x00FF;
-    private const int HOTKEY_BASE_ID = 9000;
-
-    private const uint MOD_ALT = 0x0001;
-    private const uint MOD_CONTROL = 0x0002;
-    private const uint MOD_SHIFT = 0x0004;
-    private const uint MOD_WIN = 0x0008;
-    private const uint MOD_NOREPEAT = 0x4000;
 
     private const int WH_KEYBOARD_LL = 13;
     private const int WM_KEYDOWN = 0x0100;
     private const int WM_SYSKEYDOWN = 0x0104;
 
-    private const uint MSGFLT_ADD = 1;
-    private const uint MSGFLT_ALLOW = 1;
-
     private const uint RID_INPUT = 0x10000003;
     private const uint RIDEV_INPUTSINK = 0x00000100;
-    private const int RIM_TYPEKEYBOARD = 1;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RAWINPUTDEVICE
@@ -39,39 +27,7 @@ public class HotkeyManager : IDisposable
         public IntPtr hwndTarget;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RAWINPUTHEADER
-    {
-        public uint dwType;
-        public uint dwSize;
-        public IntPtr hDevice;
-        public IntPtr wParam;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RAWKEYBOARD
-    {
-        public ushort MakeCode;
-        public ushort Flags;
-        public ushort Reserved;
-        public ushort VKey;
-        public uint Message;
-        public uint ExtraInformation;
-    }
-
     private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint msg, uint action, IntPtr pChangeFilterStruct);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool ChangeWindowMessageFilter(uint msg, uint action);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
@@ -95,286 +51,170 @@ public class HotkeyManager : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint GetRawInputData(IntPtr hRawInput, uint uiCommand, IntPtr pData, ref uint pcbSize, uint cbSizeHeader);
 
+    [DllImport("user32.dll")]
+    private static extern int GetMessageTime();
+
     private readonly IntPtr _hWnd;
     private HwndSource? _hwndSource;
+    private readonly HotkeyState _state = new();
+    private readonly HotkeyModifiers _hookModifiers = new();
+    private readonly HotkeyModifiers _rawModifiers = new();
+    private readonly AutoResetEvent _pollWake = new(false);
+    private readonly LowLevelKeyboardProc _proc;
+    private readonly Thread _pollingThread;
+    private IntPtr _hookId;
+    private IntPtr _rawInputBuffer;
+    private int _currentVk;
     private Key _currentKey;
     private ModifierKeys _currentModifiers;
-    private int _currentVk;
-    private IntPtr _hookId = IntPtr.Zero;
-    private readonly LowLevelKeyboardProc _proc;
-    private DateTime _lastTriggerTime = DateTime.MinValue;
-
-    private Thread? _pollingThread;
-    private volatile bool _isPolling;
-    private bool _wasKeyDown;
+    private int _bindingVersion;
+    private volatile bool _disposed;
 
     public event Action? HotkeyPressed;
 
     public HotkeyManager(IntPtr hWnd)
     {
         _hWnd = hWnd;
-        _hwndSource = HwndSource.FromHwnd(_hWnd);
-        _hwndSource?.AddHook(HwndHook);
-
-        // 1. Allow WM_HOTKEY and WM_INPUT through UIPI security filter from elevated games
-        try
-        {
-            ChangeWindowMessageFilter(WM_HOTKEY, MSGFLT_ADD);
-            ChangeWindowMessageFilterEx(_hWnd, WM_HOTKEY, MSGFLT_ALLOW, IntPtr.Zero);
-            ChangeWindowMessageFilter(WM_INPUT, MSGFLT_ADD);
-            ChangeWindowMessageFilterEx(_hWnd, WM_INPUT, MSGFLT_ALLOW, IntPtr.Zero);
-        }
-        catch
-        {
-        }
-
-        // 2. Register Raw Input Sink for background hardware monitoring (bypasses window message hooks)
-        try
-        {
-            RAWINPUTDEVICE[] rid = new RAWINPUTDEVICE[1];
-            rid[0].usUsagePage = 0x01; // Generic desktop controls
-            rid[0].usUsage = 0x06;     // Keyboard
-            rid[0].dwFlags = RIDEV_INPUTSINK;
-            rid[0].hwndTarget = _hWnd;
-            RegisterRawInputDevices(rid, (uint)rid.Length, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
-        }
-        catch
-        {
-        }
-
-        // 3. Install Low-Level Keyboard Hook
+        _hwndSource = HwndSource.FromHwnd(hWnd) ?? throw new ArgumentException("A live window handle is required.", nameof(hWnd));
         _proc = HookCallback;
+        _rawInputBuffer = Marshal.AllocHGlobal(128);
+        _hookModifiers.Reset(IsKeyDown);
+        _rawModifiers.Reset(IsKeyDown);
+        _hwndSource.AddHook(HwndHook);
+        RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_INPUTSINK, hwndTarget = hWnd } },
+            1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
         InstallHook();
-
-        // 4. Start dedicated high-priority GetAsyncKeyState polling thread (immune to game window hooks)
-        StartPolling();
-    }
-
-    private void StartPolling()
-    {
-        if (_isPolling) return;
-        _isPolling = true;
-        _pollingThread = new Thread(PollLoop)
-        {
-            IsBackground = true,
-            Priority = ThreadPriority.Highest,
-            Name = "MicMute_HardwareInputPoller"
-        };
+        _pollingThread = new Thread(PollLoop) { IsBackground = true, Priority = ThreadPriority.Normal, Name = "MicMute_InputPoller" };
         _pollingThread.Start();
-    }
-
-    private void StopPolling()
-    {
-        _isPolling = false;
-        _pollingThread = null;
-    }
-
-    private void PollLoop()
-    {
-        while (_isPolling)
-        {
-            int vk = _currentVk;
-            if (vk != 0)
-            {
-                short state = GetAsyncKeyState(vk);
-                bool isDown = (state & 0x8000) != 0;
-
-                if (isDown && !_wasKeyDown)
-                {
-                    _wasKeyDown = true;
-                    if (CheckModifiersMatch(_currentModifiers))
-                    {
-                        TriggerHotKey();
-                    }
-                }
-                else if (!isDown && _wasKeyDown)
-                {
-                    _wasKeyDown = false;
-                }
-            }
-
-            Thread.Sleep(12); // ~80 Hz polling interval, negligible CPU usage
-        }
-    }
-
-    private void InstallHook()
-    {
-        if (_hookId != IntPtr.Zero) return;
-        try
-        {
-            using var curProcess = Process.GetCurrentProcess();
-            using var curModule = curProcess.MainModule;
-            IntPtr modHandle = curModule != null ? GetModuleHandle(curModule.ModuleName) : IntPtr.Zero;
-            _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, modHandle, 0);
-        }
-        catch
-        {
-        }
-    }
-
-    private void UninstallHook()
-    {
-        if (_hookId != IntPtr.Zero)
-        {
-            UnhookWindowsHookEx(_hookId);
-            _hookId = IntPtr.Zero;
-        }
     }
 
     public bool Register(Key key, ModifierKeys modifiers)
     {
-        Unregister();
-
+        if (_disposed) return false;
         int vk = KeyInterop.VirtualKeyFromKey(key);
-        _currentVk = vk;
+        if (vk <= 0 || vk >= 255 || ((int)modifiers & ~15) != 0) return false;
+        if (Volatile.Read(ref _currentVk) != 0 && _currentKey == key && _currentModifiers == modifiers) return true;
+
+        // Observe the chord without reserving it with Windows. The foreground application
+        // must still receive the original key and perform its normal action (e.g. Ctrl+C).
+        Interlocked.Increment(ref _bindingVersion);
         _currentKey = key;
         _currentModifiers = modifiers;
-
-        bool anySuccess = false;
-
-        // Base registration
-        uint fsModifiers = MOD_NOREPEAT;
-        if (modifiers.HasFlag(ModifierKeys.Alt)) fsModifiers |= MOD_ALT;
-        if (modifiers.HasFlag(ModifierKeys.Control)) fsModifiers |= MOD_CONTROL;
-        if (modifiers.HasFlag(ModifierKeys.Shift)) fsModifiers |= MOD_SHIFT;
-        if (modifiers.HasFlag(ModifierKeys.Windows)) fsModifiers |= MOD_WIN;
-
-        if (RegisterHotKey(_hWnd, HOTKEY_BASE_ID, fsModifiers, (uint)vk))
-        {
-            anySuccess = true;
-        }
-
-        // If no modifiers specified (e.g. single key like ~ or F1), also register with Shift and Ctrl
-        // so walking (holding Shift) or crouching (holding Ctrl) in games like Valorant doesn't block the hotkey!
-        if (modifiers == ModifierKeys.None)
-        {
-            RegisterHotKey(_hWnd, HOTKEY_BASE_ID + 1, MOD_NOREPEAT | MOD_SHIFT, (uint)vk);
-            RegisterHotKey(_hWnd, HOTKEY_BASE_ID + 2, MOD_NOREPEAT | MOD_CONTROL, (uint)vk);
-            RegisterHotKey(_hWnd, HOTKEY_BASE_ID + 3, MOD_NOREPEAT | MOD_SHIFT | MOD_CONTROL, (uint)vk);
-        }
-
+        _hookModifiers.Reset(IsKeyDown);
+        _rawModifiers.Reset(IsKeyDown);
+        _state.Register(vk, modifiers, IsKeyDown(vk), TickNow);
+        Volatile.Write(ref _currentVk, vk);
         InstallHook();
-        return anySuccess;
+        _pollWake.Set();
+        return true;
     }
 
     public void Unregister()
     {
-        UnregisterHotKey(_hWnd, HOTKEY_BASE_ID);
-        UnregisterHotKey(_hWnd, HOTKEY_BASE_ID + 1);
-        UnregisterHotKey(_hWnd, HOTKEY_BASE_ID + 2);
-        UnregisterHotKey(_hWnd, HOTKEY_BASE_ID + 3);
-        _currentVk = 0;
+        Interlocked.Increment(ref _bindingVersion);
+        _state.Unregister();
+        Volatile.Write(ref _currentVk, 0);
+    }
+
+    private static uint TickNow => unchecked((uint)Environment.TickCount);
+    private static bool IsKeyDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
+    private static ModifierKeys PhysicalModifiers() =>
+        (IsKeyDown(0x11) ? ModifierKeys.Control : ModifierKeys.None) |
+        (IsKeyDown(0x12) ? ModifierKeys.Alt : ModifierKeys.None) |
+        (IsKeyDown(0x10) ? ModifierKeys.Shift : ModifierKeys.None) |
+        (IsKeyDown(0x5B) || IsKeyDown(0x5C) ? ModifierKeys.Windows : ModifierKeys.None);
+
+    private void PollLoop()
+    {
+        while (!_disposed)
+        {
+            int vk = Volatile.Read(ref _currentVk);
+            int version = Volatile.Read(ref _bindingVersion);
+            if (vk != 0 && _state.Poll(vk, IsKeyDown(vk), PhysicalModifiers(), TickNow))
+                QueueActivation(version);
+            _pollWake.WaitOne(vk == 0 ? Timeout.Infinite : 16);
+        }
+    }
+
+    private void QueueActivation(int version)
+    {
+        HwndSource? source = _hwndSource;
+        if (_disposed || source == null || source.Dispatcher.HasShutdownStarted) return;
+        try
+        {
+            source.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                if (!_disposed && version == Volatile.Read(ref _bindingVersion)) HotkeyPressed?.Invoke();
+            }));
+        }
+        catch (InvalidOperationException) { }
+    }
+
+    private void InstallHook()
+    {
+        if (_disposed || _hookId != IntPtr.Zero) return;
+        _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
+        if (!_disposed && nCode >= 0 && lParam != IntPtr.Zero)
         {
-            int vkCode = Marshal.ReadInt32(lParam);
-            if (_currentVk != 0 && vkCode == _currentVk)
+            int message = wParam.ToInt32();
+            bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
+            if (down || message == 0x101 || message == 0x105)
             {
-                if (CheckModifiersMatch(_currentModifiers))
-                {
-                    TriggerHotKey();
-                }
+                int vk = Marshal.ReadInt32(lParam);
+                uint timestamp = unchecked((uint)Marshal.ReadInt32(lParam, 12));
+                _hookModifiers.Observe(vk, down);
+                int version = Volatile.Read(ref _bindingVersion);
+                if (_state.Observe(HotkeySource.Hook, vk, down, _hookModifiers.Current, timestamp))
+                    QueueActivation(version);
             }
         }
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
     }
 
-    private static bool CheckModifiersMatch(ModifierKeys modifiers)
-    {
-        bool ctrlPressed = (GetAsyncKeyState(0x11) & 0x8000) != 0; // VK_CONTROL
-        bool altPressed = (GetAsyncKeyState(0x12) & 0x8000) != 0;  // VK_MENU
-        bool shiftPressed = (GetAsyncKeyState(0x10) & 0x8000) != 0;// VK_SHIFT
-        bool winPressed = (GetAsyncKeyState(0x5B) & 0x8000) != 0 || (GetAsyncKeyState(0x5C) & 0x8000) != 0; // VK_LWIN / VK_RWIN
-
-        // If no modifier is required (e.g. single key like ~ or F1), do NOT block the hotkey
-        // if user is holding Shift (walking) or Ctrl (crouching) in Valorant!
-        if (modifiers == ModifierKeys.None)
-        {
-            return !altPressed && !winPressed;
-        }
-
-        bool reqCtrl = modifiers.HasFlag(ModifierKeys.Control);
-        bool reqAlt = modifiers.HasFlag(ModifierKeys.Alt);
-        bool reqShift = modifiers.HasFlag(ModifierKeys.Shift);
-        bool reqWin = modifiers.HasFlag(ModifierKeys.Windows);
-
-        return ctrlPressed == reqCtrl && altPressed == reqAlt && shiftPressed == reqShift && winPressed == reqWin;
-    }
-
-    private void TriggerHotKey()
-    {
-        var now = DateTime.UtcNow;
-        if ((now - _lastTriggerTime).TotalMilliseconds < 220)
-        {
-            return; // Debounce multi-engine triggers
-        }
-        _lastTriggerTime = now;
-        HotkeyPressed?.Invoke();
-    }
-
     private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        // Engine 1: Win32 WM_HOTKEY
-        if (msg == WM_HOTKEY && (wParam.ToInt32() >= HOTKEY_BASE_ID && wParam.ToInt32() <= HOTKEY_BASE_ID + 3))
+        if (_disposed) return IntPtr.Zero;
+        int version = Volatile.Read(ref _bindingVersion);
+        if (msg == WM_INPUT && _rawInputBuffer != IntPtr.Zero)
         {
-            TriggerHotKey();
-            handled = true;
-            return IntPtr.Zero;
-        }
-
-        // Engine 2: Raw Input WM_INPUT (captures exclusive fullscreen game inputs)
-        if (msg == WM_INPUT)
-        {
-            try
+            uint size = 128;
+            uint bytes = GetRawInputData(lParam, RID_INPUT, _rawInputBuffer, ref size, (uint)RawKeyboardPacket.HeaderSize);
+            if (RawKeyboardPacket.TryRead(_rawInputBuffer, bytes, size, 128, out int vk, out bool down))
             {
-                uint dwSize = 0;
-                int headerSize = Marshal.SizeOf<RAWINPUTHEADER>();
-                GetRawInputData(lParam, RID_INPUT, IntPtr.Zero, ref dwSize, (uint)headerSize);
-                if (dwSize > 0)
-                {
-                    IntPtr buffer = Marshal.AllocHGlobal((int)dwSize);
-                    try
-                    {
-                        if (GetRawInputData(lParam, RID_INPUT, buffer, ref dwSize, (uint)headerSize) == dwSize)
-                        {
-                            RAWINPUTHEADER header = Marshal.PtrToStructure<RAWINPUTHEADER>(buffer);
-                            if (header.dwType == RIM_TYPEKEYBOARD)
-                            {
-                                RAWKEYBOARD kbd = Marshal.PtrToStructure<RAWKEYBOARD>(new IntPtr(buffer.ToInt64() + headerSize));
-                                // (Flags & 1) == 0 means KeyDown (RI_KEY_MAKE)
-                                if ((kbd.Flags & 1) == 0 && _currentVk != 0 && kbd.VKey == _currentVk)
-                                {
-                                    if (CheckModifiersMatch(_currentModifiers))
-                                    {
-                                        TriggerHotKey();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        Marshal.FreeHGlobal(buffer);
-                    }
-                }
-            }
-            catch
-            {
+                _rawModifiers.Observe(vk, down);
+                if (_state.Observe(HotkeySource.RawInput, vk, down, _rawModifiers.Current, unchecked((uint)GetMessageTime())))
+                    QueueActivation(version);
             }
         }
-
         return IntPtr.Zero;
     }
 
     public void Dispose()
     {
-        StopPolling();
+        if (_disposed) return;
+        _disposed = true;
         Unregister();
-        UninstallHook();
+        _pollWake.Set();
+        _pollingThread.Join();
+        _pollWake.Dispose();
+        if (_hookId != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(_hookId);
+            _hookId = IntPtr.Zero;
+        }
+        RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = 1, hwndTarget = IntPtr.Zero } },
+            1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
         _hwndSource?.RemoveHook(HwndHook);
         _hwndSource = null;
+        if (_rawInputBuffer != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(_rawInputBuffer);
+            _rawInputBuffer = IntPtr.Zero;
+        }
     }
 }

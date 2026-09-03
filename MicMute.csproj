@@ -9,18 +9,27 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <StartupObject>MicMute.App</StartupObject>
     <RootNamespace>MicMute</RootNamespace>
     <AssemblyName>MicMute</AssemblyName>
 
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+    <Compile Remove=".artifacts/**/*.cs" />
+    <Compile Remove=".tools/**/*.cs" />
+    <EmbeddedResource Include="App.xaml" LogicalName="MicMute.App.xaml" />
+    <EmbeddedResource Include="MainWindow.xaml" LogicalName="MicMute.MainWindow.xaml" />
+    <EmbeddedResource Include="OsdWindow.xaml" LogicalName="MicMute.OsdWindow.xaml" />
+    <EmbeddedResource Include="app.ico" LogicalName="MicMute.app.ico" />
     <Content Include="app.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

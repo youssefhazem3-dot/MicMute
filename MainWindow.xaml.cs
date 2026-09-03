@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -27,6 +28,9 @@ public partial class MainWindow : Window
     private bool _isInitialized;
     private bool _isUpdatingOsdTextFromSlider;
     private bool _contentLoaded;
+    private bool _isReloadingSettings;
+    private bool _isDisposed;
+    private readonly DispatcherDebouncer _deviceRefreshDebouncer;
 
     internal System.Windows.Controls.Button btnStateToggle = null!;
     internal TextBlock tbStatusText = null!;
@@ -79,10 +83,12 @@ public partial class MainWindow : Window
     public MainWindow(AudioController audioController)
     {
         InitializeComponent();
+        _deviceRefreshDebouncer = new DispatcherDebouncer(Dispatcher);
         _audioController = audioController;
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
         _audioController.DevicesChanged += AudioController_DevicesChanged;
         _audioController.WarningNotification += AudioController_WarningNotification;
+        SettingsManager.SaveFailed += SettingsManager_SaveFailed;
         new WindowInteropHelper(this).EnsureHandle();
         RefreshDeviceList();
         LoadSettingsIntoUI();
@@ -108,6 +114,7 @@ public partial class MainWindow : Window
                     root = (Window)XamlReader.Parse(xaml);
                     
                     this.Resources = root.Resources;
+                    this.Title = root.Title;
                     this.Width = root.Width;
                     if (!double.IsNaN(root.Height)) this.Height = root.Height;
                     this.SizeToContent = root.SizeToContent;
@@ -259,42 +266,51 @@ public partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
-    private async void TriggerDevicesChanged()
+    private void ScheduleDeviceRefresh(int delayMs)
     {
-        try
+        if (!_isDisposed)
         {
-            await Task.Delay(1200);
-            _audioController?.ForceUpdateActiveDevice();
-            await Dispatcher.InvokeAsync((Action)delegate
+            _deviceRefreshDebouncer.Schedule(TimeSpan.FromMilliseconds(delayMs), () =>
             {
+                _audioController.ForceUpdateActiveDevice();
                 RefreshDeviceList();
             });
         }
-        catch (Exception)
-        {
-        }
+    }
+
+    private void TriggerDevicesChanged()
+    {
+        ScheduleDeviceRefresh(1000);
     }
 
     private void LoadSettingsIntoUI()
     {
         AppSettings appSettings = SettingsManager.Load();
-        cbStartup.IsChecked = appSettings.RunOnStartup;
-        cbStartMinimized.IsChecked = appSettings.StartMinimized;
-        cbEnableOsd.IsChecked = appSettings.EnableOsd;
-        sliderOsdDuration.Value = appSettings.OsdDuration;
-        txtOsdDuration.Text = $"{appSettings.OsdDuration:F1}";
-        cbLightMode.IsChecked = appSettings.LightMode;
-        if (cbRunAsAdmin != null)
+        _isReloadingSettings = true;
+        try
         {
-            cbRunAsAdmin.IsChecked = AdminManager.IsRunAsAdminConfigured() || appSettings.RunAsAdmin;
+            cbStartup.IsChecked = appSettings.RunOnStartup;
+            cbStartMinimized.IsChecked = appSettings.StartMinimized;
+            cbEnableOsd.IsChecked = appSettings.EnableOsd;
+            sliderOsdDuration.Value = appSettings.OsdDuration;
+            txtOsdDuration.Text = UiBehavior.FormatOsdDuration(appSettings.OsdDuration, CultureInfo.CurrentCulture);
+            cbLightMode.IsChecked = appSettings.LightMode;
+            if (cbRunAsAdmin != null)
+            {
+                cbRunAsAdmin.IsChecked = appSettings.RunAsAdmin;
+            }
+            if (cbSoundFeedback != null)
+            {
+                cbSoundFeedback.IsChecked = appSettings.PlaySoundFeedback;
+            }
+            SetLightMode(appSettings.LightMode);
+            DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
+            tbStoragePath.Text = SettingsManager.GetDataFolderPath();
         }
-        if (cbSoundFeedback != null)
+        finally
         {
-            cbSoundFeedback.IsChecked = appSettings.PlaySoundFeedback;
+            _isReloadingSettings = false;
         }
-        SetLightMode(appSettings.LightMode);
-        DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
-        tbStoragePath.Text = SettingsManager.GetDataFolderPath();
 
         if (AdminManager.IsRunningAsAdmin())
         {
@@ -307,9 +323,37 @@ public partial class MainWindow : Window
             tbStatusText.ToolTip = "Tip: Enable 'Run as Administrator' below to use hotkeys inside Valorant";
         }
 
-        if (StartupManager.IsStartupEnabled() != appSettings.RunOnStartup)
+    }
+
+    private void ApplySettingsToRuntime(AppSettings settings)
+    {
+        _audioController.SetTargetDevice(settings.SelectedDeviceId);
+        StartupManager.SetStartup(settings.RunOnStartup);
+        AdminManager.SetRunAsAdmin(settings.RunAsAdmin);
+        _hotkeyManager?.Unregister();
+        if (!RegisterGlobalHotkey(settings.Hotkey, settings.HotkeyModifiers))
+            throw new InvalidOperationException("The shortcut could not be configured. Choose a different key.");
+        SetLightMode(settings.LightMode);
+    }
+
+    private void SettingsManager_SaveFailed(object? sender, string message)
+    {
+        if (_isDisposed || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
         {
-            StartupManager.SetStartup(appSettings.RunOnStartup);
+            return;
+        }
+        try
+        {
+            Dispatcher.BeginInvoke((Action)delegate
+            {
+                if (!_isDisposed)
+                {
+                    ShowTemporaryStatus("Could not save settings: " + message);
+                }
+            });
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 
@@ -387,12 +431,14 @@ public partial class MainWindow : Window
 
     private void AudioController_MuteStateChanged(object? sender, MuteStateChangedEventArgs e)
     {
-        if (SettingsManager.Load().PlaySoundFeedback)
+        if (_isDisposed || Dispatcher.HasShutdownStarted) return;
+        if (e.ShowOsd && SettingsManager.Load().PlaySoundFeedback)
         {
             AudioFeedback.Play(e.IsMuted);
         }
         Dispatcher.BeginInvoke((Action)delegate
         {
+            if (_isDisposed) return;
             UpdateMuteStateUI(e.IsMuted);
             if (string.IsNullOrEmpty(_audioController.CurrentDeviceId))
             {
@@ -419,20 +465,9 @@ public partial class MainWindow : Window
         });
     }
 
-    private async void AudioController_DevicesChanged(object? sender, EventArgs e)
+    private void AudioController_DevicesChanged(object? sender, EventArgs e)
     {
-        try
-        {
-            await Task.Delay(800);
-            _audioController?.ForceUpdateActiveDevice();
-            await Dispatcher.InvokeAsync((Action)delegate
-            {
-                RefreshDeviceList();
-            });
-        }
-        catch (Exception)
-        {
-        }
+        ScheduleDeviceRefresh(800);
     }
 
     private void AudioController_WarningNotification(object? sender, string message)
@@ -487,6 +522,7 @@ public partial class MainWindow : Window
 
     private void StartRecordingHotkey()
     {
+        _hotkeyManager?.Unregister();
         _isRecordingHotkey = true;
         btnRecordHotkey.Content = "Cancel";
         tbHotkey.Text = "Press keys...";
@@ -514,12 +550,16 @@ public partial class MainWindow : Window
             }
             else
             {
-                ShowTemporaryStatus("Shortcut already in use by another app!");
+                ShowTemporaryStatus("That shortcut could not be configured. Try a different key.");
+                // Restore previous working hotkey so the app is not left without any hotkey
+                RegisterGlobalHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
                 DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
             }
         }
         else
         {
+            // Restore previous working hotkey on cancel
+            RegisterGlobalHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
             DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
         }
     }
@@ -620,7 +660,7 @@ public partial class MainWindow : Window
 
     private void CbStartup_Checked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
             StartupManager.SetStartup(runOnStartup: true);
             SettingsManager.Save(SettingsManager.Load() with
@@ -632,7 +672,7 @@ public partial class MainWindow : Window
 
     private void CbStartup_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
             StartupManager.SetStartup(runOnStartup: false);
             SettingsManager.Save(SettingsManager.Load() with
@@ -644,7 +684,7 @@ public partial class MainWindow : Window
 
     private void CbStartMinimized_Checked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
             SettingsManager.Save(SettingsManager.Load() with
             {
@@ -655,7 +695,7 @@ public partial class MainWindow : Window
 
     private void CbStartMinimized_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
             SettingsManager.Save(SettingsManager.Load() with
             {
@@ -679,31 +719,33 @@ public partial class MainWindow : Window
 
     private void CbLightMode_Checked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
-            SetLightMode(isLight: true);
             SettingsManager.Save(SettingsManager.Load() with
             {
                 LightMode = true
             });
+            SetLightMode(isLight: true);
+            (System.Windows.Application.Current as App)?.UpdateTrayIconState();
         }
     }
 
     private void CbLightMode_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
-            SetLightMode(isLight: false);
             SettingsManager.Save(SettingsManager.Load() with
             {
                 LightMode = false
             });
+            SetLightMode(isLight: false);
+            (System.Windows.Application.Current as App)?.UpdateTrayIconState();
         }
     }
 
     private void CbRunAsAdmin_Checked(object sender, RoutedEventArgs e)
     {
-        if (!_isInitialized) return;
+        if (!_isInitialized || _isReloadingSettings) return;
         AdminManager.SetRunAsAdmin(true);
         SettingsManager.Save(SettingsManager.Load() with { RunAsAdmin = true });
 
@@ -717,27 +759,27 @@ public partial class MainWindow : Window
 
             if (res == MessageBoxResult.Yes)
             {
-                AdminManager.RestartAsAdmin();
+                if (!AdminManager.RestartAsAdmin()) ShowTemporaryStatus("Restart was cancelled or could not be completed.");
             }
         }
     }
 
     private void CbRunAsAdmin_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (!_isInitialized) return;
+        if (!_isInitialized || _isReloadingSettings) return;
         AdminManager.SetRunAsAdmin(false);
         SettingsManager.Save(SettingsManager.Load() with { RunAsAdmin = false });
     }
 
     private void CbSoundFeedback_Checked(object sender, RoutedEventArgs e)
     {
-        if (!_isInitialized) return;
+        if (!_isInitialized || _isReloadingSettings) return;
         SettingsManager.Save(SettingsManager.Load() with { PlaySoundFeedback = true });
     }
 
     private void CbSoundFeedback_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (!_isInitialized) return;
+        if (!_isInitialized || _isReloadingSettings) return;
         SettingsManager.Save(SettingsManager.Load() with { PlaySoundFeedback = false });
     }
 
@@ -799,7 +841,7 @@ public partial class MainWindow : Window
 
     private void CbEnableOsd_Checked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
             SettingsManager.Save(SettingsManager.Load() with
             {
@@ -810,7 +852,7 @@ public partial class MainWindow : Window
 
     private void CbEnableOsd_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings)
         {
             SettingsManager.Save(SettingsManager.Load() with
             {
@@ -821,12 +863,12 @@ public partial class MainWindow : Window
 
     private void SliderOsdDuration_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_isInitialized)
+        if (_isInitialized && !_isReloadingSettings && !_isUpdatingOsdTextFromSlider)
         {
-            if (txtOsdDuration != null)
+            if (txtOsdDuration != null && !txtOsdDuration.IsFocused)
             {
                 _isUpdatingOsdTextFromSlider = true;
-                txtOsdDuration.Text = $"{e.NewValue:F1}";
+                txtOsdDuration.Text = UiBehavior.FormatOsdDuration(e.NewValue, CultureInfo.CurrentCulture);
                 _isUpdatingOsdTextFromSlider = false;
             }
             SettingsManager.Save(SettingsManager.Load() with
@@ -851,7 +893,8 @@ public partial class MainWindow : Window
 
     private void TxtOsdDuration_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_isInitialized && !_isUpdatingOsdTextFromSlider && double.TryParse(txtOsdDuration.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var result) && result >= 0.1 && result <= 30.0)
+        if (_isInitialized && !_isReloadingSettings && !_isUpdatingOsdTextFromSlider
+            && UiBehavior.TryParseOsdDuration(txtOsdDuration.Text, CultureInfo.CurrentCulture, out var result))
         {
             SettingsManager.Save(SettingsManager.Load() with
             {
@@ -865,35 +908,28 @@ public partial class MainWindow : Window
 
     private void CommitOsdDurationText()
     {
-        if (double.TryParse(txtOsdDuration.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+        if (UiBehavior.TryParseOsdDuration(txtOsdDuration.Text, CultureInfo.CurrentCulture, out var result))
         {
-            if (result < 0.1)
-            {
-                result = 0.1;
-            }
-            if (result > 30.0)
-            {
-                result = 30.0;
-            }
             SettingsManager.Save(SettingsManager.Load() with
             {
                 OsdDuration = result
             });
             _isUpdatingOsdTextFromSlider = true;
             sliderOsdDuration.Value = result;
-            txtOsdDuration.Text = $"{result:F1}";
+            txtOsdDuration.Text = UiBehavior.FormatOsdDuration(result, CultureInfo.CurrentCulture);
             _isUpdatingOsdTextFromSlider = false;
         }
         else
         {
             AppSettings appSettings = SettingsManager.Load();
-            txtOsdDuration.Text = $"{appSettings.OsdDuration:F1}";
+            txtOsdDuration.Text = UiBehavior.FormatOsdDuration(appSettings.OsdDuration, CultureInfo.CurrentCulture);
         }
     }
 
     public void BtnOpenDataFolder_Click(object sender, RoutedEventArgs e)
     {
-        SettingsManager.OpenDataFolderInExplorer();
+        try { SettingsManager.OpenDataFolderInExplorer(); }
+        catch (Exception ex) { ShowTemporaryStatus("Could not open data folder: " + ex.Message); }
     }
 
     public void BtnChangeDataFolder_Click(object sender, RoutedEventArgs e)
@@ -904,9 +940,16 @@ public partial class MainWindow : Window
             fbd.SelectedPath = SettingsManager.GetDataFolderPath();
             if (fbd.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrWhiteSpace(fbd.SelectedPath))
             {
-                SettingsManager.SetCustomDataFolder(fbd.SelectedPath);
-                tbStoragePath.Text = SettingsManager.GetDataFolderPath();
-                ShowTemporaryStatus("Data folder updated to: " + fbd.SelectedPath);
+                try
+                {
+                    SettingsManager.SetCustomDataFolder(fbd.SelectedPath);
+                    tbStoragePath.Text = SettingsManager.GetDataFolderPath();
+                    ShowTemporaryStatus("Data folder updated to: " + fbd.SelectedPath);
+                }
+                catch (Exception ex)
+                {
+                    ShowTemporaryStatus("Could not change data folder: " + ex.Message);
+                }
             }
         }
     }
@@ -921,14 +964,28 @@ public partial class MainWindow : Window
 
         if (res == MessageBoxResult.Yes)
         {
-            SettingsManager.ResetAllSettings();
-            LoadSettingsIntoUI();
-            ShowTemporaryStatus("Settings have been reset to factory defaults.");
+            try
+            {
+                if (_isRecordingHotkey) StopRecordingHotkey(false);
+                SettingsManager.ResetAllSettings();
+                AppSettings defaultSettings = SettingsManager.Load();
+                LoadSettingsIntoUI();
+                ApplySettingsToRuntime(defaultSettings);
+                (System.Windows.Application.Current as App)?.UpdateTrayIconState();
+                ShowTemporaryStatus("Settings have been reset to factory defaults.");
+            }
+            catch (Exception ex) { ShowTemporaryStatus("Settings reset could not be completed: " + ex.Message); }
         }
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        _isDisposed = true;
+        _deviceRefreshDebouncer.Dispose();
+        SettingsManager.SaveFailed -= SettingsManager_SaveFailed;
+        _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
+        _audioController.DevicesChanged -= AudioController_DevicesChanged;
+        _audioController.WarningNotification -= AudioController_WarningNotification;
         base.OnClosed(e);
         _hotkeyManager?.Dispose();
     }

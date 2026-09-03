@@ -126,9 +126,30 @@ public partial class App : System.Windows.Application
     private AudioController? _audioController;
     private MainWindow? _mainWindow;
 
+    [DllImport("user32.dll", EntryPoint = "FindWindow", SetLastError = true)]
+    private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
+
+    private static IntPtr _currentHIcon = IntPtr.Zero;
+
     [STAThread]
     public static void Main(string[] args)
     {
+        if (UiBehavior.TryGetParentProcessId(args, out int parentId))
+        {
+            try
+            {
+                if (!UiBehavior.WaitForParentExit(parentId, TimeSpan.FromSeconds(30)))
+                {
+                    System.Windows.MessageBox.Show("The previous MicMute instance has not finished closing. Please try again.", "MicMute restart");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show("Could not wait for the previous MicMute instance: " + ex.Message, "MicMute restart");
+                return;
+            }
+        }
         AppDomain.CurrentDomain.AssemblyResolve += (sender, resolveArgs) =>
         {
             string? simpleName = new System.Reflection.AssemblyName(resolveArgs.Name).Name;
@@ -138,9 +159,9 @@ public partial class App : System.Windows.Application
             {
                 if (stream != null)
                 {
-                    byte[] assemblyData = new byte[stream.Length];
-                    stream.Read(assemblyData, 0, assemblyData.Length);
-                    return System.Reflection.Assembly.Load(assemblyData);
+                    using MemoryStream ms = new MemoryStream();
+                    stream.CopyTo(ms);
+                    return System.Reflection.Assembly.Load(ms.ToArray());
                 }
             }
             return null;
@@ -200,7 +221,15 @@ public partial class App : System.Windows.Application
         _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
         if (!createdNew)
         {
-            PostMessage((IntPtr)HWND_BROADCAST, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+            IntPtr existingHwnd = FindWindow(null, "Mic Mute");
+            if (existingHwnd != IntPtr.Zero)
+            {
+                PostMessage(existingHwnd, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+            }
+            else
+            {
+                PostMessage((IntPtr)HWND_BROADCAST, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+            }
             Environment.Exit(0);
             return;
         }
@@ -228,12 +257,13 @@ public partial class App : System.Windows.Application
         OsdWindow.WarmUp();
 
         AppSettings appSettings = SettingsManager.Load();
+        StartupManager.SetStartup(appSettings.RunOnStartup);
         _audioController = new AudioController();
         _audioController.SetTargetDevice(appSettings.SelectedDeviceId);
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
         InitializeTrayIcon();
         _mainWindow = new MainWindow(_audioController);
-        if (!e.Args.Contains("--minimized"))
+        if (!UiBehavior.ShouldStartMinimized(appSettings.StartMinimized, e.Args))
         {
             _mainWindow.Show();
             _mainWindow.WindowState = WindowState.Normal;
@@ -289,7 +319,7 @@ public partial class App : System.Windows.Application
         }
         string text = _audioController?.CurrentDeviceName ?? "No microphone";
         string text2 = isMuted ? "MUTED" : "ACTIVE";
-        _notifyIcon.Text = "Mic Mute (" + text2 + ")\nDevice: " + text;
+        _notifyIcon.Text = UiBehavior.LimitTooltip("Mic Mute (" + text2 + ")\nDevice: " + text);
         try
         {
             using Bitmap bitmap = new Bitmap(16, 16);
@@ -324,14 +354,19 @@ public partial class App : System.Windows.Application
                     graphics.DrawLine(pen, 3, 3, 13, 13);
                 }
             }
-            Icon icon = Icon.FromHandle(bitmap.GetHicon());
-            Icon? icon2 = _notifyIcon.Icon;
+            IntPtr newHIcon = bitmap.GetHicon();
+            Icon icon = Icon.FromHandle(newHIcon);
+            Icon? oldIcon = _notifyIcon.Icon;
             _notifyIcon.Icon = icon;
-            if (icon2 != null)
+            if (oldIcon != null)
             {
-                DestroyIcon(icon2.Handle);
-                icon2.Dispose();
+                oldIcon.Dispose();
             }
+            if (_currentHIcon != IntPtr.Zero)
+            {
+                DestroyIcon(_currentHIcon);
+            }
+            _currentHIcon = newHIcon;
         }
         catch (Exception ex)
         {
@@ -345,6 +380,11 @@ public partial class App : System.Windows.Application
             {
             }
         }
+    }
+
+    public void UpdateTrayIconState()
+    {
+        UpdateTrayIcon(_audioController?.IsMuted ?? false);
     }
 
     private static void FillRoundedRectangle(Graphics g, Brush brush, float x, float y, float width, float height, float radius)
@@ -361,9 +401,10 @@ public partial class App : System.Windows.Application
 
     private void AudioController_MuteStateChanged(object? sender, MuteStateChangedEventArgs e)
     {
+        if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
         Dispatcher.BeginInvoke((Action)delegate
         {
-            UpdateTrayIcon(e.IsMuted);
+            if (!Dispatcher.HasShutdownStarted) UpdateTrayIcon(e.IsMuted);
         });
     }
 
@@ -400,26 +441,31 @@ public partial class App : System.Windows.Application
 
     private void ExitApp()
     {
-        if (_mainWindow != null)
+        try { SettingsManager.Flush(); }
+        catch (Exception ex)
         {
-            _mainWindow.Closing -= MainWindow_Closing;
-            _mainWindow.Close();
+            System.Windows.MessageBox.Show("Settings could not be saved. MicMute will stay open so you can retry.\n\n" + ex.Message, "Save settings");
+            return;
         }
-        if (_notifyIcon != null)
-        {
-            _notifyIcon.Visible = false;
-            _notifyIcon.Dispose();
-        }
-        _audioController?.Dispose();
         Shutdown();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try { SettingsManager.Flush(); }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine("Could not save settings at shutdown: " + ex.Message);
+        }
         if (_notifyIcon != null)
         {
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
+        }
+        if (_currentHIcon != IntPtr.Zero)
+        {
+            DestroyIcon(_currentHIcon);
+            _currentHIcon = IntPtr.Zero;
         }
         _audioController?.Dispose();
         try

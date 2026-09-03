@@ -30,6 +30,15 @@ public partial class OsdWindow : Window
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     internal Border borderPanel = null!;
     internal Grid pathActive = null!;
     internal Grid pathMuted = null!;
@@ -39,6 +48,9 @@ public partial class OsdWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
     private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
@@ -151,8 +163,10 @@ public partial class OsdWindow : Window
 
     public static void ShowOsd(bool isMuted, double durationSeconds)
     {
-        _cts?.Cancel();
+        CancellationTokenSource? previousCts = _cts;
         _cts = new CancellationTokenSource();
+        previousCts?.Cancel();
+        previousCts?.Dispose();
         if (_instance == null)
         {
             _instance = new OsdWindow();
@@ -160,33 +174,53 @@ public partial class OsdWindow : Window
         _instance.UpdateState(isMuted);
 
         IntPtr handle = new WindowInteropHelper(_instance).EnsureHandle();
-        _instance.PositionOnActiveScreen();
 
         if (!_instance.IsVisible)
         {
             _instance.Show();
         }
 
-        // Forcefully re-assert HWND_TOPMOST above full-screen games
-        SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        _instance.PositionOnActiveScreen(handle);
 
-        _instance.BeginFadeSequence(durationSeconds, _cts.Token);
+        double safeDuration = double.IsFinite(durationSeconds)
+            ? Math.Clamp(durationSeconds, UiBehavior.MinimumOsdDuration, UiBehavior.MaximumOsdDuration)
+            : UiBehavior.MinimumOsdDuration;
+        _instance.BeginFadeSequence(safeDuration, _cts.Token);
     }
 
-    private void PositionOnActiveScreen()
+    private void PositionOnActiveScreen(IntPtr handle)
     {
         try
         {
             var screen = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
             var bounds = screen.Bounds;
-            Left = bounds.Left + (bounds.Width - Width) / 2.0;
-            Top = bounds.Top + (bounds.Height - Height) / 2.0;
+            if (!GetWindowRect(handle, out RECT nativeRect))
+            {
+                return;
+            }
+            var size = new PixelSize(nativeRect.Right - nativeRect.Left, nativeRect.Bottom - nativeRect.Top);
+            PixelRect target = UiBehavior.CenterInPixels(new PixelRect(bounds.Left, bounds.Top, bounds.Width, bounds.Height), size);
+            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
         catch
         {
-            Left = (SystemParameters.PrimaryScreenWidth - Width) / 2.0;
-            Top = (SystemParameters.PrimaryScreenHeight - Height) / 2.0;
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
+    }
+
+    private static readonly Color ColorMuted = Color.FromRgb(0xEF, 0x44, 0x44);
+    private static readonly SolidColorBrush BrushMutedText = CreateFrozenBrush(ColorMuted);
+    private static readonly SolidColorBrush BrushMutedBorder = CreateFrozenBrush(ColorMuted);
+
+    private static readonly Color ColorActive = Color.FromRgb(0x94, 0xA3, 0xB8);
+    private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
+    private static readonly SolidColorBrush BrushActiveBorder = CreateFrozenBrush(ColorActive);
+
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 
     private void UpdateState(bool isMuted)
@@ -196,18 +230,18 @@ public partial class OsdWindow : Window
             pathMuted.Visibility = Visibility.Visible;
             pathActive.Visibility = Visibility.Collapsed;
             tbStatus.Text = "MUTED";
-            tbStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444"));
-            borderPanel.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444"));
-            osdShadow.Color = (Color)ColorConverter.ConvertFromString("#EF4444");
+            tbStatus.Foreground = BrushMutedText;
+            borderPanel.BorderBrush = BrushMutedBorder;
+            osdShadow.Color = ColorMuted;
         }
         else
         {
             pathActive.Visibility = Visibility.Visible;
             pathMuted.Visibility = Visibility.Collapsed;
             tbStatus.Text = "ACTIVE";
-            tbStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E2E8F0"));
-            borderPanel.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#94A3B8"));
-            osdShadow.Color = (Color)ColorConverter.ConvertFromString("#94A3B8");
+            tbStatus.Foreground = BrushActiveText;
+            borderPanel.BorderBrush = BrushActiveBorder;
+            osdShadow.Color = ColorActive;
         }
     }
 
@@ -218,7 +252,8 @@ public partial class OsdWindow : Window
             IntPtr handle = new WindowInteropHelper(this).Handle;
             SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
-            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 0.95, TimeSpan.FromSeconds(0.08));
+            double startOpacity = Math.Clamp(this.Opacity, 0.0, 0.95);
+            DoubleAnimation fadeIn = new DoubleAnimation(startOpacity, 0.95, TimeSpan.FromSeconds(0.08));
             BeginAnimation(OpacityProperty, fadeIn);
 
             await Task.Delay(TimeSpan.FromSeconds(durationSeconds), token);

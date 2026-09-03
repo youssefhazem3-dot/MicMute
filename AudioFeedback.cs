@@ -11,6 +11,7 @@ public static class AudioFeedback
     private static SoundPlayer? _unmutePlayer;
     private static bool _isInitialized;
     private static readonly object _initLock = new object();
+    private static readonly object _playLock = new object();
 
     public static void Initialize()
     {
@@ -39,13 +40,16 @@ public static class AudioFeedback
             try
             {
                 if (!_isInitialized) Initialize();
-                if (isMuted)
+                lock (_playLock)
                 {
-                    _mutePlayer?.Play();
-                }
-                else
-                {
-                    _unmutePlayer?.Play();
+                    if (isMuted)
+                    {
+                        _mutePlayer?.Play();
+                    }
+                    else
+                    {
+                        _unmutePlayer?.Play();
+                    }
                 }
             }
             catch

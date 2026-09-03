@@ -7,112 +7,19 @@ using NAudio.CoreAudioApi.Interfaces;
 
 namespace MicMute;
 
+/// <summary>Owns audio endpoints on the UI dispatcher; native callbacks only queue notifications.</summary>
 public class AudioController : IMMNotificationClient, IDisposable
 {
     private readonly MMDeviceEnumerator _enumerator;
+    private readonly Dispatcher _dispatcher;
     private MMDevice? _currentDevice;
+    private AudioEndpointVolumeNotificationDelegate? _volumeHandler;
     private string _targetDeviceId = string.Empty;
+    private string _currentId = string.Empty;
+    private string _currentName = "No Device";
     private bool _isUsingFallback;
-    private readonly object _lock = new object();
-    private readonly object _updateLock = new object();
-
-    public bool IsMuted
-    {
-        get
-        {
-            MMDevice? currentDevice;
-            lock (_lock)
-            {
-                currentDevice = _currentDevice;
-            }
-            if (currentDevice == null)
-            {
-                return false;
-            }
-            try
-            {
-                return currentDevice.AudioEndpointVolume?.Mute ?? false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        set
-        {
-            MMDevice? currentDevice;
-            lock (_lock)
-            {
-                currentDevice = _currentDevice;
-            }
-            if (currentDevice == null)
-            {
-                return;
-            }
-            try
-            {
-                if (currentDevice.AudioEndpointVolume != null)
-                {
-                    currentDevice.AudioEndpointVolume.Mute = value;
-                }
-            }
-            catch (Exception ex)
-            {
-                WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message);
-            }
-        }
-    }
-
-    public bool IsUsingFallback
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _isUsingFallback;
-            }
-        }
-    }
-
-    public string CurrentDeviceName
-    {
-        get
-        {
-            MMDevice? currentDevice;
-            lock (_lock)
-            {
-                currentDevice = _currentDevice;
-            }
-            try
-            {
-                return currentDevice?.FriendlyName ?? "No Device";
-            }
-            catch
-            {
-                return "No Device";
-            }
-        }
-    }
-
-    public string CurrentDeviceId
-    {
-        get
-        {
-            MMDevice? currentDevice;
-            lock (_lock)
-            {
-                currentDevice = _currentDevice;
-            }
-            try
-            {
-                return currentDevice?.ID ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-    }
+    private bool? _lastReportedMuteState;
+    private volatile bool _disposed;
 
     public event EventHandler? DevicesChanged;
     public event EventHandler<MuteStateChangedEventArgs>? MuteStateChanged;
@@ -120,279 +27,198 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     public AudioController()
     {
+        _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
         _enumerator = new MMDeviceEnumerator();
-        _enumerator.RegisterEndpointNotificationCallback(this);
+        try { _enumerator.RegisterEndpointNotificationCallback(this); }
+        catch { _enumerator.Dispose(); throw; }
     }
+
+    public bool IsMuted
+    {
+        get
+        {
+            if (_disposed || _currentDevice == null) return false;
+            if (!_dispatcher.CheckAccess()) return _lastReportedMuteState ?? false;
+            try { return _currentDevice.AudioEndpointVolume.Mute; }
+            catch { return _lastReportedMuteState ?? false; }
+        }
+        set
+        {
+            if (!_dispatcher.CheckAccess()) { Dispatch(() => IsMuted = value); return; }
+            if (_disposed || _currentDevice == null) return;
+            try { _currentDevice.AudioEndpointVolume.Mute = value; }
+            catch (Exception ex) { WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message); }
+        }
+    }
+
+    public bool IsUsingFallback => _isUsingFallback;
+    public string CurrentDeviceName => _currentName;
+    public string CurrentDeviceId => _currentId;
 
     public List<AudioDevice> GetCaptureDevices()
     {
-        List<AudioDevice> list = new List<AudioDevice>();
+        var devices = new List<AudioDevice>();
+        if (_disposed) return devices;
         try
         {
-            foreach (MMDevice item in _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+            foreach (MMDevice device in _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
             {
-                list.Add(new AudioDevice(item.ID, item.FriendlyName));
+                using (device) { devices.Add(new AudioDevice(device.ID, device.FriendlyName)); }
             }
         }
-        catch (Exception ex)
-        {
-            WarningNotification?.Invoke(this, "Failed to list audio devices: " + ex.Message);
-        }
-        return list;
+        catch (Exception ex) { WarningNotification?.Invoke(this, "Failed to list audio devices: " + ex.Message); }
+        return devices;
     }
 
     public void SetTargetDevice(string deviceId)
     {
-        _targetDeviceId = deviceId;
+        if (!_dispatcher.CheckAccess()) { Dispatch(() => SetTargetDevice(deviceId)); return; }
+        if (_disposed) return;
+        _targetDeviceId = deviceId ?? string.Empty;
         UpdateActiveDevice();
     }
 
     public void ToggleMute()
     {
-        IsMuted = !IsMuted;
-    }
-
-    private void UpdateActiveDevice()
-    {
-        Application? current = Application.Current;
-        Dispatcher? dispatcher = current?.Dispatcher;
-        if (dispatcher != null && !dispatcher.CheckAccess())
-        {
-            dispatcher.BeginInvoke(new Action(UpdateActiveDevice));
-            return;
-        }
-        lock (_updateLock)
-        {
-            string targetDeviceId;
-            lock (_lock)
-            {
-                targetDeviceId = _targetDeviceId;
-            }
-            MMDevice? mMDevice = null;
-            bool isUsingFallback = false;
-            if (!string.IsNullOrEmpty(targetDeviceId))
-            {
-                try
-                {
-                    MMDevice device = _enumerator.GetDevice(targetDeviceId);
-                    if (device.State == DeviceState.Active)
-                    {
-                        mMDevice = device;
-                    }
-                    else
-                    {
-                        device.Dispose();
-                    }
-                }
-                catch
-                {
-                    mMDevice = null;
-                }
-            }
-            if (mMDevice == null)
-            {
-                try
-                {
-                    mMDevice = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-                    if (mMDevice != null)
-                    {
-                        isUsingFallback = true;
-                    }
-                }
-                catch
-                {
-                    mMDevice = null;
-                }
-            }
-            MMDevice? mMDevice2 = null;
-            lock (_lock)
-            {
-                mMDevice2 = _currentDevice;
-                _currentDevice = mMDevice;
-                _isUsingFallback = isUsingFallback;
-            }
-            if (mMDevice2 != null)
-            {
-                try
-                {
-                    mMDevice2.AudioEndpointVolume.OnVolumeNotification -= OnVolumeNotification;
-                }
-                catch
-                {
-                }
-                try
-                {
-                    mMDevice2.Dispose();
-                }
-                catch
-                {
-                }
-            }
-            if (mMDevice != null)
-            {
-                try
-                {
-                    mMDevice.AudioEndpointVolume.OnVolumeNotification += OnVolumeNotification;
-                    MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(mMDevice.AudioEndpointVolume.Mute, showOsd: false));
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    WarningNotification?.Invoke(this, "Failed to initialize volume listener: " + ex.Message);
-                    return;
-                }
-            }
-            WarningNotification?.Invoke(this, "No active audio capture devices found.");
-            MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(isMuted: false, showOsd: false));
-        }
+        if (!_dispatcher.CheckAccess()) { Dispatch(ToggleMute); return; }
+        if (!_disposed) IsMuted = !IsMuted;
     }
 
     public void ForceUpdateActiveDevice()
     {
+        if (!_dispatcher.CheckAccess()) { Dispatch(ForceUpdateActiveDevice); return; }
         UpdateActiveDevice();
     }
 
-    private void OnVolumeNotification(AudioVolumeNotificationData data)
+    private void UpdateActiveDevice()
     {
-        try
+        if (_disposed) return;
+        MMDevice? candidate = null;
+        bool fallback = false;
+        if (!string.IsNullOrEmpty(_targetDeviceId))
         {
-            lock (_lock)
+            try
             {
-                if (_currentDevice == null)
+                candidate = _enumerator.GetDevice(_targetDeviceId);
+                if (candidate.State != DeviceState.Active) { candidate.Dispose(); candidate = null; }
+            }
+            catch { candidate?.Dispose(); candidate = null; }
+        }
+        if (candidate == null)
+        {
+            try { candidate = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; }
+            catch { candidate = null; }
+        }
+
+        // Do not activate a second endpoint-volume listener merely to inspect the candidate.
+        if (candidate != null && _currentDevice != null && _volumeHandler != null)
+        {
+            try
+            {
+                if (_currentDevice.State == DeviceState.Active && candidate.ID == _currentId)
                 {
+                    bool muted = _currentDevice.AudioEndpointVolume.Mute; // also detects invalidated audio-service objects
+                    string name = candidate.FriendlyName;
+                    bool changed = _lastReportedMuteState != muted || name != _currentName;
+                    _currentName = name;
+                    _isUsingFallback = fallback;
+                    _lastReportedMuteState = muted;
+                    candidate.Dispose();
+                    if (changed) MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, false));
                     return;
                 }
             }
-            MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(data.Muted, showOsd: true));
+            catch { /* Rebind an invalidated current endpoint. */ }
         }
-        catch
-        {
-        }
-    }
 
-    public void OnDeviceStateChanged(string deviceId, DeviceState newState)
-    {
+        DetachCurrentDevice();
+        _currentDevice = candidate;
+        _isUsingFallback = fallback && candidate != null;
+        if (candidate == null)
+        {
+            WarningNotification?.Invoke(this, "No active audio capture devices found.");
+            MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(false, false));
+            return;
+        }
         try
         {
-            DevicesChanged?.Invoke(this, EventArgs.Empty);
-            bool flag = false;
-            lock (_lock)
-            {
-                flag = deviceId == _targetDeviceId || (_isUsingFallback && deviceId == _currentDevice?.ID);
-            }
-            if (flag)
-            {
-                UpdateActiveDevice();
-            }
+            _currentId = candidate.ID;
+            _currentName = candidate.FriendlyName;
+            MMDevice expected = candidate;
+            _volumeHandler = data => OnVolumeNotification(expected, data.Muted);
+            candidate.AudioEndpointVolume.OnVolumeNotification += _volumeHandler;
+            bool muted = candidate.AudioEndpointVolume.Mute;
+            _lastReportedMuteState = muted;
+            MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, false));
         }
-        catch
+        catch (Exception ex)
         {
+            DetachCurrentDevice();
+            WarningNotification?.Invoke(this, "Failed to initialize microphone: " + ex.Message);
+            MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(false, false));
         }
     }
 
-    public void OnDeviceAdded(string deviceId)
+    private void OnVolumeNotification(MMDevice expected, bool muted)
     {
-        try
+        // Never read COM or wait for the UI from this callback: unregister/dispose may wait for it.
+        Dispatch(() =>
         {
-            DevicesChanged?.Invoke(this, EventArgs.Empty);
-            bool flag = false;
-            lock (_lock)
+            if (!ReferenceEquals(expected, _currentDevice)) return;
+            try
             {
-                flag = deviceId == _targetDeviceId;
+                if (expected.AudioEndpointVolume.Mute != muted || _lastReportedMuteState == muted) return;
+                _lastReportedMuteState = muted;
+                MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, true));
             }
-            if (flag)
-            {
-                UpdateActiveDevice();
-            }
-        }
-        catch
-        {
-        }
+            catch (Exception ex) { WarningNotification?.Invoke(this, "Could not read microphone state: " + ex.Message); }
+        });
     }
 
-    public void OnDeviceRemoved(string deviceId)
+    private void Dispatch(Action action)
     {
-        try
-        {
-            DevicesChanged?.Invoke(this, EventArgs.Empty);
-            bool flag = false;
-            lock (_lock)
-            {
-                flag = deviceId == _targetDeviceId || deviceId == _currentDevice?.ID;
-            }
-            if (flag)
-            {
-                UpdateActiveDevice();
-            }
-        }
-        catch
-        {
-        }
+        if (_disposed || _dispatcher.HasShutdownStarted || _dispatcher.HasShutdownFinished) return;
+        try { _dispatcher.BeginInvoke(new Action(() => { if (!_disposed) action(); })); }
+        catch (InvalidOperationException) { }
     }
 
+    private void DetachCurrentDevice()
+    {
+        MMDevice? previous = _currentDevice;
+        AudioEndpointVolumeNotificationDelegate? handler = _volumeHandler;
+        _currentDevice = null;
+        _volumeHandler = null;
+        _currentId = string.Empty;
+        _currentName = "No Device";
+        _lastReportedMuteState = null;
+        if (previous == null) return;
+        try { if (handler != null) previous.AudioEndpointVolume.OnVolumeNotification -= handler; } catch { }
+        try { previous.Dispose(); } catch { }
+    }
+
+    private void NotifyDevicesChanged()
+    {
+        if (!_disposed) Dispatch(() => DevicesChanged?.Invoke(this, EventArgs.Empty));
+    }
+
+    public void OnDeviceStateChanged(string deviceId, DeviceState newState) => NotifyDevicesChanged();
+    public void OnDeviceAdded(string deviceId) => NotifyDevicesChanged();
+    public void OnDeviceRemoved(string deviceId) => NotifyDevicesChanged();
     public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
     {
-        try
-        {
-            if (flow == DataFlow.Capture && role == Role.Communications)
-            {
-                DevicesChanged?.Invoke(this, EventArgs.Empty);
-                bool flag = false;
-                lock (_lock)
-                {
-                    flag = _isUsingFallback || string.IsNullOrEmpty(_targetDeviceId);
-                }
-                if (flag)
-                {
-                    UpdateActiveDevice();
-                }
-            }
-        }
-        catch
-        {
-        }
+        if (flow == DataFlow.Capture && role == Role.Communications) NotifyDevicesChanged();
     }
-
     public void OnPropertyValueChanged(string deviceId, PropertyKey key)
     {
+        if (deviceId == _currentId) NotifyDevicesChanged();
     }
 
     public void Dispose()
     {
-        lock (_lock)
-        {
-            try
-            {
-                _enumerator.UnregisterEndpointNotificationCallback(this);
-            }
-            catch
-            {
-            }
-            if (_currentDevice != null)
-            {
-                try
-                {
-                    _currentDevice.AudioEndpointVolume.OnVolumeNotification -= OnVolumeNotification;
-                }
-                catch
-                {
-                }
-                try
-                {
-                    _currentDevice.Dispose();
-                }
-                catch
-                {
-                }
-                _currentDevice = null;
-            }
-            try
-            {
-                _enumerator.Dispose();
-            }
-            catch
-            {
-            }
-        }
+        if (_disposed) return;
+        _disposed = true;
+        try { _enumerator.UnregisterEndpointNotificationCallback(this); } catch { }
+        DetachCurrentDevice();
+        try { _enumerator.Dispose(); } catch { }
     }
 }

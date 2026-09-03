@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Windows;
 
 [assembly: AssemblyTitle("MicMute")]
@@ -12,6 +13,7 @@ using System.Windows;
 [assembly: AssemblyCulture("")]
 
 [assembly: ComVisible(false)]
+[assembly: SupportedOSPlatform("windows7.0")]
 [assembly: Guid("7FA5D9E0-9E11-40EA-B368-C8E649F56A49")]
 
 [assembly: ThemeInfo(

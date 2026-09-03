@@ -4,6 +4,7 @@ publish/
 *.dll
 *.exe
 *.runtimeconfig.json
+/*.deps.json
 !app.ico
 .vs/
 *.user
@@ -14,3 +15,5 @@ codebase_graph.md
 codebase_graph.json
 .graph/
 .handoff/
+.artifacts/
+.tools/
