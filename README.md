@@ -8,6 +8,7 @@
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Release](https://img.shields.io/badge/Version-v1.0.0-orange?style=for-the-badge)](https://github.com/youssefhazem3-dot/MicMute/releases)
+[![Download](https://img.shields.io/badge/Download-MicMute.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)
 
 <br />
 
@@ -41,7 +42,10 @@
 ## 🚀 Installation & Downloads
 
 ### Option 1: Standalone Clean Package (Recommended)
-1. Download **[`MicMute.zip`](https://github.com/youssefhazem3-dot/MicMute/releases)** from the latest release.
+
+[![Download MicMute.zip](https://img.shields.io/badge/Direct%20Download-MicMute.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)
+
+1. Download **[`MicMute.zip`](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)** (instant direct download, no setup required).
 2. Extract the archive anywhere on your system.
 3. Double-click `MicMute.exe`.
 
