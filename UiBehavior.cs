@@ -171,11 +171,14 @@ public sealed class RefreshGeneration : IDisposable
 
 internal sealed class DispatcherDebouncer : IDisposable
 {
+    private readonly object _sync = new();
     private readonly Dispatcher _dispatcher;
     private readonly RefreshGeneration _generation = new();
     private readonly DispatcherTimer _timer;
     private Action? _action;
     private long _scheduledGeneration;
+    private TimeSpan _delay;
+    private bool _updateQueued;
 
     public DispatcherDebouncer(Dispatcher dispatcher)
     {
@@ -186,37 +189,69 @@ internal sealed class DispatcherDebouncer : IDisposable
 
     public void Schedule(TimeSpan delay, Action action)
     {
-        long generation = _generation.Next();
-        if (generation == 0 || _dispatcher.HasShutdownStarted) return;
-        try
+        lock (_sync)
         {
-            _dispatcher.BeginInvoke(new Action(() =>
+            long generation = _generation.Next();
+            if (generation == 0 || _dispatcher.HasShutdownStarted) return;
+            _scheduledGeneration = generation;
+            _action = action;
+            _delay = delay;
+            if (_updateQueued) return;
+            _updateQueued = true;
+            try { _dispatcher.BeginInvoke(new Action(ApplyPendingSchedule)); }
+            catch (InvalidOperationException)
             {
-                if (!_generation.IsCurrent(generation)) return;
-                _timer.Stop();
-                _scheduledGeneration = generation;
-                _action = action;
-                _timer.Interval = delay;
-                _timer.Start();
-            }));
+                _updateQueued = false;
+                _action = null;
+            }
         }
-        catch (InvalidOperationException) { }
+    }
+
+    private void ApplyPendingSchedule()
+    {
+        lock (_sync)
+        {
+            _updateQueued = false;
+            if (!_generation.IsCurrent(_scheduledGeneration) || _action == null) return;
+            _timer.Stop();
+            _timer.Interval = _delay;
+            _timer.Start();
+        }
     }
 
     private void OnTick(object? sender, EventArgs e)
     {
-        _timer.Stop();
-        Action? action = _action;
-        _action = null;
-        if (_generation.IsCurrent(_scheduledGeneration)) action?.Invoke();
+        Action? action;
+        lock (_sync)
+        {
+            _timer.Stop();
+            // A newer request must receive its full delay before it runs.
+            if (_updateQueued || !_generation.IsCurrent(_scheduledGeneration)) return;
+            action = _action;
+            _action = null;
+        }
+        action?.Invoke();
+    }
+
+    public void Cancel()
+    {
+        lock (_sync)
+        {
+            _generation.Next();
+            _timer.Stop();
+            _action = null;
+        }
     }
 
     public void Dispose()
     {
-        _generation.Dispose();
-        // The owning window disposes this on its dispatcher.
-        _timer.Stop();
-        _timer.Tick -= OnTick;
-        _action = null;
+        lock (_sync)
+        {
+            _generation.Dispose();
+            // The owning window disposes this on its dispatcher.
+            _timer.Stop();
+            _timer.Tick -= OnTick;
+            _action = null;
+        }
     }
 }

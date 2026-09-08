@@ -74,7 +74,10 @@ public static class SettingsCodec
         {
             SelectedDeviceId = RepairEndpointId(settings.SelectedDeviceId ?? string.Empty),
             CustomDataPath = settings.CustomDataPath ?? string.Empty,
-            Hotkey = Enum.IsDefined(settings.Hotkey) && settings.Hotkey != Key.None ? settings.Hotkey : Key.F1,
+            Hotkey = Enum.IsDefined(settings.Hotkey)
+                && settings.Hotkey is not (Key.System or Key.ImeProcessed or Key.DeadCharProcessed)
+                && KeyInterop.VirtualKeyFromKey(settings.Hotkey) is > 0 and < 255
+                ? settings.Hotkey : Key.F1,
             HotkeyModifiers = ((int)settings.HotkeyModifiers & ~15) == 0 ? settings.HotkeyModifiers : ModifierKeys.None,
             OsdDuration = duration
         };

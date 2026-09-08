@@ -19,6 +19,10 @@ static class UiCases
         test(nameof(MainPanelEmbeddedXamlParses), MainPanelEmbeddedXamlParses);
         test(nameof(RestartWaitsUntilParentActuallyExits), RestartWaitsUntilParentActuallyExits);
         test(nameof(DispatcherCoalescesRefreshesAndCancelsDisposedWork), DispatcherCoalescesRefreshesAndCancelsDisposedWork);
+        test(nameof(RefreshBurstDoesNotFloodDispatcher), RefreshBurstDoesNotFloodDispatcher);
+        test(nameof(LosingFocusCancelsShortcutRecording), LosingFocusCancelsShortcutRecording);
+        test(nameof(MissingMicrophoneIsNotShownAsActive), MissingMicrophoneIsNotShownAsActive);
+        test(nameof(TemporaryStatusCannotOverwriteNewerAudioWarning), TemporaryStatusCannotOverwriteNewerAudioWarning);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -28,6 +32,86 @@ static class UiCases
         Check.Equal(1.5, currentCulture);
         Check.True(UiBehavior.TryParseOsdDuration("1.5", french, out double invariant), "invariant decimal fallback should parse");
         Check.Equal(1.5, invariant);
+    }
+
+    private static void RefreshBurstDoesNotFloodDispatcher()
+    {
+        var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        using var debouncer = new DispatcherDebouncer(dispatcher);
+        int posted = 0;
+        System.Windows.Threading.DispatcherHookEventHandler hook = (_, _) => System.Threading.Interlocked.Increment(ref posted);
+        dispatcher.Hooks.OperationPosted += hook;
+        try
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                for (int i = 0; i < 1000; i++) debouncer.Schedule(TimeSpan.FromMilliseconds(10), () => { });
+            }).GetAwaiter().GetResult();
+        }
+        finally { dispatcher.Hooks.OperationPosted -= hook; }
+        Console.WriteLine("METRIC refresh burst dispatcher operations: " + posted);
+        Check.True(posted <= 1, "1000 refresh requests must enqueue at most one dispatcher operation; actual " + posted);
+    }
+
+    private static void LosingFocusCancelsShortcutRecording()
+    {
+        using var audio = new AudioController();
+        var window = new RecordingWindow(audio);
+        try
+        {
+            window.btnRecordHotkey.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Check.Equal("Cancel", window.btnRecordHotkey.Content as string);
+            window.LoseFocus();
+            Check.Equal("Record", window.btnRecordHotkey.Content as string, "deactivation must restore the saved shortcut");
+        }
+        finally { window.Close(); }
+    }
+
+    private sealed class RecordingWindow : MainWindow
+    {
+        public RecordingWindow(AudioController audio) : base(audio) { }
+        public void LoseFocus() => OnDeactivated(EventArgs.Empty);
+    }
+
+    private static void MissingMicrophoneIsNotShownAsActive()
+    {
+        using var audio = new AudioController(); // No endpoint has been selected.
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.Equal("NO MICROPHONE", window.tbStatusText.Text);
+            Check.True(!window.btnStateToggle.IsEnabled, "mute must be disabled without an endpoint");
+            Check.Equal(System.Windows.Visibility.Visible, window.borderWarning.Visibility);
+            Check.True(window.cbDevices.SelectedItem == null, "do not imply an unbound microphone is selected");
+        }
+        finally { window.Close(); }
+    }
+
+    private static void TemporaryStatusCannotOverwriteNewerAudioWarning()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        var previousContext = System.Threading.SynchronizationContext.Current;
+        System.Threading.SynchronizationContext.SetSynchronizationContext(
+            new System.Windows.Threading.DispatcherSynchronizationContext(window.Dispatcher));
+        try
+        {
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            typeof(MainWindow).GetMethod("ShowTemporaryStatus", flags)!.Invoke(window, new object[] { "Old status" });
+            typeof(MainWindow).GetMethod("AudioController_WarningNotification", flags)!.Invoke(window, new object[] { audio, "New audio error" });
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(3300) };
+            timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
+            timer.Start();
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+            Check.Equal("New audio error", new System.Windows.Documents.TextRange(window.tbWarningMessage.ContentStart, window.tbWarningMessage.ContentEnd).Text);
+            Check.Equal(System.Windows.Visibility.Visible, window.borderWarning.Visibility);
+        }
+        finally
+        {
+            System.Threading.SynchronizationContext.SetSynchronizationContext(previousContext);
+            window.Close();
+        }
     }
 
     private static void OsdResourceLoadsUsingProductionConstructor()

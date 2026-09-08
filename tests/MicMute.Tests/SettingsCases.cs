@@ -21,6 +21,7 @@ public static class SettingsCases
         test("portable reset preserves the active directory after restart", PortableResetKeepsDirectory);
         test("flush retries the last value after a transient filesystem failure", FlushRetriesFailure);
         test("invalid hotkey enum values normalize to a usable default", InvalidHotkeyUsesDefault);
+        test("WPF sentinel keys normalize to a registerable shortcut", SentinelHotkeysUseDefault);
         test("JSON string text is not rewritten by legacy NaN migration", NamedFloatInStringIsPreserved);
         test("background persistence eventually writes the latest cached value", BackgroundPersistence);
         test("pending saves cannot overwrite migrated or reset settings", PendingSavesRespectTransitions);
@@ -44,6 +45,15 @@ public static class SettingsCases
         AppSettings settings = SettingsCodec.Deserialize("{\"Hotkey\":-999,\"HotkeyModifiers\":999}");
         Check.Equal(Key.F1, settings.Hotkey);
         Check.Equal(ModifierKeys.None, settings.HotkeyModifiers);
+    }
+
+    private static void SentinelHotkeysUseDefault()
+    {
+        foreach (Key key in new[] { Key.System, Key.ImeProcessed, Key.DeadCharProcessed })
+        {
+            AppSettings settings = SettingsCodec.Normalize(new AppSettings { Hotkey = key });
+            Check.Equal(Key.F1, settings.Hotkey, key.ToString());
+        }
     }
 
     private static void BackgroundPersistence()

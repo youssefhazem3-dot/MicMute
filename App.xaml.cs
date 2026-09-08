@@ -253,7 +253,7 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         base.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        // OSD Pre-Warmup to guarantee 0ms latency on first toggle
+        // Preload the OSD to reduce work on the first toggle.
         OsdWindow.WarmUp();
 
         AppSettings appSettings = SettingsManager.Load();
@@ -318,7 +318,7 @@ public partial class App : System.Windows.Application
             return;
         }
         string text = _audioController?.CurrentDeviceName ?? "No microphone";
-        string text2 = isMuted ? "MUTED" : "ACTIVE";
+        string text2 = string.IsNullOrEmpty(_audioController?.CurrentDeviceId) ? "NO MICROPHONE" : isMuted ? "MUTED" : "ACTIVE";
         _notifyIcon.Text = UiBehavior.LimitTooltip("Mic Mute (" + text2 + ")\nDevice: " + text);
         try
         {

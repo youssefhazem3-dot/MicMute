@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private bool _isReloadingSettings;
     private bool _isDisposed;
     private readonly DispatcherDebouncer _deviceRefreshDebouncer;
+    private readonly DispatcherDebouncer _statusDebouncer;
 
     internal System.Windows.Controls.Button btnStateToggle = null!;
     internal TextBlock tbStatusText = null!;
@@ -84,6 +85,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _deviceRefreshDebouncer = new DispatcherDebouncer(Dispatcher);
+        _statusDebouncer = new DispatcherDebouncer(Dispatcher);
         _audioController = audioController;
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
         _audioController.DevicesChanged += AudioController_DevicesChanged;
@@ -374,10 +376,6 @@ public partial class MainWindow : Window
             {
                 cbDevices.SelectedItem = audioDevice;
             }
-            else if (captureDevices.Count > 0)
-            {
-                cbDevices.SelectedIndex = 0;
-            }
         }
         finally
         {
@@ -404,6 +402,18 @@ public partial class MainWindow : Window
 
     private void UpdateMuteStateUI(bool isMuted)
     {
+        bool hasDevice = !string.IsNullOrEmpty(_audioController.CurrentDeviceId);
+        btnStateToggle.IsEnabled = hasDevice;
+        if (!hasDevice)
+        {
+            btnStateToggle.Tag = "Unavailable";
+            tbStatusText.Text = "NO MICROPHONE";
+            tbStatusText.SetResourceReference(TextBlock.ForegroundProperty, "TextWhiteBrush");
+            if (tbStatusText.Effect is DropShadowEffect glow) glow.Opacity = 0;
+            ShowWarningMessage("No active audio capture devices found.", "");
+            borderWarning.Visibility = Visibility.Visible;
+            return;
+        }
         bool isLight = SettingsManager.Load().LightMode;
         btnStateToggle.Tag = isMuted ? "Muted" : "Active";
         tbStatusText.Text = isMuted ? "M U T E D" : "A C T I V E";
@@ -439,6 +449,7 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke((Action)delegate
         {
             if (_isDisposed) return;
+            _statusDebouncer.Cancel();
             UpdateMuteStateUI(e.IsMuted);
             if (string.IsNullOrEmpty(_audioController.CurrentDeviceId))
             {
@@ -472,8 +483,11 @@ public partial class MainWindow : Window
 
     private void AudioController_WarningNotification(object? sender, string message)
     {
+        if (_isDisposed || Dispatcher.HasShutdownStarted) return;
         Dispatcher.BeginInvoke((Action)delegate
         {
+            if (_isDisposed) return;
+            _statusDebouncer.Cancel();
             tbWarningMessage.Inlines.Clear();
             System.Windows.Media.Brush foreground = (System.Windows.Media.Brush)FindResource("TextWhiteBrush");
             tbWarningMessage.Inlines.Add(new Run(message)
@@ -528,6 +542,12 @@ public partial class MainWindow : Window
         tbHotkey.Text = "Press keys...";
         tbHotkey.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
         PreviewKeyDown += MainWindow_PreviewKeyDown;
+    }
+
+    protected override void OnDeactivated(EventArgs e)
+    {
+        if (_isRecordingHotkey) StopRecordingHotkey(success: false);
+        base.OnDeactivated(e);
     }
 
     private void StopRecordingHotkey(bool success, Key key = Key.None, ModifierKeys modifiers = ModifierKeys.None)
@@ -635,14 +655,14 @@ public partial class MainWindow : Window
         return string.Join(" + ", list);
     }
 
-    private async void ShowTemporaryStatus(string message)
+    private void ShowTemporaryStatus(string message)
     {
-        try
+        if (_isDisposed) return;
+        tbWarningMessage.Inlines.Clear();
+        tbWarningMessage.Inlines.Add(new Run(message));
+        borderWarning.Visibility = Visibility.Visible;
+        _statusDebouncer.Schedule(TimeSpan.FromSeconds(3), () =>
         {
-            tbWarningMessage.Inlines.Clear();
-            tbWarningMessage.Inlines.Add(new Run(message));
-            borderWarning.Visibility = Visibility.Visible;
-            await Task.Delay(3000);
             if (string.IsNullOrEmpty(_audioController.CurrentDeviceId))
             {
                 ShowWarningMessage("No active audio capture devices found.", "");
@@ -652,10 +672,7 @@ public partial class MainWindow : Window
             {
                 borderWarning.Visibility = Visibility.Collapsed;
             }
-        }
-        catch (Exception)
-        {
-        }
+        });
     }
 
     private void CbStartup_Checked(object sender, RoutedEventArgs e)
@@ -982,6 +999,7 @@ public partial class MainWindow : Window
     {
         _isDisposed = true;
         _deviceRefreshDebouncer.Dispose();
+        _statusDebouncer.Dispose();
         SettingsManager.SaveFailed -= SettingsManager_SaveFailed;
         _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
         _audioController.DevicesChanged -= AudioController_DevicesChanged;
