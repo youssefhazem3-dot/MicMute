@@ -15,11 +15,16 @@ $env:DOTNET_NOLOGO = '1'
 $env:DOTNET_CLI_HOME = Join-Path $projectRoot '.tools/cli-home'
 $env:NUGET_PACKAGES = Join-Path $projectRoot '.tools/nuget-packages'
 if (!$CompilerPath) {
-    $testProject = Join-Path $projectRoot 'tests/MicMute.Tests/MicMute.Tests.csproj'
-    $runArgs = @('run','--project',$testProject,'--configuration','Release')
-    if ($NoRestore) { $runArgs += '--no-restore' }
-    & $DotnetPath @runArgs -- $Area
-    exit $LASTEXITCODE
+    $localCsc = Join-Path $projectRoot '.tools/dotnet/sdk/8.0.424/Roslyn/bincore/csc.dll'
+    if (Test-Path -LiteralPath $localCsc) {
+        $CompilerPath = $localCsc
+    } else {
+        $testProject = Join-Path $projectRoot 'tests/MicMute.Tests/MicMute.Tests.csproj'
+        $runArgs = @('run','--project',$testProject,'--configuration','Release')
+        if ($NoRestore) { $runArgs += '--no-restore' }
+        & $DotnetPath @runArgs -- $Area
+        exit $LASTEXITCODE
+    }
 }
 
 # Optional installed-compiler fallback for isolated regression work without an SDK.
@@ -52,6 +57,17 @@ $output = Join-Path $outDir 'MicMute.Tests.dll'
 $response = @('/nologo','/target:exe','/nostdlib+','/langversion:12','/nullable:enable','/platform:x64','/main:MicMute.Tests.Program',('/out:"' + $output + '"'))
 foreach ($reference in $references.Values) { $response += '/r:"' + $reference + '"' }
 foreach ($source in ($sources | Select-Object -Unique)) { $response += '"' + $source + '"' }
+$resources = @(
+    @{ Path = (Join-Path $projectRoot 'App.xaml'); Name = 'MicMute.App.xaml' },
+    @{ Path = (Join-Path $projectRoot 'MainWindow.xaml'); Name = 'MicMute.MainWindow.xaml' },
+    @{ Path = (Join-Path $projectRoot 'OsdWindow.xaml'); Name = 'MicMute.OsdWindow.xaml' },
+    @{ Path = (Join-Path $projectRoot 'app.ico'); Name = 'MicMute.app.ico' }
+)
+foreach ($res in $resources) {
+    if (Test-Path -LiteralPath $res.Path) {
+        $response += "/resource:`"$($res.Path)`",$($res.Name)"
+    }
+}
 $responseFile = Join-Path $outDir 'compile.rsp'
 [IO.File]::WriteAllLines($responseFile,$response)
 & $DotnetPath exec $CompilerPath "@$responseFile"

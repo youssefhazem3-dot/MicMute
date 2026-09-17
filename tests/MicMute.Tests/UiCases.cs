@@ -23,6 +23,11 @@ static class UiCases
         test(nameof(LosingFocusCancelsShortcutRecording), LosingFocusCancelsShortcutRecording);
         test(nameof(MissingMicrophoneIsNotShownAsActive), MissingMicrophoneIsNotShownAsActive);
         test(nameof(TemporaryStatusCannotOverwriteNewerAudioWarning), TemporaryStatusCannotOverwriteNewerAudioWarning);
+        test(nameof(AdaptiveMaxHeightAdaptsToTaskbarAndScreenSize), AdaptiveMaxHeightAdaptsToTaskbarAndScreenSize);
+        test(nameof(CentersWindowInVisibleWorkAreaAboveTaskbar), CentersWindowInVisibleWorkAreaAboveTaskbar);
+        test(nameof(CentersWindowWhenContentFitsWithoutClipping), CentersWindowWhenContentFitsWithoutClipping);
+        test(nameof(ClampsWindowBoundsWithinWorkArea), ClampsWindowBoundsWithinWorkArea);
+        test(nameof(MainWindowAppliesAdaptiveConstraintsAndScrollsOnSmallWorkArea), MainWindowAppliesAdaptiveConstraintsAndScrollsOnSmallWorkArea);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -135,8 +140,9 @@ static class UiCases
         var window = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(xaml);
         try
         {
-            foreach (string name in new[] { "btnStateToggle", "cbDevices", "cbStartMinimized", "txtOsdDuration", "btnResetData", "tbStoragePath" })
+            foreach (string name in new[] { "btnStateToggle", "cbDevices", "cbStartMinimized", "txtOsdDuration", "btnResetData", "tbStoragePath", "contentScrollViewer" })
                 Check.True(window.FindName(name) != null, "missing named control: " + name);
+            Check.True(window.FindName("contentScrollViewer") is System.Windows.Controls.ScrollViewer, "contentScrollViewer must be a ScrollViewer");
         }
         finally { window.Close(); }
     }
@@ -226,5 +232,99 @@ static class UiCases
         Check.True(gate.IsCurrent(second), "the newest refresh request remains runnable");
         gate.Dispose();
         Check.True(!gate.IsCurrent(second), "disposed refresh work must not update UI");
+    }
+
+    private static void AdaptiveMaxHeightAdaptsToTaskbarAndScreenSize()
+    {
+        // Screen with taskbar present (e.g. 768 - 48 = 720 work area)
+        double withTaskbar = UiBehavior.CalculateAdaptiveMaxHeight(720);
+        Check.Equal(696.0, withTaskbar);
+
+        // Screen with taskbar hidden (e.g. 768 full screen work area)
+        double taskbarHidden = UiBehavior.CalculateAdaptiveMaxHeight(768);
+        Check.Equal(744.0, taskbarHidden);
+
+        // 1080p screen with taskbar (1080 - 48 = 1032 work area)
+        double monitor1080p = UiBehavior.CalculateAdaptiveMaxHeight(1032);
+        Check.Equal(1008.0, monitor1080p);
+
+        // Very small screen: must not shrink below minimum height
+        double verySmall = UiBehavior.CalculateAdaptiveMaxHeight(200);
+        Check.Equal(UiBehavior.MinimumWindowHeight, verySmall);
+
+        // Non-finite fallbacks
+        Check.Equal(750.0, UiBehavior.CalculateAdaptiveMaxHeight(double.NaN));
+        Check.Equal(750.0, UiBehavior.CalculateAdaptiveMaxHeight(-10));
+    }
+
+    private static void CentersWindowInVisibleWorkAreaAboveTaskbar()
+    {
+        // 1366x768 screen with 48px taskbar at bottom -> WorkArea: (0, 0, 1366, 720)
+        var workArea = new DipRect(0, 0, 1366, 720);
+        var bounds = UiBehavior.CalculateCenteredWindowBounds(workArea, 350, 770);
+
+        // Max allowed height should be 696 (720 - 24)
+        Check.Equal(696.0, bounds.Height);
+        Check.Equal(350.0, bounds.Width);
+        Check.Equal(508.0, bounds.Left); // (1366 - 350) / 2
+        Check.Equal(12.0, bounds.Top);   // (720 - 696) / 2
+        Check.Equal(708.0, bounds.Top + bounds.Height);
+        Check.True(bounds.Top + bounds.Height < 720.0, "window bottom must be above taskbar (720)");
+        Check.Equal(12.0, 720.0 - (bounds.Top + bounds.Height)); // 12 DIP breathing room above taskbar
+    }
+
+    private static void CentersWindowWhenContentFitsWithoutClipping()
+    {
+        // 1920x1080 screen with 48px taskbar -> WorkArea: (0, 0, 1920, 1032)
+        var workArea = new DipRect(0, 0, 1920, 1032);
+        var bounds = UiBehavior.CalculateCenteredWindowBounds(workArea, 350, 770);
+
+        // Content fits comfortably (770 < 1008)
+        Check.Equal(770.0, bounds.Height);
+        Check.Equal(350.0, bounds.Width);
+        Check.Equal(785.0, bounds.Left); // (1920 - 350) / 2
+        Check.Equal(131.0, bounds.Top);  // (1032 - 770) / 2
+        Check.True(bounds.Top + bounds.Height < 1032.0, "window bottom must be well above taskbar");
+    }
+
+    private static void ClampsWindowBoundsWithinWorkArea()
+    {
+        var workArea = new DipRect(0, 0, 1366, 720);
+
+        // Window dragged too far down towards or under taskbar
+        var tooLow = new DipRect(500, 500, 350, 696);
+        var clamped = UiBehavior.ClampWindowBoundsToWorkArea(workArea, tooLow);
+        Check.Equal(12.0, clamped.Top); // Max allowed top for 696 height is 720 - 696 - 12 = 12
+        Check.Equal(708.0, clamped.Top + clamped.Height);
+
+        // Window with NaN values
+        var nanBounds = new DipRect(double.NaN, double.NaN, 350, 770);
+        var recovered = UiBehavior.ClampWindowBoundsToWorkArea(workArea, nanBounds);
+        Check.True(!double.IsNaN(recovered.Top));
+        Check.Equal(12.0, recovered.Top);
+    }
+
+    private static void MainWindowAppliesAdaptiveConstraintsAndScrollsOnSmallWorkArea()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.contentScrollViewer != null, "contentScrollViewer must be bound");
+            Check.Equal(System.Windows.Controls.ScrollBarVisibility.Auto, window.contentScrollViewer!.VerticalScrollBarVisibility);
+
+            var primary = System.Windows.Forms.Screen.PrimaryScreen;
+            double workHeight = primary != null ? primary.WorkingArea.Height : 720.0;
+            double expectedMax = UiBehavior.CalculateAdaptiveMaxHeight(workHeight);
+            Check.Equal(expectedMax, window.MaxHeight);
+
+            if (workHeight == 720.0)
+            {
+                Check.Equal(696.0, window.MaxHeight);
+                Check.Equal(12.0, window.Top);
+                Check.True(window.Top + window.MaxHeight < 720.0, "Window must fit cleanly above the taskbar");
+            }
+        }
+        finally { window.Close(); }
     }
 }

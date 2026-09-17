@@ -53,7 +53,12 @@ public partial class MainWindow : Window
     internal Border borderWarning = null!;
     internal TextBlock tbWarningMessage = null!;
     internal System.Windows.Controls.Image imgAppIcon = null!;
+    internal ScrollViewer contentScrollViewer = null!;
 
+    private const int WM_SETTINGCHANGE = 0x001A;
+    private const int WM_DISPLAYCHANGE = 0x007E;
+    private const int WM_DPICHANGED = 0x02E0;
+    private const int WM_EXITSIZEMOVE = 0x0232;
     private const int WM_DEVICECHANGE = 0x0219;
     private const int WM_NCLBUTTONDOWN = 0x00A1;
     private const int HTCAPTION = 0x0002;
@@ -148,6 +153,7 @@ public partial class MainWindow : Window
                     tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
                     borderWarning = (Border)root.FindName("borderWarning");
                     tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
+                    contentScrollViewer = (ScrollViewer)root.FindName("contentScrollViewer");
 
                     // Event hooks
                     var titleBar = (Border)root.FindName("borderTitleBar");
@@ -230,6 +236,39 @@ public partial class MainWindow : Window
             cbSoundFeedback.Checked += CbSoundFeedback_Checked;
             cbSoundFeedback.Unchecked += CbSoundFeedback_Unchecked;
         }
+        if (cbDevices != null && contentScrollViewer != null)
+        {
+            cbDevices.PreviewMouseWheel += (s, e) =>
+            {
+                if (!cbDevices.IsDropDownOpen)
+                {
+                    e.Handled = true;
+                    var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+                    {
+                        RoutedEvent = UIElement.MouseWheelEvent,
+                        Source = s
+                    };
+                    contentScrollViewer.RaiseEvent(eventArg);
+                }
+            };
+        }
+        if (sliderOsdDuration != null && contentScrollViewer != null)
+        {
+            sliderOsdDuration.PreviewMouseWheel += (s, e) =>
+            {
+                if (!sliderOsdDuration.IsFocused)
+                {
+                    e.Handled = true;
+                    var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+                    {
+                        RoutedEvent = UIElement.MouseWheelEvent,
+                        Source = s
+                    };
+                    contentScrollViewer.RaiseEvent(eventArg);
+                }
+            };
+        }
+        this.SizeChanged += MainWindow_SizeChanged;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -247,6 +286,98 @@ public partial class MainWindow : Window
         _hotkeyManager.HotkeyPressed += HotkeyManager_HotkeyPressed;
         AppSettings appSettings = SettingsManager.Load();
         RegisterGlobalHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
+        ApplyAdaptiveScreenConstraints(isInitialPlacement: true);
+    }
+
+    public void ApplyAdaptiveScreenConstraints(bool isInitialPlacement)
+    {
+        try
+        {
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            Screen? screen = null;
+            if (hwnd != IntPtr.Zero && !isInitialPlacement)
+            {
+                screen = Screen.FromHandle(hwnd);
+            }
+            if (screen == null)
+            {
+                screen = Screen.FromPoint(System.Windows.Forms.Cursor.Position) ?? Screen.PrimaryScreen;
+            }
+            if (screen == null) return;
+
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+            double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+            double workLeft = screen.WorkingArea.Left / scaleX;
+            double workTop = screen.WorkingArea.Top / scaleY;
+            double workWidth = screen.WorkingArea.Width / scaleX;
+            double workHeight = screen.WorkingArea.Height / scaleY;
+
+            double maxAllowedHeight = UiBehavior.CalculateAdaptiveMaxHeight(workHeight, UiBehavior.DefaultAdaptiveVerticalMargin);
+            if (Math.Abs(this.MaxHeight - maxAllowedHeight) > 0.5)
+            {
+                this.MaxHeight = maxAllowedHeight;
+            }
+
+            double currentWidth = this.ActualWidth > 0 ? this.ActualWidth : (this.Width > 0 ? this.Width : 350.0);
+
+            if (isInitialPlacement)
+            {
+                this.Measure(new System.Windows.Size(currentWidth, maxAllowedHeight));
+                double desiredHeight = this.DesiredSize.Height > 0 ? this.DesiredSize.Height : maxAllowedHeight;
+                double targetHeight = Math.Min(desiredHeight, maxAllowedHeight);
+
+                var centered = UiBehavior.CalculateCenteredWindowBounds(
+                    new DipRect(workLeft, workTop, workWidth, workHeight),
+                    currentWidth,
+                    targetHeight,
+                    UiBehavior.DefaultAdaptiveVerticalMargin);
+
+                this.Left = centered.Left;
+                this.Top = centered.Top;
+            }
+            else
+            {
+                double currentHeight = this.ActualHeight > 0 ? this.ActualHeight : this.MaxHeight;
+                var clamped = UiBehavior.ClampWindowBoundsToWorkArea(
+                    new DipRect(workLeft, workTop, workWidth, workHeight),
+                    new DipRect(this.Left, this.Top, currentWidth, currentHeight),
+                    UiBehavior.DefaultAdaptiveVerticalMargin);
+
+                this.Left = clamped.Left;
+                this.Top = clamped.Top;
+            }
+        }
+        catch
+        {
+            double workHeight = SystemParameters.WorkArea.Height;
+            this.MaxHeight = UiBehavior.CalculateAdaptiveMaxHeight(workHeight);
+        }
+    }
+
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        try
+        {
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            Screen? screen = Screen.FromHandle(hwnd) ?? Screen.PrimaryScreen;
+            if (screen == null) return;
+
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+            double workTop = screen.WorkingArea.Top / scaleY;
+            double workHeight = screen.WorkingArea.Height / scaleY;
+
+            double halfMargin = UiBehavior.DefaultAdaptiveVerticalMargin / 2.0;
+            double maxTop = workTop + workHeight - this.ActualHeight - halfMargin;
+            if (this.Top > maxTop)
+            {
+                this.Top = Math.Max(workTop + halfMargin, maxTop);
+            }
+        }
+        catch { }
     }
 
     private IntPtr HwndMessageHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -259,11 +390,16 @@ public partial class MainWindow : Window
         {
             this.Show();
             this.WindowState = WindowState.Normal;
+            ApplyAdaptiveScreenConstraints(isInitialPlacement: false);
             this.Activate();
             this.Focus();
             ShowWindow(hwnd, 9); // SW_RESTORE
             SetForegroundWindow(hwnd);
             handled = true;
+        }
+        else if (msg == WM_SETTINGCHANGE || msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED || msg == WM_EXITSIZEMOVE)
+        {
+            ApplyAdaptiveScreenConstraints(isInitialPlacement: false);
         }
         return IntPtr.Zero;
     }
@@ -827,6 +963,9 @@ public partial class MainWindow : Window
             Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 239, 68, 68));
             Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
             Resources["WarningTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 38, 38));
+            Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 0, 0, 0));
+            Resources["ScrollBarThumbHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(80, 0, 0, 0));
+            Resources["ScrollBarThumbDragBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(120, 0, 0, 0));
         }
         else
         {
@@ -849,6 +988,9 @@ public partial class MainWindow : Window
             Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(26, 255, 69, 58));
             Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
             Resources["WarningTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
+            Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, 255, 255, 255));
+            Resources["ScrollBarThumbHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(85, 255, 255, 255));
+            Resources["ScrollBarThumbDragBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 255, 255, 255));
         }
         if (_audioController != null)
         {
