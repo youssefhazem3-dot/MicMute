@@ -160,6 +160,16 @@ public partial class MainWindow : Window
             this.SnapsToDevicePixels = root.SnapsToDevicePixels;
             this.UseLayoutRounding = root.UseLayoutRounding;
 
+            try
+            {
+                string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.ico");
+                if (System.IO.File.Exists(iconPath))
+                {
+                    this.Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri(iconPath));
+                }
+            }
+            catch { }
+
             // Bind all controls from root before detaching content
             btnStateToggle = (System.Windows.Controls.Button)root.FindName("btnStateToggle");
             tbStatusText = (TextBlock)root.FindName("tbStatusText");
@@ -576,6 +586,7 @@ public partial class MainWindow : Window
     {
         if (!_isUpdatingDeviceList && cbDevices.SelectedItem is AudioDevice audioDevice)
         {
+            DiagnosticLogger.LogUi($"Selected audio capture device: '{audioDevice.Name}' (ID: {audioDevice.Id})");
             _audioController.SetTargetDevice(audioDevice.Id);
             SettingsManager.Save(SettingsManager.Load() with
             {
@@ -586,6 +597,7 @@ public partial class MainWindow : Window
 
     private void BtnStateToggle_Click(object sender, RoutedEventArgs e)
     {
+        DiagnosticLogger.LogUi("Mute button clicked in UI");
         _audioController.ToggleMute();
     }
 
@@ -618,19 +630,23 @@ public partial class MainWindow : Window
 
         if (isMuted)
         {
-            var redColor = System.Windows.Media.Color.FromRgb(239, 68, 68);
-            var redTextBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(220, 38, 38) : System.Windows.Media.Color.FromRgb(248, 113, 113));
-            tbStatusText.Foreground = redTextBrush;
-            if (dotStatus != null) dotStatus.Fill = new SolidColorBrush(redColor);
+            // Clean chill low-light red: relaxed rose-salmon text, calm ruby dot, subtle wine-tinted glass wash
+            var chillRedText = isLight ? System.Windows.Media.Color.FromRgb(155, 44, 44) : System.Windows.Media.Color.FromRgb(226, 133, 133);
+            var chillDotColor = isLight ? System.Windows.Media.Color.FromRgb(185, 28, 28) : System.Windows.Media.Color.FromRgb(197, 48, 48);
+
+            tbStatusText.Foreground = new SolidColorBrush(chillRedText);
+            if (dotStatus != null) dotStatus.Fill = new SolidColorBrush(chillDotColor);
             if (dotGlow != null)
             {
-                dotGlow.Color = redColor;
-                dotGlow.Opacity = isLight ? 0.3 : 0.8;
-                dotGlow.BlurRadius = 8;
+                dotGlow.Color = chillDotColor;
+                dotGlow.Opacity = isLight ? 0.20 : 0.40;
+                dotGlow.BlurRadius = 5;
             }
             if (borderStatusCapsule != null)
             {
-                borderStatusCapsule.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(isLight ? (byte)25 : (byte)32, 239, 68, 68));
+                borderStatusCapsule.Background = new SolidColorBrush(
+                    isLight ? System.Windows.Media.Color.FromArgb(16, 185, 28, 28)
+                            : System.Windows.Media.Color.FromArgb(22, 197, 48, 48));
                 borderStatusCapsule.BorderThickness = new Thickness(0);
                 borderStatusCapsule.BorderBrush = null;
             }
@@ -717,6 +733,7 @@ public partial class MainWindow : Window
 
     private void HotkeyManager_HotkeyPressed()
     {
+        DiagnosticLogger.LogHotkey("Global shortcut key triggered -> Toggling mute");
         _audioController.ToggleMute();
     }
 
@@ -1086,11 +1103,11 @@ public partial class MainWindow : Window
         if (isLight)
         {
             Resources["WindowBgBrush"] = new LinearGradientBrush(
-                System.Windows.Media.Color.FromArgb(248, 248, 249, 250),
-                System.Windows.Media.Color.FromArgb(248, 233, 236, 239),
+                System.Windows.Media.Color.FromArgb(174, 248, 249, 250),
+                System.Windows.Media.Color.FromArgb(174, 233, 236, 239),
                 new Point(0.0, 0.0), new Point(1.0, 1.0));
             Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0));
-            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 255, 255, 255));
+            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255));
             Resources["InputBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245));
             Resources["TitleBarBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 255, 255, 255));
             Resources["TitleTextBrush"] = themeGlyphBrush;
@@ -1124,28 +1141,29 @@ public partial class MainWindow : Window
                 new Point(0.0, 0.0), new Point(1.0, 1.0));
             Resources["JewelRingBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255));
 
-            // Hero Mute Button: Liquid Slate-Graphite Lens in Light Mode
+            // Hero Mute Button: Liquid Slate-Graphite Lens matching Toggle Switches in Light Mode
             var heroLensLight = new RadialGradientBrush
             {
-                Center = new Point(0.35, 0.30),
-                GradientOrigin = new Point(0.35, 0.30),
+                Center = new Point(0.35, 0.25),
+                GradientOrigin = new Point(0.35, 0.25),
                 RadiusX = 0.65,
                 RadiusY = 0.65
             };
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(100, 116, 139), 0.0));
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(71, 85, 105), 0.45));
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(51, 65, 85), 0.85));
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(30, 41, 59), 1.0));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(108, 122, 142), 0.0));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(85, 99, 120), 0.35));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(71, 85, 105), 0.70));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(55, 67, 83), 1.0));
             Resources["HeroLensActiveBrush"] = heroLensLight;
 
             var heroGlowLight = new RadialGradientBrush
             {
-                Center = new Point(0.5, 0.5),
-                GradientOrigin = new Point(0.5, 0.5),
+                Center = new Point(0.5, 0.40),
+                GradientOrigin = new Point(0.5, 0.30),
                 RadiusX = 0.5,
                 RadiusY = 0.5
             };
-            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(40, 71, 85, 105), 0.0));
+            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(35, 71, 85, 105), 0.0));
+            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(12, 71, 85, 105), 0.5));
             heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 71, 85, 105), 1.0));
             Resources["HeroGlowActiveBrush"] = heroGlowLight;
             Resources["HeroIconActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
@@ -1221,8 +1239,8 @@ public partial class MainWindow : Window
             // Hero Mute Button: Liquid White-Zinc Lens in Dark Mode
             var heroLensDark = new RadialGradientBrush
             {
-                Center = new Point(0.35, 0.30),
-                GradientOrigin = new Point(0.35, 0.30),
+                Center = new Point(0.35, 0.25),
+                GradientOrigin = new Point(0.35, 0.25),
                 RadiusX = 0.65,
                 RadiusY = 0.65
             };
@@ -1234,12 +1252,13 @@ public partial class MainWindow : Window
 
             var heroGlowDark = new RadialGradientBrush
             {
-                Center = new Point(0.5, 0.5),
-                GradientOrigin = new Point(0.5, 0.5),
+                Center = new Point(0.5, 0.40),
+                GradientOrigin = new Point(0.5, 0.30),
                 RadiusX = 0.5,
                 RadiusY = 0.5
             };
-            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(120, 255, 255, 255), 0.0));
+            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(65, 255, 255, 255), 0.0));
+            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(20, 255, 255, 255), 0.5));
             heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 1.0));
             Resources["HeroGlowActiveBrush"] = heroGlowDark;
             Resources["HeroIconActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27));

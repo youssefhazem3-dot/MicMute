@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -59,56 +60,81 @@ public partial class App : System.Windows.Application
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool DestroyIcon(IntPtr handle);
 
-    private class ModernBlueRenderer : ToolStripProfessionalRenderer
+    private class LiquidGlassMenuRenderer : ToolStripProfessionalRenderer
     {
-        public ModernBlueRenderer()
-            : base(new ModernBlueColorTable())
+        public LiquidGlassMenuRenderer()
+            : base(new LiquidGlassColorTable())
         {
+            RoundedEdges = true;
+        }
+
+        protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+        {
+            bool lightMode = SettingsManager.Load().LightMode;
+            Color bgColor = lightMode ? Color.FromArgb(250, 250, 252) : Color.FromArgb(24, 24, 27);
+            using SolidBrush brush = new SolidBrush(bgColor);
+            e.Graphics.FillRectangle(brush, e.AffectedBounds);
+        }
+
+        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+        {
+            bool lightMode = SettingsManager.Load().LightMode;
+            Color borderColor = lightMode ? Color.FromArgb(228, 228, 231) : Color.FromArgb(46, 46, 52);
+            using Pen pen = new Pen(borderColor, 1f);
+            e.Graphics.DrawRectangle(pen, 0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
         }
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
             bool lightMode = SettingsManager.Load().LightMode;
-            e.TextColor = (lightMode ? Color.FromArgb(29, 29, 31) : Color.FromArgb(245, 245, 247));
+            e.TextColor = lightMode ? Color.FromArgb(24, 24, 27) : Color.FromArgb(244, 244, 246);
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             base.OnRenderItemText(e);
         }
 
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
             bool lightMode = SettingsManager.Load().LightMode;
-            e.ArrowColor = (lightMode ? Color.FromArgb(21, 90, 132) : Color.FromArgb(41, 127, 184));
+            e.ArrowColor = lightMode ? Color.FromArgb(113, 113, 122) : Color.FromArgb(161, 161, 170);
             base.OnRenderArrow(e);
         }
 
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
         {
-            if (e.Item.Selected)
+            if (e.Item.Selected && e.Item.Enabled)
             {
-                using (SolidBrush brush = new SolidBrush(SettingsManager.Load().LightMode ? Color.FromArgb(229, 231, 235) : Color.FromArgb(31, 41, 55)))
-                {
-                    e.Graphics.FillRectangle(brush, 1, 1, e.Item.Width - 2, e.Item.Height - 2);
-                }
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                bool lightMode = SettingsManager.Load().LightMode;
+                Color hoverColor = lightMode ? Color.FromArgb(232, 232, 237) : Color.FromArgb(44, 44, 50);
+                using SolidBrush brush = new SolidBrush(hoverColor);
+                Rectangle rect = new Rectangle(4, 2, e.Item.Width - 8, e.Item.Height - 4);
+                using GraphicsPath path = CreateRoundedRectanglePath(rect, 5f);
+                e.Graphics.FillPath(brush, path);
             }
+        }
+
+        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+        {
+            bool lightMode = SettingsManager.Load().LightMode;
+            Color sepColor = lightMode ? Color.FromArgb(228, 228, 231) : Color.FromArgb(39, 39, 45);
+            int y = e.Item.Height / 2;
+            using Pen pen = new Pen(sepColor, 1f);
+            e.Graphics.DrawLine(pen, 8, y, e.Item.Width - 8, y);
         }
     }
 
-    private class ModernBlueColorTable : ProfessionalColorTable
+    private class LiquidGlassColorTable : ProfessionalColorTable
     {
         private bool IsLight => SettingsManager.Load().LightMode;
 
-        private Color BgWindow => !IsLight ? Color.FromArgb(11, 15, 25) : Color.FromArgb(255, 255, 255);
-
-        private Color BgSelection => !IsLight ? Color.FromArgb(31, 41, 55) : Color.FromArgb(229, 231, 235);
-
-        private Color AccentColor => !IsLight ? Color.FromArgb(41, 127, 184) : Color.FromArgb(21, 90, 132);
-
-        private Color Border => AccentColor;
-
-        private Color Separator => !IsLight ? Color.FromArgb(31, 41, 55) : Color.FromArgb(229, 231, 235);
+        private Color BgWindow => IsLight ? Color.FromArgb(250, 250, 252) : Color.FromArgb(24, 24, 27);
+        private Color BgSelection => IsLight ? Color.FromArgb(232, 232, 237) : Color.FromArgb(44, 44, 50);
+        private Color Border => IsLight ? Color.FromArgb(228, 228, 231) : Color.FromArgb(46, 46, 52);
+        private Color Separator => IsLight ? Color.FromArgb(228, 228, 231) : Color.FromArgb(39, 39, 45);
 
         public override Color ToolStripDropDownBackground => BgWindow;
         public override Color MenuBorder => Border;
-        public override Color MenuItemBorder => BgSelection;
+        public override Color MenuItemBorder => Color.Transparent;
         public override Color MenuItemSelected => BgSelection;
         public override Color MenuItemSelectedGradientBegin => BgSelection;
         public override Color MenuItemSelectedGradientEnd => BgSelection;
@@ -116,6 +142,7 @@ public partial class App : System.Windows.Application
         public override Color MenuItemPressedGradientEnd => BgWindow;
         public override Color ImageMarginGradientBegin => BgWindow;
         public override Color ImageMarginGradientEnd => BgWindow;
+        public override Color ImageMarginGradientMiddle => BgWindow;
         public override Color SeparatorDark => Separator;
         public override Color SeparatorLight => Color.Transparent;
     }
@@ -218,20 +245,52 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        DiagnosticLogger.Initialize(e.Args);
+
         _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
         if (!createdNew)
         {
-            IntPtr existingHwnd = FindWindow(null, "Mic Mute");
-            if (existingHwnd != IntPtr.Zero)
+            if (DiagnosticLogger.IsEnabled)
             {
-                PostMessage(existingHwnd, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+                DiagnosticLogger.LogWarning("Another MicMute instance is running in the background.");
+                DiagnosticLogger.LogInfo("Attempting to close previous instance for this diagnostic session...");
+                try
+                {
+                    var currentId = Environment.ProcessId;
+                    foreach (var proc in Process.GetProcessesByName("MicMute"))
+                    {
+                        if (proc.Id != currentId)
+                        {
+                            proc.Kill();
+                            proc.WaitForExit(3000);
+                        }
+                    }
+                    _mutex = new Mutex(initiallyOwned: true, MutexName, out createdNew);
+                    if (createdNew)
+                    {
+                        DiagnosticLogger.LogInfo("Successfully acquired application mutex.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError("Could not close previous instance", ex);
+                }
             }
-            else
+
+            if (!createdNew)
             {
-                PostMessage((IntPtr)HWND_BROADCAST, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+                IntPtr existingHwnd = FindWindow(null, "Mic Mute");
+                if (existingHwnd != IntPtr.Zero)
+                {
+                    PostMessage(existingHwnd, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+                }
+                else
+                {
+                    PostMessage((IntPtr)HWND_BROADCAST, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+                }
+                Environment.Exit(0);
+                return;
             }
-            Environment.Exit(0);
-            return;
         }
 
         // Automatic High Refresh Rate Detection (144Hz, 240Hz, 360Hz)
@@ -245,6 +304,10 @@ public partial class App : System.Windows.Application
                 refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 120);
             }
             Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(Timeline), new FrameworkPropertyMetadata(refreshRate));
+            if (DiagnosticLogger.IsEnabled)
+            {
+                DiagnosticLogger.LogInfo($"Display refresh rate set to: {refreshRate} FPS");
+            }
         }
         catch
         {
@@ -262,6 +325,13 @@ public partial class App : System.Windows.Application
         _audioController.SetTargetDevice(appSettings.SelectedDeviceId);
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
         InitializeTrayIcon();
+
+        if (DiagnosticLogger.IsEnabled)
+        {
+            DiagnosticLogger.LogAudio($"Active capture endpoint: '{_audioController.CurrentDeviceName}' (Muted: {_audioController.IsMuted})");
+            DiagnosticLogger.LogInfo($"Shortcut configured: {appSettings.Hotkey} (Modifiers: {appSettings.HotkeyModifiers})");
+        }
+
         _mainWindow = new MainWindow(_audioController);
         if (!UiBehavior.ShouldStartMinimized(appSettings.StartMinimized, e.Args))
         {
@@ -290,22 +360,37 @@ public partial class App : System.Windows.Application
         };
         ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
         contextMenuStrip.ShowImageMargin = false;
-        contextMenuStrip.Renderer = new ModernBlueRenderer();
+        contextMenuStrip.Renderer = new LiquidGlassMenuRenderer();
+        contextMenuStrip.Padding = new Padding(4, 5, 4, 5);
+        try
+        {
+            contextMenuStrip.Font = new Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+        }
+        catch
+        {
+            contextMenuStrip.Font = new Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+        }
+
         ToolStripMenuItem value = new ToolStripMenuItem("Toggle Mute", null, delegate
         {
             _audioController?.ToggleMute();
-        });
+        }) { AutoSize = true, Margin = new Padding(0, 1, 0, 1), Padding = new Padding(12, 6, 12, 6) };
+
         ToolStripMenuItem value2 = new ToolStripMenuItem("Open Control Panel", null, delegate
         {
             ShowWindow();
-        });
+        }) { AutoSize = true, Margin = new Padding(0, 1, 0, 1), Padding = new Padding(12, 6, 12, 6) };
+
+        ToolStripSeparator separator = new ToolStripSeparator { Margin = new Padding(0, 3, 0, 3) };
+
         ToolStripMenuItem value3 = new ToolStripMenuItem("Quit", null, delegate
         {
             ExitApp();
-        });
+        }) { AutoSize = true, Margin = new Padding(0, 1, 0, 1), Padding = new Padding(12, 6, 12, 6) };
+
         contextMenuStrip.Items.Add(value);
         contextMenuStrip.Items.Add(value2);
-        contextMenuStrip.Items.Add(new ToolStripSeparator());
+        contextMenuStrip.Items.Add(separator);
         contextMenuStrip.Items.Add(value3);
         _notifyIcon.ContextMenuStrip = contextMenuStrip;
         UpdateTrayIcon(_audioController?.IsMuted ?? false);
@@ -322,37 +407,96 @@ public partial class App : System.Windows.Application
         _notifyIcon.Text = UiBehavior.LimitTooltip("Mic Mute (" + text2 + ")\nDevice: " + text);
         try
         {
-            using Bitmap bitmap = new Bitmap(16, 16);
+            int size = Math.Max(16, SystemInformation.SmallIconSize.Width);
+            using Bitmap bitmap = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             using (Graphics graphics = Graphics.FromImage(bitmap))
             {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 graphics.Clear(Color.Transparent);
+
                 bool lightMode = SettingsManager.Load().LightMode;
-                Color color = isMuted ? Color.FromArgb(255, 59, 48) : (lightMode ? Color.FromArgb(21, 90, 132) : Color.FromArgb(41, 127, 184));
-                using (SolidBrush brush = new SolidBrush(color))
+
+                // Squircle badge background & border
+                float s = size;
+                RectangleF badgeRect = new RectangleF(0.5f, 0.5f, s - 1f, s - 1f);
+                float cornerRadius = s * 0.28f;
+
+                Color badgeBg = isMuted
+                    ? Color.FromArgb(185, 42, 42) // Chill low-light red (#B92A2A)
+                    : (lightMode ? Color.FromArgb(45, 45, 48) : Color.FromArgb(24, 24, 27)); // Sleek neutral glass
+                Color badgeBorder = isMuted
+                    ? Color.FromArgb(220, 38, 38)
+                    : (lightMode ? Color.FromArgb(70, 70, 75) : Color.FromArgb(46, 46, 52));
+
+                using (GraphicsPath badgePath = CreateRoundedRectanglePath(badgeRect, cornerRadius))
                 {
-                    graphics.FillEllipse(brush, 0, 0, 16, 16);
+                    using (SolidBrush bgBrush = new SolidBrush(badgeBg))
+                        graphics.FillPath(bgBrush, badgePath);
+                    using (Pen borderPen = new Pen(badgeBorder, 1f))
+                        graphics.DrawPath(borderPen, badgePath);
                 }
-                using Pen pen = new Pen(Color.White, 1.2f);
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                using (SolidBrush brush2 = new SolidBrush(Color.White))
+
+                // Center and scale microphone glyph from Gemini reference design (24x24 box)
+                float cx = s / 2f;
+                float cy = s / 2f;
+                float scale = (s * 0.65f) / 24f;
+
+                graphics.TranslateTransform(cx, cy);
+                graphics.ScaleTransform(scale, scale);
+                graphics.TranslateTransform(-12f, -12f);
+
+                // Microphone Capsule (Solid rounded pill)
+                using (GraphicsPath capsule = new GraphicsPath())
                 {
-                    FillRoundedRectangle(graphics, brush2, 6f, 4f, 4f, 6f, 1.5f);
-                    graphics.DrawArc(pen, 4.5f, 5.5f, 7f, 5f, 0f, 180f);
-                    graphics.DrawLine(pen, 8f, 10.5f, 8f, 12.5f);
-                    graphics.DrawLine(pen, 6f, 12.5f, 10f, 12.5f);
+                    capsule.AddArc(8.25f, 2.5f, 7.5f, 7.5f, 180, 180);
+                    capsule.AddLine(15.75f, 6.25f, 15.75f, 10.5f);
+                    capsule.AddArc(8.25f, 6.75f, 7.5f, 7.5f, 0, 180);
+                    capsule.AddLine(8.25f, 10.5f, 8.25f, 6.25f);
+                    capsule.CloseFigure();
+
+                    using (SolidBrush micBrush = new SolidBrush(Color.White))
+                        graphics.FillPath(micBrush, capsule);
                 }
+
+                // Microphone Cradle, Stem, and Foot
+                using (Pen cradlePen = new Pen(Color.White, 2.0f))
+                {
+                    cradlePen.StartCap = LineCap.Round;
+                    cradlePen.EndCap = LineCap.Round;
+
+                    using (GraphicsPath cradle = new GraphicsPath())
+                    {
+                        cradle.AddLine(6.0f, 7.5f, 6.0f, 10.5f);
+                        cradle.AddArc(6.0f, 4.5f, 12.0f, 12.0f, 180, -180);
+                        cradle.AddLine(18.0f, 10.5f, 18.0f, 7.5f);
+                        graphics.DrawPath(cradlePen, cradle);
+                    }
+
+                    // Neck / stem
+                    graphics.DrawLine(cradlePen, 12.0f, 16.5f, 12.0f, 20.0f);
+                    // Foot base
+                    graphics.DrawLine(cradlePen, 8.0f, 20.0f, 16.0f, 20.0f);
+                }
+
+                // Muted diagonal slash
                 if (isMuted)
                 {
-                    using (Pen pen2 = new Pen(color, 2.2f))
+                    using (Pen slashBacking = new Pen(Color.FromArgb(140, 0, 0, 0), 4.2f))
                     {
-                        pen2.StartCap = LineCap.Round;
-                        pen2.EndCap = LineCap.Round;
-                        graphics.DrawLine(pen2, 3, 3, 13, 13);
+                        slashBacking.StartCap = LineCap.Round;
+                        slashBacking.EndCap = LineCap.Round;
+                        graphics.DrawLine(slashBacking, 3.5f, 3.5f, 20.5f, 20.5f);
                     }
-                    graphics.DrawLine(pen, 3, 3, 13, 13);
+                    using (Pen slashWhite = new Pen(Color.White, 2.2f))
+                    {
+                        slashWhite.StartCap = LineCap.Round;
+                        slashWhite.EndCap = LineCap.Round;
+                        graphics.DrawLine(slashWhite, 3.5f, 3.5f, 20.5f, 20.5f);
+                    }
                 }
+
+                graphics.ResetTransform();
             }
             IntPtr newHIcon = bitmap.GetHicon();
             Icon icon = Icon.FromHandle(newHIcon);
@@ -387,20 +531,29 @@ public partial class App : System.Windows.Application
         UpdateTrayIcon(_audioController?.IsMuted ?? false);
     }
 
+    private static GraphicsPath CreateRoundedRectanglePath(RectangleF rect, float radius)
+    {
+        GraphicsPath path = new GraphicsPath();
+        float d = radius * 2f;
+        if (d > rect.Width) d = rect.Width;
+        if (d > rect.Height) d = rect.Height;
+        path.AddArc(rect.X, rect.Y, d, d, 180f, 90f);
+        path.AddArc(rect.Right - d, rect.Y, d, d, 270f, 90f);
+        path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0f, 90f);
+        path.AddArc(rect.X, rect.Bottom - d, d, d, 90f, 90f);
+        path.CloseFigure();
+        return path;
+    }
+
     private static void FillRoundedRectangle(Graphics g, Brush brush, float x, float y, float width, float height, float radius)
     {
-        using GraphicsPath graphicsPath = new GraphicsPath();
-        float num = radius * 2f;
-        graphicsPath.AddArc(x, y, num, num, 180f, 90f);
-        graphicsPath.AddArc(x + width - num, y, num, num, 270f, 90f);
-        graphicsPath.AddArc(x + width - num, y + height - num, num, num, 0f, 90f);
-        graphicsPath.AddArc(x, y + height - num, num, num, 90f, 90f);
-        graphicsPath.CloseAllFigures();
+        using GraphicsPath graphicsPath = CreateRoundedRectanglePath(new RectangleF(x, y, width, height), radius);
         g.FillPath(brush, graphicsPath);
     }
 
     private void AudioController_MuteStateChanged(object? sender, MuteStateChangedEventArgs e)
     {
+        DiagnosticLogger.LogAudio($"Event: MuteStateChanged -> {(e.IsMuted ? "MUTED [Chill Red]" : "LIVE [Active]")}");
         if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
         Dispatcher.BeginInvoke((Action)delegate
         {

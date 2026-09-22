@@ -220,9 +220,10 @@ public partial class OsdWindow : Window
         }
     }
 
-    private static readonly Color ColorMuted = Color.FromRgb(0xEF, 0x44, 0x44);
-    private static readonly SolidColorBrush BrushMutedText = CreateFrozenBrush(ColorMuted);
-    private static readonly SolidColorBrush BrushMutedBorder = CreateFrozenBrush(ColorMuted);
+    private static readonly Color ColorMutedText = Color.FromRgb(0xE2, 0x85, 0x85);
+    private static readonly Color ColorMutedBorder = Color.FromRgb(0xB9, 0x2A, 0x2A);
+    private static readonly SolidColorBrush BrushMutedText = CreateFrozenBrush(ColorMutedText);
+    private static readonly SolidColorBrush BrushMutedBorder = CreateFrozenBrush(ColorMutedBorder);
 
     private static readonly Color ColorActive = Color.FromRgb(0x94, 0xA3, 0xB8);
     private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
@@ -244,7 +245,7 @@ public partial class OsdWindow : Window
             tbStatus.Text = "MUTED";
             tbStatus.Foreground = BrushMutedText;
             borderPanel.BorderBrush = BrushMutedBorder;
-            osdShadow.Color = ColorMuted;
+            osdShadow.Color = ColorMutedBorder;
         }
         else
         {

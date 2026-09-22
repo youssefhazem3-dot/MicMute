@@ -205,22 +205,22 @@
                                     BorderThickness="1.2"
                                     CornerRadius="15">
                                 <Border.Effect>
-                                    <DropShadowEffect x:Name="glow" BlurRadius="12" ShadowDepth="0" Opacity="0" Color="{DynamicResource AccentColor}" />
+                                    <DropShadowEffect x:Name="glow" BlurRadius="7" ShadowDepth="2" Direction="270" Opacity="0" Color="{DynamicResource AccentColor}" />
                                 </Border.Effect>
-                                <!-- Trench Depth & Refraction Overlay -->
+                                <!-- Trench Depth & Refraction Overlay (Physical Overhead Lighting) -->
                                 <Grid>
-                                    <Border Height="8" VerticalAlignment="Top" CornerRadius="14,14,0,0" Opacity="0.25">
+                                    <Border Height="8" VerticalAlignment="Top" CornerRadius="14,14,0,0" Opacity="0.30">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                <GradientStop Color="#000000" Offset="0.0" />
+                                                <GradientStop Color="#40000000" Offset="0.0" />
                                                 <GradientStop Color="#00000000" Offset="1.0" />
                                             </LinearGradientBrush>
                                         </Border.Background>
                                     </Border>
-                                    <Border Height="4" VerticalAlignment="Bottom" CornerRadius="0,0,14,14" Opacity="0.18">
+                                    <Border Height="4" VerticalAlignment="Bottom" CornerRadius="0,0,14,14" Opacity="0.22">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
-                                                <GradientStop Color="#FFFFFF" Offset="0.0" />
+                                                <GradientStop Color="#30FFFFFF" Offset="0.0" />
                                                 <GradientStop Color="#00FFFFFF" Offset="1.0" />
                                             </LinearGradientBrush>
                                         </Border.Background>
@@ -244,7 +244,7 @@
                                     </TransformGroup>
                                 </Border.RenderTransform>
                                 <Border.Effect>
-                                    <DropShadowEffect BlurRadius="5" ShadowDepth="1.5" Opacity="0.3" Color="Black" />
+                                    <DropShadowEffect BlurRadius="4" ShadowDepth="1.8" Direction="270" Opacity="0.30" Color="Black" />
                                 </Border.Effect>
                                 <!-- Overhead Specular Crescent Highlight -->
                                 <Border Height="5" Margin="4,1.5,4,0" VerticalAlignment="Top" CornerRadius="2.5">
@@ -280,7 +280,7 @@
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimation Storyboard.TargetName="glow"
                                                              Storyboard.TargetProperty="Opacity"
-                                                             To="0.45"
+                                                             To="0.22"
                                                              Duration="0:0:0.20" />
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -304,6 +304,55 @@
                                                              Storyboard.TargetProperty="Opacity"
                                                              To="0"
                                                              Duration="0:0:0.20" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+
+                            <!-- Hover Bounce Interaction matching OSD Slider -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                                             Storyboard.TargetProperty="ScaleX"
+                                                             To="1.10"
+                                                             Duration="0:0:0.15">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                                             Storyboard.TargetProperty="ScaleY"
+                                                             To="1.10"
+                                                             Duration="0:0:0.15">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                                             Storyboard.TargetProperty="ScaleX"
+                                                             To="1.00"
+                                                             Duration="0:0:0.16">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                                             Storyboard.TargetProperty="ScaleY"
+                                                             To="1.00"
+                                                             Duration="0:0:0.16">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -431,20 +480,22 @@
                                 <ScaleTransform x:Name="gridScale" ScaleX="1.0" ScaleY="1.0" />
                             </Grid.RenderTransform>
 
-                            <!-- Dynamic Ambient Halo -->
+                            <!-- Dynamic Ambient Halo (Physically Offset Downward from Overhead Light) -->
                             <Ellipse x:Name="glow"
-                                     Width="92" Height="92"
+                                     Width="98" Height="98"
                                      Opacity="0.45"
+                                     Margin="0,5,0,0"
                                      RenderTransformOrigin="0.5,0.5">
                                 <Ellipse.Fill>
-                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-                                        <GradientStop Color="#9038BDF8" Offset="0.0" />
-                                        <GradientStop Color="#0038BDF8" Offset="1.0" />
+                                    <RadialGradientBrush Center="0.5,0.40" GradientOrigin="0.5,0.30" RadiusX="0.5" RadiusY="0.5">
+                                        <GradientStop Color="#40FFFFFF" Offset="0.0" />
+                                        <GradientStop Color="#15FFFFFF" Offset="0.5" />
+                                        <GradientStop Color="#00FFFFFF" Offset="1.0" />
                                     </RadialGradientBrush>
                                 </Ellipse.Fill>
                             </Ellipse>
 
-                            <!-- Outer Jewel-Cut Glass Bevel Ring -->
+                            <!-- Outer Jewel-Cut Glass Bevel Ring (Physically Grounded Downward Contact Shadow) -->
                             <Border x:Name="outerJewelRing"
                                     Width="86" Height="86"
                                     CornerRadius="43"
@@ -452,7 +503,7 @@
                                     BorderThickness="1.5"
                                     Background="{DynamicResource JewelRingBgBrush}">
                                 <Border.Effect>
-                                    <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.35" Color="Black" />
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.38" Color="Black" />
                                 </Border.Effect>
                             </Border>
 
@@ -463,7 +514,7 @@
                                     BorderBrush="#85FFFFFF"
                                     BorderThickness="1">
                                 <Border.Background>
-                                    <RadialGradientBrush Center="0.35,0.30" GradientOrigin="0.35,0.30" RadiusX="0.65" RadiusY="0.65">
+                                    <RadialGradientBrush Center="0.35,0.25" GradientOrigin="0.35,0.25" RadiusX="0.65" RadiusY="0.65">
                                         <GradientStop Color="#FFFFFFFF" Offset="0.0" />
                                         <GradientStop Color="#FFE4E4E7" Offset="0.45" />
                                         <GradientStop Color="#FFD4D4D8" Offset="0.85" />
@@ -471,15 +522,19 @@
                                     </RadialGradientBrush>
                                 </Border.Background>
                                 <Grid>
-                                    <!-- Overhead Specular Crescent Highlight -->
-                                    <Border Height="22" Margin="10,2,10,0" VerticalAlignment="Top" CornerRadius="12,12,6,6">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                <GradientStop Color="#CCFFFFFF" Offset="0.0" />
+                                    <!-- Overhead Specular Curved Glass Highlight -->
+                                    <Ellipse Width="44" Height="18"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Top"
+                                             Margin="0,3,0,0">
+                                        <Ellipse.Fill>
+                                            <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                                                <GradientStop Color="#C8FFFFFF" Offset="0.0" />
+                                                <GradientStop Color="#40FFFFFF" Offset="0.5" />
                                                 <GradientStop Color="#00FFFFFF" Offset="1.0" />
                                             </LinearGradientBrush>
-                                        </Border.Background>
-                                    </Border>
+                                        </Ellipse.Fill>
+                                    </Ellipse>
 
                                     <!-- Razor-Sharp Vector Microphone Cutout -->
                                     <Grid Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -487,23 +542,23 @@
                                               Fill="{DynamicResource HeroIconActiveBrush}"
                                               Stretch="Uniform"
                                               Width="24" Height="24"
-                                              Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z">
+                                              Data="M12,2.5 C9.93,2.5 8.25,4.18 8.25,6.25 L8.25,10.5 C8.25,12.57 9.93,14.25 12,14.25 C14.07,14.25 15.75,12.57 15.75,10.5 L15.75,6.25 C15.75,4.18 14.07,2.5 12,2.5 Z M6,7.5 C6,6.95 6.45,6.5 7,6.5 C7.55,6.5 8,6.95 8,7.5 L8,10.5 C8,12.71 9.79,14.5 12,14.5 C14.21,14.5 16,12.71 16,10.5 L16,7.5 C16,6.95 16.45,6.5 17,6.5 C17.55,6.5 18,6.95 18,7.5 L18,10.5 C18,13.48 15.82,15.96 13,16.42 L13,19.5 L15.5,19.5 C16.05,19.5 16.5,19.95 16.5,20.5 C16.5,21.05 16.05,21.5 15.5,21.5 L8.5,21.5 C7.95,21.5 7.5,21.05 7.5,20.5 C7.5,19.95 7.95,19.5 8.5,19.5 L11,19.5 L11,16.42 C8.18,15.96 6,13.48 6,10.5 Z">
                                             <Path.Effect>
-                                                <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.3" Color="Black" />
+                                                <DropShadowEffect BlurRadius="4" ShadowDepth="1.5" Direction="270" Opacity="0.3" Color="Black" />
                                             </Path.Effect>
                                         </Path>
                                         <!-- Clean Diagonal Slash Line for Muted State -->
                                         <Line x:Name="slashBg"
-                                              X1="2" Y1="2" X2="22" Y2="22"
+                                              X1="2.5" Y1="2.5" X2="21.5" Y2="21.5"
                                               Stroke="#80000000"
                                               StrokeThickness="4.5"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
                                               Visibility="Collapsed" />
                                         <Line x:Name="slash"
-                                              X1="2" Y1="2" X2="22" Y2="22"
+                                              X1="2.5" Y1="2.5" X2="21.5" Y2="21.5"
                                               Stroke="#FFFFFF"
-                                              StrokeThickness="2.2"
+                                              StrokeThickness="2.4"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
                                               Visibility="Collapsed" />
@@ -521,22 +576,24 @@
                                 <Setter TargetName="iconPath" Property="Fill" Value="{DynamicResource HeroIconActiveBrush}" />
                             </Trigger>
 
+                            <!-- Clean Chill Low-Light Red Muted State -->
                             <Trigger Property="Tag" Value="Muted">
                                 <Setter TargetName="lens" Property="Background">
                                     <Setter.Value>
-                                        <RadialGradientBrush Center="0.35,0.30" GradientOrigin="0.35,0.30" RadiusX="0.65" RadiusY="0.65">
-                                            <GradientStop Color="#FFF87171" Offset="0.0" />
-                                            <GradientStop Color="#FFEF4444" Offset="0.45" />
-                                            <GradientStop Color="#FFDC2626" Offset="0.85" />
-                                            <GradientStop Color="#FF991B1B" Offset="1.0" />
+                                        <RadialGradientBrush Center="0.35,0.25" GradientOrigin="0.35,0.25" RadiusX="0.65" RadiusY="0.65">
+                                            <GradientStop Color="#FFD9534F" Offset="0.0" />
+                                            <GradientStop Color="#FFA82828" Offset="0.45" />
+                                            <GradientStop Color="#FF6E1515" Offset="0.85" />
+                                            <GradientStop Color="#FF420D0D" Offset="1.0" />
                                         </RadialGradientBrush>
                                     </Setter.Value>
                                 </Setter>
                                 <Setter TargetName="glow" Property="Fill">
                                     <Setter.Value>
-                                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-                                            <GradientStop Color="#90EF4444" Offset="0.0" />
-                                            <GradientStop Color="#00EF4444" Offset="1.0" />
+                                        <RadialGradientBrush Center="0.5,0.40" GradientOrigin="0.5,0.30" RadiusX="0.5" RadiusY="0.5">
+                                            <GradientStop Color="#35801818" Offset="0.0" />
+                                            <GradientStop Color="#12801818" Offset="0.5" />
+                                            <GradientStop Color="#00801818" Offset="1.0" />
                                         </RadialGradientBrush>
                                     </Setter.Value>
                                 </Setter>
@@ -864,7 +921,7 @@
                     <!-- Left: App Vector Icon & Title (Icon dynamically follows Theme!) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0">
                         <Path x:Name="titleBarIcon"
-                              Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"
+                              Data="M12,2.5 C9.93,2.5 8.25,4.18 8.25,6.25 L8.25,10.5 C8.25,12.57 9.93,14.25 12,14.25 C14.07,14.25 15.75,12.57 15.75,10.5 L15.75,6.25 C15.75,4.18 14.07,2.5 12,2.5 Z M6,7.5 C6,6.95 6.45,6.5 7,6.5 C7.55,6.5 8,6.95 8,7.5 L8,10.5 C8,12.71 9.79,14.5 12,14.5 C14.21,14.5 16,12.71 16,10.5 L16,7.5 C16,6.95 16.45,6.5 17,6.5 C17.55,6.5 18,6.95 18,7.5 L18,10.5 C18,13.48 15.82,15.96 13,16.42 L13,19.5 L15.5,19.5 C16.05,19.5 16.5,19.95 16.5,20.5 C16.5,21.05 16.05,21.5 15.5,21.5 L8.5,21.5 C7.95,21.5 7.5,21.05 7.5,20.5 C7.5,19.95 7.95,19.5 8.5,19.5 L11,19.5 L11,16.42 C8.18,15.96 6,13.48 6,10.5 Z"
                               Fill="{DynamicResource TitleTextBrush}"
                               Stretch="Uniform"
                               Width="13" Height="13"
@@ -964,6 +1021,7 @@
                                            FontFamily="Consolas, Segoe UI Variable Text, Segoe UI"
                                            FontWeight="Bold"
                                            FontSize="10"
+                                           Margin="0,1,0,0"
                                            VerticalAlignment="Center" />
                             </Border>
                             <TextBlock Text=" to toggle" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
@@ -994,7 +1052,7 @@
                                         BorderThickness="1"
                                         Margin="0,0,9,0"
                                         VerticalAlignment="Center">
-                                    <Path Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"
+                                    <Path Data="M12,2.5 C9.93,2.5 8.25,4.18 8.25,6.25 L8.25,10.5 C8.25,12.57 9.93,14.25 12,14.25 C14.07,14.25 15.75,12.57 15.75,10.5 L15.75,6.25 C15.75,4.18 14.07,2.5 12,2.5 Z M6,7.5 C6,6.95 6.45,6.5 7,6.5 C7.55,6.5 8,6.95 8,7.5 L8,10.5 C8,12.71 9.79,14.5 12,14.5 C14.21,14.5 16,12.71 16,10.5 L16,7.5 C16,6.95 16.45,6.5 17,6.5 C17.55,6.5 18,6.95 18,7.5 L18,10.5 C18,13.48 15.82,15.96 13,16.42 L13,19.5 L15.5,19.5 C16.05,19.5 16.5,19.95 16.5,20.5 C16.5,21.05 16.05,21.5 15.5,21.5 L8.5,21.5 C7.95,21.5 7.5,21.05 7.5,20.5 C7.5,19.95 7.95,19.5 8.5,19.5 L11,19.5 L11,16.42 C8.18,15.96 6,13.48 6,10.5 Z"
                                           Fill="{DynamicResource SquircleIconBrush}"
                                           Stretch="Uniform"
                                           Width="13" Height="13"
@@ -1069,6 +1127,7 @@
                                                    FontFamily="Consolas, Segoe UI"
                                                    FontWeight="Bold"
                                                    FontSize="11"
+                                                   Margin="0,1.5,0,0"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Center" />
                                     </Border>
@@ -1352,52 +1411,89 @@
                     <!-- Hidden legacy checkbox to preserve settings binding -->
                     <CheckBox x:Name="cbLightMode" Visibility="Collapsed" />
 
-                    <!-- COMPACT FOOTER: Data & Storage Disclosure -->
+                    <!-- GROUP 3: Settings Location & Data (iOS Inset Squircle Group) -->
                     <Border Background="{DynamicResource CardBgBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="12"
-                            Padding="10,6"
-                            Margin="0,0,0,6">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                            CornerRadius="16"
+                            Padding="12,10"
+                            Margin="0,0,0,10">
+                        <StackPanel>
+                            <!-- Row 1: Header with Label, Icon and Action Buttons -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                            <Path Grid.Column="0"
-                                  Data="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"
-                                  Fill="{DynamicResource TextGrayBrush}"
-                                  Stretch="Uniform"
-                                  Width="12" Height="10"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,6,0" />
+                                <!-- Standard 28x28 Squircle Tile -->
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"
+                                          Fill="{DynamicResource SquircleIconBrush}"
+                                          Stretch="Uniform"
+                                          Width="13" Height="11"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
 
-                            <TextBlock x:Name="tbStoragePath"
-                                       Grid.Column="1"
-                                       Text="%APPDATA%\MicMute"
-                                       Foreground="{DynamicResource TextGrayBrush}"
-                                       FontSize="10"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center"
-                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Settings Location"
+                                               Foreground="{DynamicResource TextWhiteBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold" />
+                                    <TextBlock Text="Configuration file and data directory"
+                                               Foreground="{DynamicResource TextGrayBrush}"
+                                               FontSize="9.5" />
+                                </StackPanel>
 
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button x:Name="btnOpenFolder" Content="Open"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Padding="6,2" FontSize="10"
-                                        Click="BtnOpenDataFolder_Click" />
-                                <Button x:Name="btnChangeFolder" Content="Change"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Padding="6,2" FontSize="10" Margin="4,0,0,0"
-                                        Click="BtnChangeDataFolder_Click" />
-                                <Button x:Name="btnResetData" Content="Reset"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Padding="6,2" FontSize="10" Margin="4,0,0,0"
-                                        Click="BtnResetSettings_Click" />
-                            </StackPanel>
-                        </Grid>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="btnOpenFolder" Content="Open"
+                                            Style="{StaticResource SecondaryActionButtonStyle}"
+                                            Height="26" Padding="10,0" FontSize="10.5"
+                                            Click="BtnOpenDataFolder_Click" />
+                                    <Button x:Name="btnChangeFolder" Content="Change"
+                                            Style="{StaticResource SecondaryActionButtonStyle}"
+                                            Height="26" Padding="10,0" FontSize="10.5" Margin="5,0,0,0"
+                                            Click="BtnChangeDataFolder_Click" />
+                                    <Button x:Name="btnResetData" Content="Reset"
+                                            Style="{StaticResource SecondaryActionButtonStyle}"
+                                            Height="26" Padding="10,0" FontSize="10.5" Margin="5,0,0,0"
+                                            Click="BtnResetSettings_Click" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Clean Separator -->
+                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,8,0,8" />
+
+                            <!-- Row 2: Inset Glass Pill for Full Path Display -->
+                            <Border Background="{DynamicResource InputBgBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="tbStoragePath"
+                                               Text="%APPDATA%\MicMute"
+                                               Foreground="{DynamicResource TextGrayBrush}"
+                                               FontSize="10"
+                                               FontFamily="Consolas, SF Mono, Cascadia Mono, Segoe UI Mono, monospace"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
                     </Border>
 
                     <!-- Warning / Notification Box -->

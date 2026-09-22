@@ -126,12 +126,13 @@ public static class UiBehavior
 
     public static bool ShouldStartMinimized(bool storedPreference, string[]? arguments)
     {
-        if (HasArgument(arguments, "--show"))
+        if (HasArgument(arguments, "--show") || IsDiagnosticMode(arguments))
         {
             return false;
         }
         return HasArgument(arguments, "--minimized") || storedPreference;
     }
+
 
     public static string BuildRestartArguments(int parentProcessId, bool showWindow)
     {
@@ -183,7 +184,15 @@ public static class UiBehavior
         }
     }
 
-    private static bool HasArgument(string[]? arguments, string expected)
+    public static bool IsDiagnosticMode(string[]? arguments)
+    {
+        return HasArgument(arguments, "--diagnostic")
+            || HasArgument(arguments, "--diag")
+            || HasArgument(arguments, "-d")
+            || string.Equals(Environment.GetEnvironmentVariable("MICMUTE_DIAGNOSTIC"), "1", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool HasArgument(string[]? arguments, string expected)
     {
         if (arguments == null)
         {
