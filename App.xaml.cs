@@ -242,7 +242,7 @@ public partial class App : System.Windows.Application
             devMode.dmSize = (short)Marshal.SizeOf(devMode);
             if (EnumDisplaySettings(null, -1, ref devMode) && devMode.dmDisplayFrequency > 30)
             {
-                refreshRate = Math.Max(60, devMode.dmDisplayFrequency);
+                refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 120);
             }
             Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(Timeline), new FrameworkPropertyMetadata(refreshRate));
         }

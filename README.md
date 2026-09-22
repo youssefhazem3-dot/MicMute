@@ -50,6 +50,7 @@ Here is a concise summary of the latest stability improvements and fixes:
 * **OSD Multi-Monitor & DPI Fix:** Eliminated screen jumping and display flickering on launch; added per-monitor DPI coordinate scaling.
 * **Safer Shortcut Recording:** Pressing `Escape` now cleanly cancels shortcut recording, and core typing/navigation keys (`Tab`, `Enter`, `Space`, `Backspace`, `CapsLock`) are protected from accidental binding.
 * **No UI Freezing on Device Hotplug:** Headset connection/disconnection device enumeration now runs asynchronously in the background.
+* **GPU Spikes & Performance Lag Fixed:** Eliminated high GPU utilization (spiking up to 70%) caused by continuous pixel shader blur operations and infinite animation loops on transparent layered surfaces. Replaced with efficient vector radial gradient rendering and clamped the maximum UI animation rate to 120 FPS.
 * **Single Standalone Executable:** Packaged into a single self-contained `.exe` with zero external runtime requirements (no .NET 8 desktop runtime installation needed).
 
 ---

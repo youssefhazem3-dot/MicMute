@@ -383,12 +383,14 @@
                         <Grid>
                             <Ellipse x:Name="glow"
                                      Width="88" Height="88"
-                                     Fill="#0091FF"
-                                     Opacity="0.3"
+                                     Opacity="0.4"
                                      RenderTransformOrigin="0.5,0.5">
-                                <Ellipse.Effect>
-                                    <BlurEffect Radius="5" />
-                                </Ellipse.Effect>
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                        <GradientStop Color="#800091FF" Offset="0.0" />
+                                        <GradientStop Color="#000091FF" Offset="1.0" />
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
                                 <Ellipse.RenderTransform>
                                     <ScaleTransform ScaleX="1.0" ScaleY="1.0" />
                                 </Ellipse.RenderTransform>
@@ -449,7 +451,14 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="Tag" Value="Active">
                                 <Setter TargetName="iconPath" Property="Fill" Value="#164B6E" />
-                                <Setter TargetName="glow" Property="Fill" Value="#0091FF" />
+                                <Setter TargetName="glow" Property="Fill">
+                                    <Setter.Value>
+                                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                            <GradientStop Color="#800091FF" Offset="0.0" />
+                                            <GradientStop Color="#000091FF" Offset="1.0" />
+                                        </RadialGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
                                 <Setter TargetName="slashBg" Property="Visibility" Value="Collapsed" />
                                 <Setter TargetName="slash" Property="Visibility" Value="Collapsed" />
                             </Trigger>
@@ -465,35 +474,17 @@
                                     </Setter.Value>
                                 </Setter>
                                 <Setter TargetName="iconPath" Property="Fill" Value="#880E4F" />
-                                <Setter TargetName="glow" Property="Fill" Value="#FF453A" />
+                                <Setter TargetName="glow" Property="Fill">
+                                    <Setter.Value>
+                                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                            <GradientStop Color="#80FF453A" Offset="0.0" />
+                                            <GradientStop Color="#00FF453A" Offset="1.0" />
+                                        </RadialGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
                                 <Setter TargetName="slashBg" Property="Visibility" Value="Visible" />
                                 <Setter TargetName="slash" Property="Visibility" Value="Visible" />
                             </Trigger>
-
-                            <EventTrigger RoutedEvent="FrameworkElement.Loaded" SourceName="glow">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="glow"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         From="0.1" To="0.65"
-                                                         Duration="0:0:1.6"
-                                                         AutoReverse="True"
-                                                         RepeatBehavior="Forever" />
-                                        <DoubleAnimation Storyboard.TargetName="glow"
-                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                         From="0.95" To="1.1"
-                                                         Duration="0:0:1.6"
-                                                         AutoReverse="True"
-                                                         RepeatBehavior="Forever" />
-                                        <DoubleAnimation Storyboard.TargetName="glow"
-                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                         From="0.95" To="1.1"
-                                                         Duration="0:0:1.6"
-                                                         AutoReverse="True"
-                                                         RepeatBehavior="Forever" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
 
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Trigger.EnterActions>
