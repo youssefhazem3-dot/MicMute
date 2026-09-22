@@ -1,12 +1,10 @@
 using System;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Interop;
@@ -147,7 +145,7 @@ public partial class App : System.Windows.Application
         public override Color SeparatorLight => Color.Transparent;
     }
 
-    private static Mutex? _mutex;
+    private static AppInstanceMutex? _mutex;
     private const string MutexName = "Global\\MicMuteAppMutex_7FA5D9E0-9E11-40EA-B368-C8E649F56A49";
     private NotifyIcon? _notifyIcon;
     private AudioController? _audioController;
@@ -247,50 +245,26 @@ public partial class App : System.Windows.Application
     {
         DiagnosticLogger.Initialize(e.Args);
 
-        _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
-        if (!createdNew)
+        _mutex = AppInstanceMutex.TryAcquire(MutexName);
+        if (_mutex == null)
         {
             if (DiagnosticLogger.IsEnabled)
             {
-                DiagnosticLogger.LogWarning("Another MicMute instance is running in the background.");
-                DiagnosticLogger.LogInfo("Attempting to close previous instance for this diagnostic session...");
-                try
-                {
-                    var currentId = Environment.ProcessId;
-                    foreach (var proc in Process.GetProcessesByName("MicMute"))
-                    {
-                        if (proc.Id != currentId)
-                        {
-                            proc.Kill();
-                            proc.WaitForExit(3000);
-                        }
-                    }
-                    _mutex = new Mutex(initiallyOwned: true, MutexName, out createdNew);
-                    if (createdNew)
-                    {
-                        DiagnosticLogger.LogInfo("Successfully acquired application mutex.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticLogger.LogError("Could not close previous instance", ex);
-                }
+                DiagnosticLogger.LogWarning("MicMute is already running. Quit it from the tray before starting a diagnostic session.");
             }
-
-            if (!createdNew)
+            IntPtr existingHwnd = FindWindow(null, "Mic Mute");
+            if (existingHwnd != IntPtr.Zero)
             {
-                IntPtr existingHwnd = FindWindow(null, "Mic Mute");
-                if (existingHwnd != IntPtr.Zero)
-                {
-                    PostMessage(existingHwnd, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
-                }
-                else
-                {
-                    PostMessage((IntPtr)HWND_BROADCAST, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
-                }
-                Environment.Exit(0);
-                return;
+                PostMessage(existingHwnd, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
             }
+            else
+            {
+                PostMessage((IntPtr)HWND_BROADCAST, (uint)WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+            }
+            if (DiagnosticLogger.IsEnabled)
+                System.Windows.MessageBox.Show("MicMute is already running. Quit it from the tray, then start diagnostics again.", "MicMute diagnostics");
+            Environment.Exit(0);
+            return;
         }
 
         // Automatic High Refresh Rate Detection (144Hz, 240Hz, 360Hz)
@@ -322,7 +296,7 @@ public partial class App : System.Windows.Application
         AppSettings appSettings = SettingsManager.Load();
         StartupManager.SetStartup(appSettings.RunOnStartup);
         _audioController = new AudioController();
-        _audioController.SetTargetDevice(appSettings.SelectedDeviceId);
+        _audioController.SetTargetDeviceAsync(appSettings.SelectedDeviceId).GetAwaiter().GetResult();
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
         InitializeTrayIcon();
 
@@ -623,7 +597,6 @@ public partial class App : System.Windows.Application
         _audioController?.Dispose();
         try
         {
-            _mutex?.ReleaseMutex();
             _mutex?.Dispose();
         }
         catch

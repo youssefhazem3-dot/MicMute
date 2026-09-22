@@ -16,15 +16,16 @@ $env:DOTNET_CLI_HOME = Join-Path $projectRoot '.tools/cli-home'
 $env:NUGET_PACKAGES = Join-Path $projectRoot '.tools/nuget-packages'
 if (!$CompilerPath) {
     $localCsc = Join-Path $projectRoot '.tools/dotnet/sdk/8.0.424/Roslyn/bincore/csc.dll'
-    if (Test-Path -LiteralPath $localCsc) {
-        $CompilerPath = $localCsc
-    } else {
+    $availableSdks = & $DotnetPath --list-sdks
+    if ($LASTEXITCODE -eq 0 -and $availableSdks) {
         $testProject = Join-Path $projectRoot 'tests/MicMute.Tests/MicMute.Tests.csproj'
         $runArgs = @('run','--project',$testProject,'--configuration','Release')
         if ($NoRestore) { $runArgs += '--no-restore' }
         & $DotnetPath @runArgs -- $Area
         exit $LASTEXITCODE
     }
+    if (Test-Path -LiteralPath $localCsc) { $CompilerPath = $localCsc }
+    else { throw 'No .NET SDK or fallback C# compiler is available.' }
 }
 
 # Optional installed-compiler fallback for isolated regression work without an SDK.

@@ -10,10 +10,10 @@ Write-Host "   MicMute Local Diagnostic Runner (PowerShell)" -ForegroundColor Cy
 Write-Host "=======================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Terminate any running MicMute processes to avoid locks
-Get-Process -Name "MicMute" -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "[*] Terminating existing MicMute process (PID: $($_.Id))..." -ForegroundColor Yellow
-    Stop-Process -Id $_.Id -Force
+# Keep the active instance and its pending settings intact.
+if (Get-Process -Name "MicMute" -ErrorAction SilentlyContinue) {
+    Write-Error "MicMute is already running. Quit it from the tray before starting diagnostics."
+    exit 2
 }
 
 # 2. Resolve dotnet path

@@ -1,24 +1,25 @@
 using System;
 using System.Collections.Generic;
-using System.Windows;
-using System.Windows.Threading;
+using System.Threading;
+using System.Threading.Tasks;
 using NAudio.CoreAudioApi;
 using NAudio.CoreAudioApi.Interfaces;
 
 namespace MicMute;
 
-/// <summary>Owns audio endpoints on the UI dispatcher; native callbacks only queue notifications.</summary>
+/// <summary>Owns audio endpoints on a dedicated STA dispatcher; native callbacks only queue notifications.</summary>
 public class AudioController : IMMNotificationClient, IDisposable
 {
-    private readonly MMDeviceEnumerator _enumerator;
-    private readonly Dispatcher _dispatcher;
+    private readonly AudioWorkQueue _workQueue;
+    private MMDeviceEnumerator? _enumerator;
+    private readonly AudioMuteState _muteState = new();
     private MMDevice? _currentDevice;
     private AudioEndpointVolumeNotificationDelegate? _volumeHandler;
     private string _targetDeviceId = string.Empty;
     private string _currentId = string.Empty;
     private string _currentName = "No Device";
-    private bool _isUsingFallback;
-    private bool? _lastReportedMuteState;
+    private volatile bool _isUsingFallback;
+    private int _cachedMuteState = -1;
     private volatile bool _disposed;
 
     public event EventHandler? DevicesChanged;
@@ -27,75 +28,86 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     public AudioController()
     {
-        _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
-        _enumerator = new MMDeviceEnumerator();
-        try { _enumerator.RegisterEndpointNotificationCallback(this); }
-        catch { _enumerator.Dispose(); throw; }
+        _workQueue = new AudioWorkQueue();
+        try
+        {
+            _workQueue.InvokeAsync(() =>
+            {
+                _enumerator = new MMDeviceEnumerator();
+                try { _enumerator.RegisterEndpointNotificationCallback(this); }
+                catch { _enumerator.Dispose(); _enumerator = null; throw; }
+            }).GetAwaiter().GetResult();
+        }
+        catch { _workQueue.Dispose(); throw; }
     }
 
     public bool IsMuted
     {
-        get
-        {
-            if (_disposed || _currentDevice == null) return false;
-            if (!_dispatcher.CheckAccess()) return _lastReportedMuteState ?? false;
-            try { return _currentDevice.AudioEndpointVolume.Mute; }
-            catch { return _lastReportedMuteState ?? false; }
-        }
-        set
-        {
-            if (!_dispatcher.CheckAccess()) { Dispatch(() => IsMuted = value); return; }
-            if (_disposed || _currentDevice == null) return;
-            try
-            {
-                _currentDevice.AudioEndpointVolume.Mute = value;
-                if (_lastReportedMuteState != value)
-                {
-                    _lastReportedMuteState = value;
-                    MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, true));
-                }
-            }
-            catch (Exception ex) { WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message); }
-        }
+        get => !_disposed && Volatile.Read(ref _cachedMuteState) == 1;
+        set => Queue(() => SetMuteOnAudioThread(value));
     }
 
     public bool IsUsingFallback => _isUsingFallback;
-    public string CurrentDeviceName => _currentName;
-    public string CurrentDeviceId => _currentId;
+    public string CurrentDeviceName => Volatile.Read(ref _currentName);
+    public string CurrentDeviceId => Volatile.Read(ref _currentId);
 
-    public List<AudioDevice> GetCaptureDevices()
+    public Task<List<AudioDevice>> GetCaptureDevicesAsync()
     {
-        var devices = new List<AudioDevice>();
-        if (_disposed) return devices;
-        try
+        if (_disposed) return Task.FromResult(new List<AudioDevice>());
+        return _workQueue.InvokeAsync(() =>
         {
-            foreach (MMDevice device in _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+            var devices = new List<AudioDevice>();
+            try
             {
-                using (device) { devices.Add(new AudioDevice(device.ID, device.FriendlyName)); }
+                foreach (MMDevice device in _enumerator!.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+                {
+                    using (device) { devices.Add(new AudioDevice(device.ID, device.FriendlyName)); }
+                }
             }
-        }
-        catch (Exception ex) { WarningNotification?.Invoke(this, "Failed to list audio devices: " + ex.Message); }
-        return devices;
+            catch (Exception ex)
+            {
+                WarningNotification?.Invoke(this, "Failed to list audio devices: " + ex.Message);
+                throw;
+            }
+            return devices;
+        });
     }
 
     public void SetTargetDevice(string deviceId)
     {
-        if (!_dispatcher.CheckAccess()) { Dispatch(() => SetTargetDevice(deviceId)); return; }
-        if (_disposed) return;
-        _targetDeviceId = deviceId ?? string.Empty;
-        UpdateActiveDevice();
+        Queue(() => { _targetDeviceId = deviceId ?? string.Empty; UpdateActiveDevice(); });
     }
+
+    public Task SetTargetDeviceAsync(string deviceId) => _disposed ? Task.CompletedTask :
+        _workQueue.InvokeAsync(() => { _targetDeviceId = deviceId ?? string.Empty; UpdateActiveDevice(); });
 
     public void ToggleMute()
     {
-        if (!_dispatcher.CheckAccess()) { Dispatch(ToggleMute); return; }
-        if (!_disposed) IsMuted = !IsMuted;
+        Queue(() =>
+        {
+            if (_currentDevice == null) return;
+            bool current;
+            try { current = _currentDevice.AudioEndpointVolume.Mute; }
+            catch { current = _muteState.Current ?? false; }
+            SetMuteOnAudioThread(!current);
+        });
     }
 
-    public void ForceUpdateActiveDevice()
+    public void ForceUpdateActiveDevice() => Queue(UpdateActiveDevice);
+
+    private void SetMuteOnAudioThread(bool value)
     {
-        if (!_dispatcher.CheckAccess()) { Dispatch(ForceUpdateActiveDevice); return; }
-        UpdateActiveDevice();
+        if (_disposed || _currentDevice == null) return;
+        try
+        {
+            _currentDevice.AudioEndpointVolume.Mute = value;
+            if (_muteState.RecordLocalChange(value))
+            {
+                Volatile.Write(ref _cachedMuteState, value ? 1 : 0);
+                MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, true));
+            }
+        }
+        catch (Exception ex) { WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message); }
     }
 
     private void UpdateActiveDevice()
@@ -107,24 +119,24 @@ public class AudioController : IMMNotificationClient, IDisposable
         {
             try
             {
-                candidate = _enumerator.GetDevice(_targetDeviceId);
+                candidate = _enumerator!.GetDevice(_targetDeviceId);
                 if (candidate.State != DeviceState.Active) { candidate.Dispose(); candidate = null; }
             }
             catch { candidate?.Dispose(); candidate = null; }
         }
         if (candidate == null)
         {
-            try { candidate = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; }
+            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; }
             catch { candidate = null; }
         }
         if (candidate == null)
         {
-            try { candidate = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); fallback = true; }
+            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); fallback = true; }
             catch { candidate = null; }
         }
         if (candidate == null)
         {
-            try { candidate = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; }
+            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; }
             catch { candidate = null; }
         }
 
@@ -137,10 +149,11 @@ public class AudioController : IMMNotificationClient, IDisposable
                 {
                     bool muted = _currentDevice.AudioEndpointVolume.Mute; // also detects invalidated audio-service objects
                     string name = candidate.FriendlyName;
-                    bool changed = _lastReportedMuteState != muted || name != _currentName;
-                    _currentName = name;
+                    bool changed = _muteState.Current != muted || name != _currentName;
+                    Volatile.Write(ref _currentName, name);
                     _isUsingFallback = fallback;
-                    _lastReportedMuteState = muted;
+                    _muteState.RecordLocalChange(muted);
+                    Volatile.Write(ref _cachedMuteState, muted ? 1 : 0);
                     candidate.Dispose();
                     if (changed) MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, false));
                     return;
@@ -160,13 +173,14 @@ public class AudioController : IMMNotificationClient, IDisposable
         }
         try
         {
-            _currentId = candidate.ID;
-            _currentName = candidate.FriendlyName;
+            Volatile.Write(ref _currentId, candidate.ID);
+            Volatile.Write(ref _currentName, candidate.FriendlyName);
             MMDevice expected = candidate;
             _volumeHandler = data => OnVolumeNotification(expected, data.Muted);
             candidate.AudioEndpointVolume.OnVolumeNotification += _volumeHandler;
             bool muted = candidate.AudioEndpointVolume.Mute;
-            _lastReportedMuteState = muted;
+            _muteState.RecordLocalChange(muted);
+            Volatile.Write(ref _cachedMuteState, muted ? 1 : 0);
             MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, false));
         }
         catch (Exception ex)
@@ -180,20 +194,26 @@ public class AudioController : IMMNotificationClient, IDisposable
     private void OnVolumeNotification(MMDevice expected, bool muted)
     {
         // Never read COM or wait for the UI from this callback: unregister/dispose may wait for it.
-        Dispatch(() =>
+        Queue(() =>
         {
             if (!ReferenceEquals(expected, _currentDevice)) return;
-            if (_lastReportedMuteState == muted) return;
-            _lastReportedMuteState = muted;
-            MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, true));
+            try
+            {
+                if (!_muteState.TryApplyNotification(muted, () => expected.AudioEndpointVolume.Mute, out bool current)) return;
+                Volatile.Write(ref _cachedMuteState, current ? 1 : 0);
+                MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(current, true));
+            }
+            catch (Exception ex) { WarningNotification?.Invoke(this, "Could not read microphone state: " + ex.Message); }
         });
     }
 
-    private void Dispatch(Action action)
+    private void Queue(Action action)
     {
-        if (_disposed || _dispatcher.HasShutdownStarted || _dispatcher.HasShutdownFinished) return;
-        try { _dispatcher.BeginInvoke(new Action(() => { if (!_disposed) action(); })); }
-        catch (InvalidOperationException) { }
+        if (_disposed) return;
+        Task queued = _workQueue.InvokeAsync(() => { if (!_disposed) action(); });
+        _ = queued.ContinueWith(task =>
+            System.Diagnostics.Trace.WriteLine("Audio operation failed: " + task.Exception?.GetBaseException()),
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private void DetachCurrentDevice()
@@ -202,9 +222,10 @@ public class AudioController : IMMNotificationClient, IDisposable
         AudioEndpointVolumeNotificationDelegate? handler = _volumeHandler;
         _currentDevice = null;
         _volumeHandler = null;
-        _currentId = string.Empty;
-        _currentName = "No Device";
-        _lastReportedMuteState = null;
+        Volatile.Write(ref _currentId, string.Empty);
+        Volatile.Write(ref _currentName, "No Device");
+        Volatile.Write(ref _cachedMuteState, -1);
+        _muteState.Reset();
         if (previous == null) return;
         try { if (handler != null) previous.AudioEndpointVolume.OnVolumeNotification -= handler; } catch { }
         try { previous.Dispose(); } catch { }
@@ -212,7 +233,7 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     private void NotifyDevicesChanged()
     {
-        if (!_disposed) Dispatch(() => DevicesChanged?.Invoke(this, EventArgs.Empty));
+        Queue(() => DevicesChanged?.Invoke(this, EventArgs.Empty));
     }
 
     public void OnDeviceStateChanged(string deviceId, DeviceState newState) => NotifyDevicesChanged();
@@ -225,15 +246,32 @@ public class AudioController : IMMNotificationClient, IDisposable
     }
     public void OnPropertyValueChanged(string deviceId, PropertyKey key)
     {
-        if (deviceId == _currentId) NotifyDevicesChanged();
+        if (deviceId == CurrentDeviceId) NotifyDevicesChanged();
     }
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        try { _enumerator.UnregisterEndpointNotificationCallback(this); } catch { }
-        DetachCurrentDevice();
-        try { _enumerator.Dispose(); } catch { }
+        Task cleanup = _workQueue.InvokeAsync(() =>
+        {
+            try { _enumerator?.UnregisterEndpointNotificationCallback(this); } catch { }
+            DetachCurrentDevice();
+            try { _enumerator?.Dispose(); } catch { }
+            _enumerator = null;
+        });
+        bool finished;
+        try { finished = cleanup.Wait(TimeSpan.FromMilliseconds(100)); }
+        catch (AggregateException ex)
+        {
+            System.Diagnostics.Trace.WriteLine("Audio cleanup failed: " + ex.GetBaseException());
+            finished = true;
+        }
+        if (finished) _workQueue.Dispose();
+        else _ = cleanup.ContinueWith(task =>
+        {
+            if (task.IsFaulted) System.Diagnostics.Trace.WriteLine("Audio cleanup failed: " + task.Exception?.GetBaseException());
+            _workQueue.Dispose();
+        }, TaskScheduler.Default);
     }
 }

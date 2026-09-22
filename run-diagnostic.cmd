@@ -6,8 +6,13 @@ echo    MicMute Local Diagnostic Runner
 echo =======================================================
 echo.
 
-:: 1. Terminate any running background MicMute instances to prevent file/mutex collisions
-taskkill /f /im MicMute.exe >nul 2>&1
+:: Keep the active instance and its pending settings intact.
+tasklist /FI "IMAGENAME eq MicMute.exe" | find /I "MicMute.exe" >nul
+if not errorlevel 1 (
+    echo [ERROR] MicMute is already running. Quit it from the tray before starting diagnostics.
+    pause
+    exit /b 2
+)
 
 :: 2. Resolve local dotnet SDK
 set "DOTNET_EXE=%~dp0.tools\dotnet\dotnet.exe"

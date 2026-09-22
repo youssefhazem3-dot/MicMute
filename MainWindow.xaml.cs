@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -32,6 +31,8 @@ public partial class MainWindow : Window
     private bool _isDisposed;
     private readonly DispatcherDebouncer _deviceRefreshDebouncer;
     private readonly DispatcherDebouncer _statusDebouncer;
+    private readonly LatestRefreshCoordinator<List<AudioDevice>> _deviceRefreshCoordinator;
+    private readonly double _preferredWidth;
 
     internal System.Windows.Controls.Button btnStateToggle = null!;
     internal TextBlock tbStatusText = null!;
@@ -99,9 +100,16 @@ public partial class MainWindow : Window
     public MainWindow(AudioController audioController)
     {
         InitializeComponent();
+        _preferredWidth = Width > 0 ? Width : 412.0;
         _deviceRefreshDebouncer = new DispatcherDebouncer(Dispatcher);
         _statusDebouncer = new DispatcherDebouncer(Dispatcher);
         _audioController = audioController;
+        _deviceRefreshCoordinator = new LatestRefreshCoordinator<List<AudioDevice>>(
+            _audioController.GetCaptureDevicesAsync,
+            ApplyDeviceList,
+            retryDelay: TimeSpan.FromMilliseconds(500),
+            onFailure: ex => AudioController_WarningNotification(this, "Failed to refresh microphones: " + ex.Message),
+            dispatcher: Dispatcher);
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
         _audioController.DevicesChanged += AudioController_DevicesChanged;
         _audioController.WarningNotification += AudioController_WarningNotification;
@@ -118,35 +126,10 @@ public partial class MainWindow : Window
         if (_contentLoaded) return;
         _contentLoaded = true;
 
-        Window? root = null;
-        string? xaml = null;
-
         string localFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MainWindow.xaml");
-        if (File.Exists(localFile))
+        Window root = LoadWindowRoot(localFile);
+        if (root != null)
         {
-            try { xaml = File.ReadAllText(localFile); } catch { }
-        }
-
-        if (string.IsNullOrEmpty(xaml))
-        {
-            using (Stream? stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml"))
-            {
-                if (stream != null)
-                {
-                    using (StreamReader sr = new StreamReader(stream))
-                    {
-                        xaml = sr.ReadToEnd();
-                    }
-                }
-            }
-        }
-
-        if (!string.IsNullOrEmpty(xaml))
-        {
-            xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
-            xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
-            root = (Window)XamlReader.Parse(xaml);
-            
             this.Resources = root.Resources;
             this.Title = root.Title;
             this.Width = root.Width;
@@ -316,6 +299,51 @@ public partial class MainWindow : Window
         this.SizeChanged += MainWindow_SizeChanged;
     }
 
+    internal static Window LoadWindowRoot(string localFile)
+    {
+        if (File.Exists(localFile))
+        {
+            try { return ParseWindowRoot(File.ReadAllText(localFile)); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine("Ignoring invalid loose MainWindow.xaml: " + ex);
+            }
+        }
+
+        using Stream stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml")
+            ?? throw new FileNotFoundException("Embedded MainWindow.xaml was not found.");
+        using StreamReader reader = new(stream);
+        return ParseWindowRoot(reader.ReadToEnd());
+    }
+
+    private static Window ParseWindowRoot(string xaml)
+    {
+        xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
+        xaml = System.Text.RegularExpressions.Regex.Replace(xaml,
+            @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
+        Window root = (Window)XamlReader.Parse(xaml);
+        bool valid = root.FindName("btnStateToggle") is System.Windows.Controls.Button
+            && root.FindName("tbStatusText") is TextBlock
+            && root.FindName("cbDevices") is System.Windows.Controls.ComboBox
+            && root.FindName("tbHotkey") is TextBlock
+            && root.FindName("btnRecordHotkey") is System.Windows.Controls.Button
+            && root.FindName("cbEnableOsd") is System.Windows.Controls.CheckBox
+            && root.FindName("sliderOsdDuration") is Slider
+            && root.FindName("txtOsdDuration") is System.Windows.Controls.TextBox
+            && root.FindName("cbStartup") is System.Windows.Controls.CheckBox
+            && root.FindName("cbStartMinimized") is System.Windows.Controls.CheckBox
+            && root.FindName("cbLightMode") is System.Windows.Controls.CheckBox
+            && root.FindName("cbRunAsAdmin") is System.Windows.Controls.CheckBox
+            && root.FindName("cbSoundFeedback") is System.Windows.Controls.CheckBox
+            && root.FindName("tbStoragePath") is TextBlock
+            && root.FindName("borderWarning") is Border
+            && root.FindName("tbWarningMessage") is TextBlock
+            && root.FindName("contentScrollViewer") is ScrollViewer;
+        if (valid) return root;
+        root.Close();
+        throw new InvalidDataException("MainWindow.xaml is missing required controls.");
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -359,40 +387,7 @@ public partial class MainWindow : Window
             double workWidth = screen.WorkingArea.Width / scaleX;
             double workHeight = screen.WorkingArea.Height / scaleY;
 
-            double maxAllowedHeight = UiBehavior.CalculateAdaptiveMaxHeight(workHeight, UiBehavior.DefaultAdaptiveVerticalMargin);
-            if (Math.Abs(this.MaxHeight - maxAllowedHeight) > 0.5)
-            {
-                this.MaxHeight = maxAllowedHeight;
-            }
-
-            double currentWidth = this.ActualWidth > 0 ? this.ActualWidth : (this.Width > 0 ? this.Width : 412.0);
-
-            if (isInitialPlacement)
-            {
-                this.Measure(new System.Windows.Size(currentWidth, maxAllowedHeight));
-                double desiredHeight = this.DesiredSize.Height > 0 ? this.DesiredSize.Height : maxAllowedHeight;
-                double targetHeight = Math.Min(desiredHeight, maxAllowedHeight);
-
-                var centered = UiBehavior.CalculateCenteredWindowBounds(
-                    new DipRect(workLeft, workTop, workWidth, workHeight),
-                    currentWidth,
-                    targetHeight,
-                    UiBehavior.DefaultAdaptiveVerticalMargin);
-
-                this.Left = centered.Left;
-                this.Top = centered.Top;
-            }
-            else
-            {
-                double currentHeight = this.ActualHeight > 0 ? this.ActualHeight : this.MaxHeight;
-                var clamped = UiBehavior.ClampWindowBoundsToWorkArea(
-                    new DipRect(workLeft, workTop, workWidth, workHeight),
-                    new DipRect(this.Left, this.Top, currentWidth, currentHeight),
-                    UiBehavior.DefaultAdaptiveVerticalMargin);
-
-                this.Left = clamped.Left;
-                this.Top = clamped.Top;
-            }
+            ApplyAdaptiveBounds(new DipRect(workLeft, workTop, workWidth, workHeight), isInitialPlacement);
         }
         catch
         {
@@ -542,44 +537,46 @@ public partial class MainWindow : Window
 
     private void RefreshDeviceList()
     {
-        if (_isUpdatingDeviceList || _isDisposed)
+        if (!_isDisposed) _deviceRefreshCoordinator.Request();
+    }
+
+    internal void ApplyAdaptiveBounds(DipRect workArea, bool isInitialPlacement)
+    {
+        double maxAllowedHeight = UiBehavior.CalculateAdaptiveMaxHeight(workArea.Height, UiBehavior.DefaultAdaptiveVerticalMargin);
+        if (Math.Abs(MaxHeight - maxAllowedHeight) > 0.5) MaxHeight = maxAllowedHeight;
+
+        double currentWidth = _preferredWidth;
+        if (isInitialPlacement)
         {
-            return;
+            Measure(new System.Windows.Size(Math.Min(currentWidth, workArea.Width), maxAllowedHeight));
+            double desiredHeight = DesiredSize.Height > 0 ? DesiredSize.Height : maxAllowedHeight;
+            var centered = UiBehavior.CalculateCenteredWindowBounds(
+                workArea, currentWidth, Math.Min(desiredHeight, maxAllowedHeight), UiBehavior.DefaultAdaptiveVerticalMargin);
+            Width = centered.Width;
+            Left = centered.Left;
+            Top = centered.Top;
         }
-        _isUpdatingDeviceList = true;
-        Task.Run(() =>
+        else
         {
-            try
-            {
-                List<AudioDevice> captureDevices = _audioController.GetCaptureDevices();
-                string currentId = _audioController.CurrentDeviceId;
-                if (_isDisposed || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
-                Dispatcher.BeginInvoke((Action)delegate
-                {
-                    if (_isDisposed) return;
-                    try
-                    {
-                        cbDevices.ItemsSource = captureDevices;
-                        AudioDevice? audioDevice = captureDevices.FirstOrDefault((AudioDevice d) => d.Id == currentId);
-                        if (audioDevice != null)
-                        {
-                            cbDevices.SelectedItem = audioDevice;
-                        }
-                    }
-                    finally
-                    {
-                        _isUpdatingDeviceList = false;
-                    }
-                });
-            }
-            catch
-            {
-                if (!_isDisposed && !Dispatcher.HasShutdownStarted)
-                {
-                    Dispatcher.BeginInvoke((Action)delegate { _isUpdatingDeviceList = false; });
-                }
-            }
-        });
+            double currentHeight = ActualHeight > 0 ? ActualHeight : MaxHeight;
+            var clamped = UiBehavior.ClampWindowBoundsToWorkArea(
+                workArea, new DipRect(Left, Top, currentWidth, currentHeight), UiBehavior.DefaultAdaptiveVerticalMargin);
+            Width = clamped.Width;
+            Left = clamped.Left;
+            Top = clamped.Top;
+        }
+    }
+
+    private void ApplyDeviceList(List<AudioDevice> captureDevices)
+    {
+        if (_isDisposed) return;
+        _isUpdatingDeviceList = true;
+        try
+        {
+            cbDevices.ItemsSource = captureDevices;
+            cbDevices.SelectedItem = captureDevices.FirstOrDefault(d => d.Id == _audioController.CurrentDeviceId);
+        }
+        finally { _isUpdatingDeviceList = false; }
     }
 
     private void CbDevices_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -592,6 +589,7 @@ public partial class MainWindow : Window
             {
                 SelectedDeviceId = audioDevice.Id
             });
+            RefreshDeviceList();
         }
     }
 
@@ -1294,6 +1292,7 @@ public partial class MainWindow : Window
         {
             UpdateMuteStateUI(_audioController.IsMuted);
         }
+        OsdWindow.UpdateVisibleTheme(isLight);
     }
 
     private void CbEnableOsd_Checked(object sender, RoutedEventArgs e)
@@ -1440,6 +1439,7 @@ public partial class MainWindow : Window
         _isDisposed = true;
         _deviceRefreshDebouncer.Dispose();
         _statusDebouncer.Dispose();
+        _deviceRefreshCoordinator.Dispose();
         SettingsManager.SaveFailed -= SettingsManager_SaveFailed;
         _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
         _audioController.DevicesChanged -= AudioController_DevicesChanged;

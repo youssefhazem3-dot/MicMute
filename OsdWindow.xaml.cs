@@ -44,7 +44,12 @@ public partial class OsdWindow : Window
     internal Grid pathMuted = null!;
     internal TextBlock tbStatus = null!;
     internal DropShadowEffect osdShadow = null!;
+    internal System.Windows.Shapes.Path activeGlyph = null!;
+    internal System.Windows.Shapes.Path mutedGlyph = null!;
+    internal System.Windows.Shapes.Line muteSlash = null!;
     private bool _contentLoaded;
+    private bool _lightMode;
+    private bool _isMuted;
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
@@ -121,6 +126,9 @@ public partial class OsdWindow : Window
                     pathActive = (Grid)root.FindName("pathActive");
                     pathMuted = (Grid)root.FindName("pathMuted");
                     tbStatus = (TextBlock)root.FindName("tbStatus");
+                    activeGlyph = (System.Windows.Shapes.Path)root.FindName("activeGlyph");
+                    mutedGlyph = (System.Windows.Shapes.Path)root.FindName("mutedGlyph");
+                    muteSlash = (System.Windows.Shapes.Line)root.FindName("muteSlash");
                     if (borderPanel != null)
                     {
                         osdShadow = (DropShadowEffect)borderPanel.Effect;
@@ -171,6 +179,7 @@ public partial class OsdWindow : Window
         {
             _instance = new OsdWindow();
         }
+        _instance.ApplyTheme(SettingsManager.Load().LightMode);
         _instance.UpdateState(isMuted);
 
         IntPtr handle = new WindowInteropHelper(_instance).EnsureHandle();
@@ -228,6 +237,10 @@ public partial class OsdWindow : Window
     private static readonly Color ColorActive = Color.FromRgb(0x94, 0xA3, 0xB8);
     private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
     private static readonly SolidColorBrush BrushActiveBorder = CreateFrozenBrush(ColorActive);
+    private static readonly SolidColorBrush BrushDarkBackground = CreateFrozenBrush(Color.FromArgb(0xE5, 0x0F, 0x14, 0x1C));
+    private static readonly SolidColorBrush BrushLightBackground = CreateFrozenBrush(Color.FromArgb(0xF2, 0xF8, 0xF9, 0xFA));
+    private static readonly SolidColorBrush BrushLightActive = CreateFrozenBrush(Color.FromRgb(55, 65, 81));
+    private static readonly SolidColorBrush BrushLightMuted = CreateFrozenBrush(Color.FromRgb(155, 44, 44));
 
     private static SolidColorBrush CreateFrozenBrush(Color color)
     {
@@ -236,25 +249,42 @@ public partial class OsdWindow : Window
         return brush;
     }
 
+    public static void UpdateVisibleTheme(bool isLight)
+    {
+        if (_instance?.IsVisible == true) _instance.ApplyTheme(isLight);
+    }
+
+    internal void ApplyTheme(bool isLight)
+    {
+        _lightMode = isLight;
+        borderPanel.Background = isLight ? BrushLightBackground : BrushDarkBackground;
+        activeGlyph.Fill = isLight ? BrushLightActive : BrushActiveText;
+        mutedGlyph.Fill = isLight ? BrushLightMuted : BrushMutedText;
+        muteSlash.Stroke = isLight ? BrushLightMuted : BrushMutedText;
+        osdShadow.Opacity = isLight ? 0.25 : 0.45;
+        UpdateState(_isMuted);
+    }
+
     private void UpdateState(bool isMuted)
     {
+        _isMuted = isMuted;
         if (isMuted)
         {
             pathMuted.Visibility = Visibility.Visible;
             pathActive.Visibility = Visibility.Collapsed;
             tbStatus.Text = "MUTED";
-            tbStatus.Foreground = BrushMutedText;
-            borderPanel.BorderBrush = BrushMutedBorder;
-            osdShadow.Color = ColorMutedBorder;
+            tbStatus.Foreground = _lightMode ? BrushLightMuted : BrushMutedText;
+            borderPanel.BorderBrush = _lightMode ? BrushLightMuted : BrushMutedBorder;
+            osdShadow.Color = _lightMode ? BrushLightMuted.Color : ColorMutedBorder;
         }
         else
         {
             pathActive.Visibility = Visibility.Visible;
             pathMuted.Visibility = Visibility.Collapsed;
             tbStatus.Text = "ACTIVE";
-            tbStatus.Foreground = BrushActiveText;
-            borderPanel.BorderBrush = BrushActiveBorder;
-            osdShadow.Color = ColorActive;
+            tbStatus.Foreground = _lightMode ? BrushLightActive : BrushActiveText;
+            borderPanel.BorderBrush = _lightMode ? BrushLightActive : BrushActiveBorder;
+            osdShadow.Color = _lightMode ? BrushLightActive.Color : ColorActive;
         }
     }
 

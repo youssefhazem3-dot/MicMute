@@ -10,13 +10,17 @@ static class UiCases
         test(nameof(ParsesDurationUsingCurrentCultureAndInvariantFallback), ParsesDurationUsingCurrentCultureAndInvariantFallback);
         test(nameof(RejectsNonFiniteAndOutOfRangeDurations), RejectsNonFiniteAndOutOfRangeDurations);
         test(nameof(FormatsDurationUsingTheRequestedCulture), FormatsDurationUsingTheRequestedCulture);
+        test(nameof(OsdSliderCoversEveryAcceptedDuration), OsdSliderCoversEveryAcceptedDuration);
         test(nameof(BoundsTrayTooltipToShellLimit), BoundsTrayTooltipToShellLimit);
         test(nameof(CentersPhysicalWindowRectInPhysicalScreenBounds), CentersPhysicalWindowRectInPhysicalScreenBounds);
         test(nameof(ExplicitStartupArgumentsOverrideStoredPreference), ExplicitStartupArgumentsOverrideStoredPreference);
         test(nameof(RestartArgumentsIdentifyParentAndRequestVisibleWindow), RestartArgumentsIdentifyParentAndRequestVisibleWindow);
         test(nameof(RefreshGenerationInvalidatesOlderCallbacks), RefreshGenerationInvalidatesOlderCallbacks);
         test(nameof(OsdResourceLoadsUsingProductionConstructor), OsdResourceLoadsUsingProductionConstructor);
+        test(nameof(OsdPaletteFollowsLightMode), OsdPaletteFollowsLightMode);
         test(nameof(MainPanelEmbeddedXamlParses), MainPanelEmbeddedXamlParses);
+        test(nameof(BrokenLooseXamlFallsBackToEmbeddedPanel), BrokenLooseXamlFallsBackToEmbeddedPanel);
+        test(nameof(IncompleteLooseXamlFallsBackToEmbeddedPanel), IncompleteLooseXamlFallsBackToEmbeddedPanel);
         test(nameof(RestartWaitsUntilParentActuallyExits), RestartWaitsUntilParentActuallyExits);
         test(nameof(DispatcherCoalescesRefreshesAndCancelsDisposedWork), DispatcherCoalescesRefreshesAndCancelsDisposedWork);
         test(nameof(RefreshBurstDoesNotFloodDispatcher), RefreshBurstDoesNotFloodDispatcher);
@@ -28,6 +32,7 @@ static class UiCases
         test(nameof(CentersWindowInVisibleWorkAreaAboveTaskbar), CentersWindowInVisibleWorkAreaAboveTaskbar);
         test(nameof(CentersWindowWhenContentFitsWithoutClipping), CentersWindowWhenContentFitsWithoutClipping);
         test(nameof(ClampsWindowBoundsWithinWorkArea), ClampsWindowBoundsWithinWorkArea);
+        test(nameof(NarrowWorkAreaResizesWindowAndAllowsHorizontalAccess), NarrowWorkAreaResizesWindowAndAllowsHorizontalAccess);
         test(nameof(MainWindowAppliesAdaptiveConstraintsAndScrollsOnSmallWorkArea), MainWindowAppliesAdaptiveConstraintsAndScrollsOnSmallWorkArea);
     }
 
@@ -38,6 +43,76 @@ static class UiCases
         Check.Equal(1.5, currentCulture);
         Check.True(UiBehavior.TryParseOsdDuration("1.5", french, out double invariant), "invariant decimal fallback should parse");
         Check.Equal(1.5, invariant);
+    }
+
+    private static void OsdSliderCoversEveryAcceptedDuration()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try { Check.Equal(UiBehavior.MaximumOsdDuration, window.sliderOsdDuration.Maximum); }
+        finally { window.Close(); }
+    }
+
+    private static void NarrowWorkAreaResizesWindowAndAllowsHorizontalAccess()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.ApplyAdaptiveBounds(new DipRect(0, 0, 400, 720), isInitialPlacement: true);
+            Check.Equal(400.0, window.Width);
+            Check.Equal(System.Windows.Controls.ScrollBarVisibility.Auto,
+                window.contentScrollViewer.HorizontalScrollBarVisibility);
+            window.ApplyAdaptiveBounds(new DipRect(0, 0, 1200, 900), isInitialPlacement: false);
+            Check.Equal(412.0, window.Width, "the preferred width must return on a larger monitor");
+        }
+        finally { window.Close(); }
+    }
+
+    private static void BrokenLooseXamlFallsBackToEmbeddedPanel()
+    {
+        string localFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "micmute-invalid-xaml-" + Guid.NewGuid().ToString("N") + ".xaml");
+        System.IO.File.WriteAllText(localFile, "<Window><broken");
+        try
+        {
+            var root = MainWindow.LoadWindowRoot(localFile);
+            try { Check.True(root.FindName("btnStateToggle") != null, "the embedded panel must load when the loose file is invalid"); }
+            finally { root.Close(); }
+        }
+        finally { System.IO.File.Delete(localFile); }
+    }
+
+    private static void IncompleteLooseXamlFallsBackToEmbeddedPanel()
+    {
+        string localFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "micmute-incomplete-xaml-" + Guid.NewGuid().ToString("N") + ".xaml");
+        System.IO.File.WriteAllText(localFile,
+            "<Window xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\"><Grid/></Window>");
+        try
+        {
+            var root = MainWindow.LoadWindowRoot(localFile);
+            try { Check.True(root.FindName("btnStateToggle") != null, "an incompatible loose panel must not replace the embedded panel"); }
+            finally { root.Close(); }
+        }
+        finally { System.IO.File.Delete(localFile); }
+    }
+
+    private static void OsdPaletteFollowsLightMode()
+    {
+        var window = new OsdWindow();
+        try
+        {
+            window.ApplyTheme(true);
+            var light = (System.Windows.Media.SolidColorBrush)window.borderPanel.Background;
+            Check.True(light.Color.R > 200, "light OSD should use a light surface");
+            var lightGlyph = (System.Windows.Media.SolidColorBrush)window.activeGlyph.Fill;
+            Check.True(lightGlyph.Color.R < 100, "active glyph must contrast with the light surface");
+            window.ApplyTheme(false);
+            var dark = (System.Windows.Media.SolidColorBrush)window.borderPanel.Background;
+            Check.True(dark.Color.R < 60, "dark OSD should use a dark surface");
+            var darkGlyph = (System.Windows.Media.SolidColorBrush)window.activeGlyph.Fill;
+            Check.True(darkGlyph.Color.R > 180, "active glyph must contrast with the dark surface");
+        }
+        finally { window.Close(); }
     }
 
     private static void RefreshBurstDoesNotFloodDispatcher()
@@ -110,6 +185,7 @@ static class UiCases
         {
             Check.Equal("NO MICROPHONE", window.tbStatusText.Text);
             Check.True(!window.btnStateToggle.IsEnabled, "mute must be disabled without an endpoint");
+            Check.True(window.btnStateToggle.Opacity < 0.6, "unavailable mute control must look disabled");
             Check.Equal(System.Windows.Visibility.Visible, window.borderWarning.Visibility);
             Check.True(window.cbDevices.SelectedItem == null, "do not imply an unbound microphone is selected");
         }

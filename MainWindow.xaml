@@ -662,6 +662,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.45" />
+                    <Setter Property="Cursor" Value="Arrow" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Modern ComboBox Style with Apple Frosted Glass Popover -->
@@ -965,10 +971,10 @@
                           Style="{StaticResource ModernScrollViewerStyle}"
                           Focusable="False"
                           VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
+                          HorizontalScrollBarVisibility="Auto"
                           CanContentScroll="False"
                           PanningMode="VerticalOnly">
-                <StackPanel Margin="14,0,14,14">
+                <StackPanel Margin="14,0,14,14" MinWidth="380">
                     
                     <!-- HERO SECTION: Liquid Lens Button & Precision Capsule -->
                     <StackPanel HorizontalAlignment="Center" Margin="0,2,0,12">
@@ -1200,7 +1206,7 @@
                                 <Slider x:Name="sliderOsdDuration"
                                         Grid.Column="1"
                                         Style="{StaticResource ModernSliderStyle}"
-                                        Minimum="0.1" Maximum="10.0"
+                                         Minimum="0.1" Maximum="30.0"
                                         TickFrequency="0.1"
                                         IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
