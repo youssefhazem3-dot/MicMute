@@ -89,9 +89,10 @@
         <SolidColorBrush x:Key="KeycapBorderBrush" Color="#3F3F46" />
         <SolidColorBrush x:Key="KeycapTextBrush" Color="#F4F4F5" />
 
-        <SolidColorBrush x:Key="WarningBgBrush" Color="#20EF4444" />
-        <SolidColorBrush x:Key="WarningBorderBrush" Color="#EF4444" />
-        <SolidColorBrush x:Key="WarningTextBrush" Color="#F87171" />
+        <!-- Bottom Status / Notification Box Brushes (Monochrome Theme) -->
+        <SolidColorBrush x:Key="WarningBgBrush" Color="#14FFFFFF" />
+        <SolidColorBrush x:Key="WarningBorderBrush" Color="#20FFFFFF" />
+        <SolidColorBrush x:Key="WarningTextBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="CaptionButtonHoverBrush" Color="#18FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#25FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#45FFFFFF" />
@@ -536,29 +537,29 @@
                                         </Ellipse.Fill>
                                     </Ellipse>
 
-                                    <!-- Razor-Sharp Vector Microphone Cutout -->
-                                    <Grid Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- Razor-Sharp Vector Microphone Cutout Matching App Logo (app.ico) -->
+                                    <Grid Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <Path x:Name="iconPath"
                                               Fill="{DynamicResource HeroIconActiveBrush}"
                                               Stretch="Uniform"
-                                              Width="24" Height="24"
-                                              Data="M12,2.5 C9.93,2.5 8.25,4.18 8.25,6.25 L8.25,10.5 C8.25,12.57 9.93,14.25 12,14.25 C14.07,14.25 15.75,12.57 15.75,10.5 L15.75,6.25 C15.75,4.18 14.07,2.5 12,2.5 Z M6,7.5 C6,6.95 6.45,6.5 7,6.5 C7.55,6.5 8,6.95 8,7.5 L8,10.5 C8,12.71 9.79,14.5 12,14.5 C14.21,14.5 16,12.71 16,10.5 L16,7.5 C16,6.95 16.45,6.5 17,6.5 C17.55,6.5 18,6.95 18,7.5 L18,10.5 C18,13.48 15.82,15.96 13,16.42 L13,19.5 L15.5,19.5 C16.05,19.5 16.5,19.95 16.5,20.5 C16.5,21.05 16.05,21.5 15.5,21.5 L8.5,21.5 C7.95,21.5 7.5,21.05 7.5,20.5 C7.5,19.95 7.95,19.5 8.5,19.5 L11,19.5 L11,16.42 C8.18,15.96 6,13.48 6,10.5 Z">
+                                              Width="32" Height="32"
+                                              Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z">
                                             <Path.Effect>
-                                                <DropShadowEffect BlurRadius="4" ShadowDepth="1.5" Direction="270" Opacity="0.3" Color="Black" />
+                                                <DropShadowEffect BlurRadius="4" ShadowDepth="1.2" Direction="270" Opacity="0.22" Color="Black" />
                                             </Path.Effect>
                                         </Path>
-                                        <!-- Clean Diagonal Slash Line for Muted State -->
+                                        <!-- Clean Diagonal Slash Line for Muted State Matching App Logo (app.ico) -->
                                         <Line x:Name="slashBg"
-                                              X1="2.5" Y1="2.5" X2="21.5" Y2="21.5"
-                                              Stroke="#80000000"
-                                              StrokeThickness="4.5"
+                                              X1="3" Y1="3" X2="29" Y2="29"
+                                              Stroke="#60000000"
+                                              StrokeThickness="5.0"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
                                               Visibility="Collapsed" />
                                         <Line x:Name="slash"
-                                              X1="2.5" Y1="2.5" X2="21.5" Y2="21.5"
+                                              X1="3" Y1="3" X2="29" Y2="29"
                                               Stroke="#FFFFFF"
-                                              StrokeThickness="2.4"
+                                              StrokeThickness="2.5"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
                                               Visibility="Collapsed" />
@@ -576,27 +577,28 @@
                                 <Setter TargetName="iconPath" Property="Fill" Value="{DynamicResource HeroIconActiveBrush}" />
                             </Trigger>
 
-                            <!-- Clean Chill Low-Light Red Muted State -->
+                            <!-- Standard Balanced UI Red Muted State (White Icon & Slash matching App Logo) -->
                             <Trigger Property="Tag" Value="Muted">
                                 <Setter TargetName="lens" Property="Background">
                                     <Setter.Value>
                                         <RadialGradientBrush Center="0.35,0.25" GradientOrigin="0.35,0.25" RadiusX="0.65" RadiusY="0.65">
-                                            <GradientStop Color="#FFD9534F" Offset="0.0" />
-                                            <GradientStop Color="#FFA82828" Offset="0.45" />
-                                            <GradientStop Color="#FF6E1515" Offset="0.85" />
-                                            <GradientStop Color="#FF420D0D" Offset="1.0" />
+                                            <GradientStop Color="#FFF87171" Offset="0.0" />
+                                            <GradientStop Color="#FFEF4444" Offset="0.40" />
+                                            <GradientStop Color="#FFDC2626" Offset="0.75" />
+                                            <GradientStop Color="#FFB91C1C" Offset="1.0" />
                                         </RadialGradientBrush>
                                     </Setter.Value>
                                 </Setter>
                                 <Setter TargetName="glow" Property="Fill">
                                     <Setter.Value>
                                         <RadialGradientBrush Center="0.5,0.40" GradientOrigin="0.5,0.30" RadiusX="0.5" RadiusY="0.5">
-                                            <GradientStop Color="#35801818" Offset="0.0" />
-                                            <GradientStop Color="#12801818" Offset="0.5" />
-                                            <GradientStop Color="#00801818" Offset="1.0" />
+                                            <GradientStop Color="#40EF4444" Offset="0.0" />
+                                            <GradientStop Color="#15EF4444" Offset="0.5" />
+                                            <GradientStop Color="#00EF4444" Offset="1.0" />
                                         </RadialGradientBrush>
                                     </Setter.Value>
                                 </Setter>
+                                <Setter TargetName="iconPath" Property="Fill" Value="#FFFFFF" />
                                 <Setter TargetName="slashBg" Property="Visibility" Value="Visible" />
                                 <Setter TargetName="slash" Property="Visibility" Value="Visible" />
                             </Trigger>
@@ -908,10 +910,6 @@
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1.5"
             CornerRadius="20">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.35" Color="Black" />
-        </Border.Effect>
-
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="38" />
@@ -927,10 +925,10 @@
                     <!-- Left: App Vector Icon & Title (Icon dynamically follows Theme!) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0">
                         <Path x:Name="titleBarIcon"
-                              Data="M12,2.5 C9.93,2.5 8.25,4.18 8.25,6.25 L8.25,10.5 C8.25,12.57 9.93,14.25 12,14.25 C14.07,14.25 15.75,12.57 15.75,10.5 L15.75,6.25 C15.75,4.18 14.07,2.5 12,2.5 Z M6,7.5 C6,6.95 6.45,6.5 7,6.5 C7.55,6.5 8,6.95 8,7.5 L8,10.5 C8,12.71 9.79,14.5 12,14.5 C14.21,14.5 16,12.71 16,10.5 L16,7.5 C16,6.95 16.45,6.5 17,6.5 C17.55,6.5 18,6.95 18,7.5 L18,10.5 C18,13.48 15.82,15.96 13,16.42 L13,19.5 L15.5,19.5 C16.05,19.5 16.5,19.95 16.5,20.5 C16.5,21.05 16.05,21.5 15.5,21.5 L8.5,21.5 C7.95,21.5 7.5,21.05 7.5,20.5 C7.5,19.95 7.95,19.5 8.5,19.5 L11,19.5 L11,16.42 C8.18,15.96 6,13.48 6,10.5 Z"
+                              Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z"
                               Fill="{DynamicResource TitleTextBrush}"
                               Stretch="Uniform"
-                              Width="13" Height="13"
+                              Width="14" Height="14"
                               VerticalAlignment="Center"
                               Margin="0,0,7,0" />
                         <TextBlock Text="MicMute"
@@ -1058,10 +1056,10 @@
                                         BorderThickness="1"
                                         Margin="0,0,9,0"
                                         VerticalAlignment="Center">
-                                    <Path Data="M12,2.5 C9.93,2.5 8.25,4.18 8.25,6.25 L8.25,10.5 C8.25,12.57 9.93,14.25 12,14.25 C14.07,14.25 15.75,12.57 15.75,10.5 L15.75,6.25 C15.75,4.18 14.07,2.5 12,2.5 Z M6,7.5 C6,6.95 6.45,6.5 7,6.5 C7.55,6.5 8,6.95 8,7.5 L8,10.5 C8,12.71 9.79,14.5 12,14.5 C14.21,14.5 16,12.71 16,10.5 L16,7.5 C16,6.95 16.45,6.5 17,6.5 C17.55,6.5 18,6.95 18,7.5 L18,10.5 C18,13.48 15.82,15.96 13,16.42 L13,19.5 L15.5,19.5 C16.05,19.5 16.5,19.95 16.5,20.5 C16.5,21.05 16.05,21.5 15.5,21.5 L8.5,21.5 C7.95,21.5 7.5,21.05 7.5,20.5 C7.5,19.95 7.95,19.5 8.5,19.5 L11,19.5 L11,16.42 C8.18,15.96 6,13.48 6,10.5 Z"
+                                    <Path Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z"
                                           Fill="{DynamicResource SquircleIconBrush}"
                                           Stretch="Uniform"
-                                          Width="13" Height="13"
+                                          Width="14" Height="14"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
@@ -1425,12 +1423,11 @@
                             Padding="12,10"
                             Margin="0,0,0,10">
                         <StackPanel>
-                            <!-- Row 1: Header with Label, Icon and Action Buttons -->
+                            <!-- Row 1: Header with Label and Icon -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Standard 28x28 Squircle Tile -->
@@ -1459,25 +1456,33 @@
                                                Foreground="{DynamicResource TextGrayBrush}"
                                                FontSize="9.5" />
                                 </StackPanel>
+                            </Grid>
 
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button x:Name="btnOpenFolder" Content="Open"
-                                            Style="{StaticResource SecondaryActionButtonStyle}"
-                                            Height="26" Padding="10,0" FontSize="10.5"
-                                            Click="BtnOpenDataFolder_Click" />
-                                    <Button x:Name="btnChangeFolder" Content="Change"
-                                            Style="{StaticResource SecondaryActionButtonStyle}"
-                                            Height="26" Padding="10,0" FontSize="10.5" Margin="5,0,0,0"
-                                            Click="BtnChangeDataFolder_Click" />
-                                    <Button x:Name="btnResetData" Content="Reset"
-                                            Style="{StaticResource SecondaryActionButtonStyle}"
-                                            Height="26" Padding="10,0" FontSize="10.5" Margin="5,0,0,0"
-                                            Click="BtnResetSettings_Click" />
-                                </StackPanel>
+                            <!-- Row 2: 3 Action Buttons in an evenly spaced horizontal row under the text -->
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" x:Name="btnOpenFolder" Content="Open"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Height="26" FontSize="10.5" HorizontalAlignment="Stretch"
+                                        Click="BtnOpenDataFolder_Click" />
+                                <Button Grid.Column="2" x:Name="btnChangeFolder" Content="Change"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Height="26" FontSize="10.5" HorizontalAlignment="Stretch"
+                                        Click="BtnChangeDataFolder_Click" />
+                                <Button Grid.Column="4" x:Name="btnResetData" Content="Reset"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Height="26" FontSize="10.5" HorizontalAlignment="Stretch"
+                                        Click="BtnResetSettings_Click" />
                             </Grid>
 
                             <!-- Clean Separator -->
-                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,8,0,8" />
+                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,10,0,8" />
 
                             <!-- Row 2: Inset Glass Pill for Full Path Display -->
                             <Border Background="{DynamicResource InputBgBrush}"
@@ -1508,15 +1513,41 @@
                             Background="{DynamicResource WarningBgBrush}"
                             BorderBrush="{DynamicResource WarningBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="10"
-                            Padding="10,6">
+                            CornerRadius="12"
+                            Padding="10,7"
+                            Margin="0,4,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="⚠️" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock x:Name="tbWarningMessage" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="10.5" TextWrapping="Wrap" VerticalAlignment="Center" />
+
+                            <!-- Squircle Tile matching the rest of the application -->
+                            <Border x:Name="borderWarningIcon"
+                                    Grid.Column="0"
+                                    Width="24" Height="24"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource SquircleBgBrush}"
+                                    BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                    BorderThickness="1"
+                                    Margin="0,0,9,0"
+                                    VerticalAlignment="Center">
+                                <Path x:Name="pathWarningIcon"
+                                      Data="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                                      Fill="{DynamicResource SquircleIconBrush}"
+                                      Stretch="Uniform"
+                                      Width="12" Height="12"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            </Border>
+
+                            <TextBlock x:Name="tbWarningMessage"
+                                       Grid.Column="1"
+                                       Foreground="{DynamicResource WarningTextBrush}"
+                                       FontSize="10.5"
+                                       FontWeight="Medium"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
                         </Grid>
                     </Border>
 

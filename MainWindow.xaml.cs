@@ -63,8 +63,13 @@ public partial class MainWindow : Window
     internal TextBlock tbStoragePath = null!;
     internal Border borderWarning = null!;
     internal TextBlock tbWarningMessage = null!;
+    internal Border borderWarningIcon = null!;
+    internal System.Windows.Shapes.Path pathWarningIcon = null!;
     internal System.Windows.Controls.Image imgAppIcon = null!;
     internal ScrollViewer contentScrollViewer = null!;
+
+    private static readonly Geometry IconCheck = Geometry.Parse("M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z");
+    private static readonly Geometry IconWarning = Geometry.Parse("M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z");
 
     private const int WM_SETTINGCHANGE = 0x001A;
     private const int WM_DISPLAYCHANGE = 0x007E;
@@ -182,6 +187,8 @@ public partial class MainWindow : Window
             tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
             borderWarning = (Border)root.FindName("borderWarning");
             tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
+            borderWarningIcon = (Border)root.FindName("borderWarningIcon");
+            pathWarningIcon = (System.Windows.Shapes.Path)root.FindName("pathWarningIcon");
             contentScrollViewer = (ScrollViewer)root.FindName("contentScrollViewer");
 
             // Event hooks
@@ -628,23 +635,23 @@ public partial class MainWindow : Window
 
         if (isMuted)
         {
-            // Clean chill low-light red: relaxed rose-salmon text, calm ruby dot, subtle wine-tinted glass wash
-            var chillRedText = isLight ? System.Windows.Media.Color.FromRgb(155, 44, 44) : System.Windows.Media.Color.FromRgb(226, 133, 133);
-            var chillDotColor = isLight ? System.Windows.Media.Color.FromRgb(185, 28, 28) : System.Windows.Media.Color.FromRgb(197, 48, 48);
+            // Standard balanced UI red: clean coral/ruby text, pure red dot, subtle translucent red wash
+            var redTextColor = isLight ? System.Windows.Media.Color.FromRgb(220, 38, 38) : System.Windows.Media.Color.FromRgb(248, 113, 113);
+            var redDotColor = isLight ? System.Windows.Media.Color.FromRgb(220, 38, 38) : System.Windows.Media.Color.FromRgb(239, 68, 68);
 
-            tbStatusText.Foreground = new SolidColorBrush(chillRedText);
-            if (dotStatus != null) dotStatus.Fill = new SolidColorBrush(chillDotColor);
+            tbStatusText.Foreground = new SolidColorBrush(redTextColor);
+            if (dotStatus != null) dotStatus.Fill = new SolidColorBrush(redDotColor);
             if (dotGlow != null)
             {
-                dotGlow.Color = chillDotColor;
-                dotGlow.Opacity = isLight ? 0.20 : 0.40;
-                dotGlow.BlurRadius = 5;
+                dotGlow.Color = redDotColor;
+                dotGlow.Opacity = isLight ? 0.35 : 0.55;
+                dotGlow.BlurRadius = 6;
             }
             if (borderStatusCapsule != null)
             {
                 borderStatusCapsule.Background = new SolidColorBrush(
-                    isLight ? System.Windows.Media.Color.FromArgb(16, 185, 28, 28)
-                            : System.Windows.Media.Color.FromArgb(22, 197, 48, 48));
+                    isLight ? System.Windows.Media.Color.FromArgb(20, 220, 38, 38)
+                            : System.Windows.Media.Color.FromArgb(24, 239, 68, 68));
                 borderStatusCapsule.BorderThickness = new Thickness(0);
                 borderStatusCapsule.BorderBrush = null;
             }
@@ -719,8 +726,9 @@ public partial class MainWindow : Window
         {
             if (_isDisposed) return;
             _statusDebouncer.Cancel();
+            if (pathWarningIcon != null) pathWarningIcon.Data = IconWarning;
             tbWarningMessage.Inlines.Clear();
-            System.Windows.Media.Brush foreground = (System.Windows.Media.Brush)FindResource("TextWhiteBrush");
+            System.Windows.Media.Brush foreground = (System.Windows.Media.Brush)FindResource("WarningTextBrush");
             tbWarningMessage.Inlines.Add(new Run(message)
             {
                 Foreground = foreground
@@ -920,6 +928,16 @@ public partial class MainWindow : Window
     private void ShowTemporaryStatus(string message)
     {
         if (_isDisposed) return;
+        if (pathWarningIcon != null)
+        {
+            bool isWarning = message.StartsWith("Could not", StringComparison.OrdinalIgnoreCase) ||
+                             message.Contains("cannot", StringComparison.OrdinalIgnoreCase) ||
+                             message.Contains("cancelled", StringComparison.OrdinalIgnoreCase) ||
+                             message.Contains("different key", StringComparison.OrdinalIgnoreCase) ||
+                             message.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+                             message.Contains("failed", StringComparison.OrdinalIgnoreCase);
+            pathWarningIcon.Data = isWarning ? IconWarning : IconCheck;
+        }
         tbWarningMessage.Inlines.Clear();
         tbWarningMessage.Inlines.Add(new Run(message));
         borderWarning.Visibility = Visibility.Visible;
@@ -985,6 +1003,10 @@ public partial class MainWindow : Window
 
     private void ShowWarningMessage(string labelText, string micName)
     {
+        if (pathWarningIcon != null)
+        {
+            pathWarningIcon.Data = IconWarning;
+        }
         tbWarningMessage.Inlines.Clear();
         tbWarningMessage.Inlines.Add(new Run(labelText));
         if (!string.IsNullOrEmpty(micName))
@@ -1182,10 +1204,10 @@ public partial class MainWindow : Window
             Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
             Resources["StatusDotBrush"] = themeGlyphBrush;
 
-            // Warning
-            Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 239, 68, 68));
-            Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
-            Resources["WarningTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 38, 38));
+            // Warning / Status Message Box (Monochrome Black & White Theme)
+            Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(12, 0, 0, 0));
+            Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(22, 0, 0, 0));
+            Resources["WarningTextBrush"] = themeGlyphBrush;
 
             // Scrollbars
             Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 0, 0, 0));
@@ -1277,10 +1299,10 @@ public partial class MainWindow : Window
             Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
             Resources["StatusDotBrush"] = themeGlyphBrush;
 
-            // Warning
-            Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(26, 255, 69, 58));
-            Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
-            Resources["WarningTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
+            // Warning / Status Message Box (Monochrome Black & White Theme)
+            Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
+            Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
+            Resources["WarningTextBrush"] = themeGlyphBrush;
 
             // Scrollbars
             Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(36, 255, 255, 255));

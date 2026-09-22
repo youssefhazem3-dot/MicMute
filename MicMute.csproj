@@ -32,7 +32,12 @@
     <EmbeddedResource Include="MainWindow.xaml" LogicalName="MicMute.MainWindow.xaml" />
     <EmbeddedResource Include="OsdWindow.xaml" LogicalName="MicMute.OsdWindow.xaml" />
     <EmbeddedResource Include="app.ico" LogicalName="MicMute.app.ico" />
+    <EmbeddedResource Include="sounds\mute.wav" LogicalName="MicMute.sounds.mute.wav" />
+    <EmbeddedResource Include="sounds\unmute.wav" LogicalName="MicMute.sounds.unmute.wav" />
     <Content Include="app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="sounds\*.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="MainWindow.xaml">

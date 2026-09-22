@@ -229,8 +229,8 @@ public partial class OsdWindow : Window
         }
     }
 
-    private static readonly Color ColorMutedText = Color.FromRgb(0xE2, 0x85, 0x85);
-    private static readonly Color ColorMutedBorder = Color.FromRgb(0xB9, 0x2A, 0x2A);
+    private static readonly Color ColorMutedText = Color.FromRgb(0xF8, 0x71, 0x71); // Clean standard balanced red (#F87171)
+    private static readonly Color ColorMutedBorder = Color.FromRgb(0xDC, 0x26, 0x26); // Tailwind Red 600 (#DC2626)
     private static readonly SolidColorBrush BrushMutedText = CreateFrozenBrush(ColorMutedText);
     private static readonly SolidColorBrush BrushMutedBorder = CreateFrozenBrush(ColorMutedBorder);
 

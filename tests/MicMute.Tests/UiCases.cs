@@ -28,12 +28,20 @@ static class UiCases
         test(nameof(PressingEscapeCancelsShortcutRecording), PressingEscapeCancelsShortcutRecording);
         test(nameof(MissingMicrophoneIsNotShownAsActive), MissingMicrophoneIsNotShownAsActive);
         test(nameof(TemporaryStatusCannotOverwriteNewerAudioWarning), TemporaryStatusCannotOverwriteNewerAudioWarning);
+        test(nameof(StatusBoxFollowsSystemThemeAndMonochromeIcons), StatusBoxFollowsSystemThemeAndMonochromeIcons);
+        test(nameof(HeroButtonMatchesAppLogoGeometryAndStateTriggers), HeroButtonMatchesAppLogoGeometryAndStateTriggers);
+        test(nameof(AudioFeedbackLoadsDiscordChimesAndSynthesizesFallback), AudioFeedbackLoadsDiscordChimesAndSynthesizesFallback);
         test(nameof(AdaptiveMaxHeightAdaptsToTaskbarAndScreenSize), AdaptiveMaxHeightAdaptsToTaskbarAndScreenSize);
         test(nameof(CentersWindowInVisibleWorkAreaAboveTaskbar), CentersWindowInVisibleWorkAreaAboveTaskbar);
         test(nameof(CentersWindowWhenContentFitsWithoutClipping), CentersWindowWhenContentFitsWithoutClipping);
         test(nameof(ClampsWindowBoundsWithinWorkArea), ClampsWindowBoundsWithinWorkArea);
         test(nameof(NarrowWorkAreaResizesWindowAndAllowsHorizontalAccess), NarrowWorkAreaResizesWindowAndAllowsHorizontalAccess);
         test(nameof(MainWindowAppliesAdaptiveConstraintsAndScrollsOnSmallWorkArea), MainWindowAppliesAdaptiveConstraintsAndScrollsOnSmallWorkArea);
+        test(nameof(ApplicationIconIntegrityAndNoLegacyIconsRemain), ApplicationIconIntegrityAndNoLegacyIconsRemain);
+        test(nameof(TrayContextMenuHasCompactDimensionsAndRoundedConfiguration), TrayContextMenuHasCompactDimensionsAndRoundedConfiguration);
+        test(nameof(MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones), MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones);
+        test(nameof(MainWindowCornersHaveNoClippedDropShadowArtifacts), MainWindowCornersHaveNoClippedDropShadowArtifacts);
+        test(nameof(SettingsLocationOptionsArePlacedUnderHeaderInEvenRow), SettingsLocationOptionsArePlacedUnderHeaderInEvenRow);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -219,6 +227,69 @@ static class UiCases
         }
     }
 
+    private static void StatusBoxFollowsSystemThemeAndMonochromeIcons()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.borderWarningIcon != null, "borderWarningIcon squircle tile must be present");
+            Check.True(window.pathWarningIcon != null, "pathWarningIcon must be present");
+
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            
+            // Success message should set checkmark icon
+            typeof(MainWindow).GetMethod("ShowTemporaryStatus", flags)!.Invoke(window, new object[] { "Shortcut changed successfully." });
+            Check.Equal("Shortcut changed successfully.", new System.Windows.Documents.TextRange(window.tbWarningMessage.ContentStart, window.tbWarningMessage.ContentEnd).Text);
+            Check.True(window.pathWarningIcon!.Data != null, "pathWarningIcon data must be set");
+
+            // Warning message should set warning triangle icon
+            typeof(MainWindow).GetMethod("ShowWarningMessage", flags)!.Invoke(window, new object[] { "No active audio capture devices found.", "" });
+            Check.True(window.pathWarningIcon!.Data != null, "pathWarningIcon data must be set on warning");
+
+            // Verify dark mode brushes are monochrome
+            typeof(MainWindow).GetMethod("SetLightMode", flags)!.Invoke(window, new object[] { false });
+            var darkBg = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBgBrush"];
+            var darkBorder = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBorderBrush"];
+            var darkText = (System.Windows.Media.SolidColorBrush)window.Resources["WarningTextBrush"];
+            Check.True(darkBg.Color.R == darkBg.Color.G && darkBg.Color.G == darkBg.Color.B, "dark WarningBgBrush must be neutral monochrome");
+            Check.True(darkBorder.Color.R == darkBorder.Color.G && darkBorder.Color.G == darkBorder.Color.B, "dark WarningBorderBrush must be neutral monochrome");
+            Check.True(darkText.Color.R > 200 && darkText.Color.G > 200 && darkText.Color.B > 200, "dark WarningTextBrush must be white/near-white");
+            Check.True(Math.Abs(darkText.Color.R - darkText.Color.B) <= 2, "dark WarningTextBrush must be neutral");
+
+            // Verify light mode brushes are monochrome
+            typeof(MainWindow).GetMethod("SetLightMode", flags)!.Invoke(window, new object[] { true });
+            var lightBg = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBgBrush"];
+            var lightBorder = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBorderBrush"];
+            var lightText = (System.Windows.Media.SolidColorBrush)window.Resources["WarningTextBrush"];
+            Check.True(lightBg.Color.R == lightBg.Color.G && lightBg.Color.G == lightBg.Color.B, "light WarningBgBrush must be neutral monochrome");
+            Check.True(lightBorder.Color.R == lightBorder.Color.G && lightBorder.Color.G == lightBorder.Color.B, "light WarningBorderBrush must be neutral monochrome");
+            Check.True(lightText.Color.R < 100 && lightText.Color.G < 100 && lightText.Color.B < 100, "light WarningTextBrush must be dark neutral");
+            Check.True(lightText.Color.R != 239 && lightText.Color.R != 220, "light WarningTextBrush must not be red");
+        }
+        finally { window.Close(); }
+    }
+
+    private static void AudioFeedbackLoadsDiscordChimesAndSynthesizesFallback()
+    {
+        AudioFeedback.Initialize();
+
+        string[] resourceNames = typeof(AudioFeedback).Assembly.GetManifestResourceNames();
+        Check.True(Array.Exists(resourceNames, r => r == "MicMute.sounds.mute.wav"), "MicMute.sounds.mute.wav must be embedded");
+        Check.True(Array.Exists(resourceNames, r => r == "MicMute.sounds.unmute.wav"), "MicMute.sounds.unmute.wav must be embedded");
+
+        using var fallbackMute = AudioFeedback.CreateDiscordChimePlayer(isMuted: true);
+        fallbackMute.Load();
+        Check.True(fallbackMute.IsLoadCompleted, "fallback mute chime must load into SoundPlayer");
+
+        using var fallbackUnmute = AudioFeedback.CreateDiscordChimePlayer(isMuted: false);
+        fallbackUnmute.Load();
+        Check.True(fallbackUnmute.IsLoadCompleted, "fallback unmute chime must load into SoundPlayer");
+
+        AudioFeedback.Play(isMuted: true);
+        AudioFeedback.Play(isMuted: false);
+    }
+
     private static void OsdResourceLoadsUsingProductionConstructor()
     {
         var window = new OsdWindow();
@@ -245,6 +316,35 @@ static class UiCases
             Check.True(window.FindName("contentScrollViewer") is System.Windows.Controls.ScrollViewer, "contentScrollViewer must be a ScrollViewer");
         }
         finally { window.Close(); }
+    }
+
+    private static void HeroButtonMatchesAppLogoGeometryAndStateTriggers()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "main panel resource must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // Verify the hero button style and titlebar use the studio condenser app logo vector geometry
+        const string appLogoVectorPrefix = "F1M12,14.6207084655762L11.859619140625,14.9596195220947";
+        Check.True(rawXaml.Contains(appLogoVectorPrefix), "MainWindow.xaml must contain the app logo vector geometry");
+
+        // Verify 32x32 icon sizing in hero button for prominent glass presence
+        Check.True(rawXaml.Contains(@"<Grid Width=""32"" Height=""32"""), "hero button microphone must use 32x32 dimensions");
+
+        // Verify muted trigger in MicToggleButtonStyle sets icon to White to match app logo
+        Check.True(rawXaml.Contains(@"<Setter TargetName=""iconPath"" Property=""Fill"" Value=""#FFFFFF"" />"),
+            "Muted state must set hero icon to white matching the app logo");
+
+        // Verify blood-red coagulated dark tones are eliminated in favor of standard balanced UI red
+        Check.True(!rawXaml.Contains("#FF420D0D"), "Dark coagulated blood tone #FF420D0D must not exist in MainWindow.xaml");
+        Check.True(!rawXaml.Contains("#FF6E1515"), "Dark blood tone #FF6E1515 must not exist in MainWindow.xaml");
+        Check.True(!rawXaml.Contains("#35801818"), "Dark blood ambient tone #35801818 must not exist in MainWindow.xaml");
+        Check.True(rawXaml.Contains("#FFEF4444") && rawXaml.Contains("#FFDC2626"),
+            "Hero lens muted state must use standard balanced UI red (#FFEF4444, #FFDC2626)");
+
+        // Verify old dead generic clipart path is completely removed
+        Check.True(!rawXaml.Contains("M12,2.5 C9.93,2.5 8.25,4.18"), "Old dead generic microphone path must not exist in MainWindow.xaml");
     }
 
     private static void DispatcherCoalescesRefreshesAndCancelsDisposedWork()
@@ -426,5 +526,155 @@ static class UiCases
             }
         }
         finally { window.Close(); }
+    }
+
+    private static void ApplicationIconIntegrityAndNoLegacyIconsRemain()
+    {
+        // 1. Verify embedded resource MicMute.app.ico in App assembly
+        var assembly = typeof(App).Assembly;
+        using var stream = assembly.GetManifestResourceStream("MicMute.app.ico");
+        Check.True(stream != null, "MicMute.app.ico embedded resource must exist");
+        Check.Equal(21305, stream!.Length);
+
+        // 2. Read resource stream bytes and verify ICO header and 7 frames
+        byte[] icoBytes = new byte[stream.Length];
+        stream.Seek(0, System.IO.SeekOrigin.Begin);
+        stream.Read(icoBytes, 0, icoBytes.Length);
+
+        ushort reserved = BitConverter.ToUInt16(icoBytes, 0);
+        ushort type = BitConverter.ToUInt16(icoBytes, 2);
+        ushort count = BitConverter.ToUInt16(icoBytes, 4);
+        Check.Equal(0, (int)reserved);
+        Check.Equal(1, (int)type);
+        Check.Equal(7, (int)count);
+
+        byte[] expectedSizes = [16, 24, 32, 48, 64, 128, 0];
+        for (int i = 0; i < 7; i++)
+        {
+            int entryOffset = 6 + i * 16;
+            byte w = icoBytes[entryOffset];
+            byte h = icoBytes[entryOffset + 1];
+            Check.Equal((int)expectedSizes[i], (int)w);
+            Check.Equal((int)expectedSizes[i], (int)h);
+        }
+
+        // 3. Ensure no stale 116,602-byte legacy icon file exists in the current output directory
+        string baseDir = AppContext.BaseDirectory;
+        string localIco = System.IO.Path.Combine(baseDir, "app.ico");
+        if (System.IO.File.Exists(localIco))
+        {
+            long len = new System.IO.FileInfo(localIco).Length;
+            Check.True(len != 116602, "Legacy 116,602-byte gold icon must not exist in output directory");
+            Check.Equal(21305, (int)len);
+        }
+    }
+
+    private static void TrayContextMenuHasCompactDimensionsAndRoundedConfiguration()
+    {
+        using var menu = new App.LiquidGlassContextMenu();
+        menu.Renderer = new App.LiquidGlassMenuRenderer();
+        try
+        {
+            menu.Font = new System.Drawing.Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+        }
+        catch
+        {
+            menu.Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+        }
+
+        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 3, 0, 3) };
+        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open Control Panel") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 3, 0, 3) };
+        var sep = new System.Windows.Forms.ToolStripSeparator { Margin = new System.Windows.Forms.Padding(0, 2, 0, 2) };
+        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 3, 0, 3) };
+
+        menu.Items.Add(item1);
+        menu.Items.Add(item2);
+        menu.Items.Add(sep);
+        menu.Items.Add(item3);
+
+        Check.True(!menu.ShowImageMargin, "ShowImageMargin must be false");
+        Check.True(!menu.ShowCheckMargin, "ShowCheckMargin must be false");
+        Check.True(menu.Renderer is App.LiquidGlassMenuRenderer, "Renderer must be LiquidGlassMenuRenderer");
+
+        var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
+        // Compact width: should comfortably fit the items without excessive empty gap (between 145 and 180)
+        Check.True(preferredSize.Width >= 145 && preferredSize.Width <= 180, $"Menu preferred width {preferredSize.Width} must be compact");
+        // Compact height: 3 items + separator + padding should be under 105px (previously bloated to >135px)
+        Check.True(preferredSize.Height >= 70 && preferredSize.Height <= 105, $"Menu preferred height {preferredSize.Height} must be compact and under 105px");
+    }
+
+    private static void MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones()
+    {
+        // Check MainWindow.xaml
+        using var mwStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(mwStream != null, "MainWindow.xaml must be embedded");
+        using var mwReader = new System.IO.StreamReader(mwStream!);
+        string mwXaml = mwReader.ReadToEnd();
+
+        // Check OsdWindow.xaml
+        using var osdStream = typeof(OsdWindow).Assembly.GetManifestResourceStream("MicMute.OsdWindow.xaml");
+        Check.True(osdStream != null, "OsdWindow.xaml must be embedded");
+        using var osdReader = new System.IO.StreamReader(osdStream!);
+        string osdXaml = osdReader.ReadToEnd();
+
+        // Assert no coagulated/blood-red color hexes remain
+        string[] bloodColors = { "#420D0D", "#6E1515", "#801818", "#E28585" };
+        foreach (var c in bloodColors)
+        {
+            Check.True(!mwXaml.Contains(c), $"MainWindow.xaml must not contain blood color {c}");
+            Check.True(!osdXaml.Contains(c), $"OsdWindow.xaml must not contain blood color {c}");
+        }
+
+        // Assert standard UI red colors are present
+        Check.True(mwXaml.Contains("#FFEF4444"), "MainWindow.xaml must use standard UI red #FFEF4444");
+        Check.True(mwXaml.Contains("#FFF87171"), "MainWindow.xaml must use standard UI red highlight #FFF87171");
+        Check.True(osdXaml.Contains("#F87171"), "OsdWindow.xaml must use standard UI red #F87171");
+    }
+
+    private static void MainWindowCornersHaveNoClippedDropShadowArtifacts()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml resource must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // The outer window border must not have a DropShadowEffect which causes light-black sharp edge artifacts in the 4 corners
+        Check.True(!rawXaml.Contains(@"<DropShadowEffect BlurRadius=""28"""),
+            "Outer window border must not have BlurRadius=28 DropShadowEffect");
+
+        // Verify root Border has CornerRadius 20 and no Effect
+        int borderIdx = rawXaml.IndexOf("<!-- Outer Window Frame (iOS Liquid Glass Shell) -->", StringComparison.Ordinal);
+        Check.True(borderIdx >= 0, "Outer window frame comment must exist");
+        string borderSection = rawXaml.Substring(borderIdx, 300);
+        Check.True(!borderSection.Contains("<Border.Effect>"), "Outer window border must not have <Border.Effect>");
+    }
+
+    private static void SettingsLocationOptionsArePlacedUnderHeaderInEvenRow()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml resource must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Verify Settings Location and description exist
+        int groupStart = rawXaml.IndexOf("Settings Location", StringComparison.Ordinal);
+        Check.True(groupStart >= 0, "Settings Location must exist in MainWindow.xaml");
+
+        int descIdx = rawXaml.IndexOf("Configuration file and data directory", groupStart, StringComparison.Ordinal);
+        Check.True(descIdx > groupStart, "Configuration file and data directory must exist");
+
+        // 2. Verify btnOpenFolder, btnChangeFolder, btnResetData are placed AFTER description text
+        int btnOpenIdx = rawXaml.IndexOf(@"x:Name=""btnOpenFolder""", descIdx, StringComparison.Ordinal);
+        Check.True(btnOpenIdx > descIdx, "btnOpenFolder must be placed after the description text");
+
+        int btnChangeIdx = rawXaml.IndexOf(@"x:Name=""btnChangeFolder""", btnOpenIdx, StringComparison.Ordinal);
+        Check.True(btnChangeIdx > btnOpenIdx, "btnChangeFolder must follow btnOpenFolder");
+
+        int btnResetIdx = rawXaml.IndexOf(@"x:Name=""btnResetData""", btnChangeIdx, StringComparison.Ordinal);
+        Check.True(btnResetIdx > btnChangeIdx, "btnResetData must follow btnChangeFolder");
+
+        // 3. Verify all 3 buttons are in a grid with even spacing (* columns and 8px gaps)
+        Check.True(rawXaml.Contains(@"<ColumnDefinition Width=""*"" />"), "Must contain * width columns for buttons");
+        Check.True(rawXaml.Contains(@"<ColumnDefinition Width=""8"" />"), "Must contain even 8px gaps between buttons");
     }
 }
