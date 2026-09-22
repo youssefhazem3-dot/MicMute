@@ -36,6 +36,16 @@ public partial class MainWindow : Window
     internal System.Windows.Controls.Button btnStateToggle = null!;
     internal TextBlock tbStatusText = null!;
     internal DropShadowEffect statusGlow = null!;
+    internal Border? borderStatusCapsule;
+    internal System.Windows.Shapes.Ellipse? dotStatus;
+    internal DropShadowEffect? dotGlow;
+    internal System.Windows.Controls.Button? btnHeroHotkey;
+    internal TextBlock? tbHeroHotkey;
+    internal System.Windows.Controls.Button? btnTitleTheme;
+    internal System.Windows.Shapes.Path? pathTitleTheme;
+    internal System.Windows.Shapes.Path? titleBarIcon;
+    internal System.Windows.Controls.Button? btnMin;
+    internal System.Windows.Controls.Button? btnCls;
     internal System.Windows.Controls.ComboBox cbDevices = null!;
     internal Border borderHotkey = null!;
     internal DropShadowEffect glowHotkey = null!;
@@ -109,91 +119,117 @@ public partial class MainWindow : Window
         _contentLoaded = true;
 
         Window? root = null;
-        using (Stream? stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml"))
+        string? xaml = null;
+
+        string localFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MainWindow.xaml");
+        if (File.Exists(localFile))
         {
-            if (stream != null)
+            try { xaml = File.ReadAllText(localFile); } catch { }
+        }
+
+        if (string.IsNullOrEmpty(xaml))
+        {
+            using (Stream? stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml"))
             {
-                using (StreamReader sr = new StreamReader(stream))
+                if (stream != null)
                 {
-                    string xaml = sr.ReadToEnd();
-                    xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
-                    xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
-                    root = (Window)XamlReader.Parse(xaml);
-                    
-                    this.Resources = root.Resources;
-                    this.Title = root.Title;
-                    this.Width = root.Width;
-                    if (!double.IsNaN(root.Height)) this.Height = root.Height;
-                    this.SizeToContent = root.SizeToContent;
-                    this.WindowStyle = root.WindowStyle;
-                    this.AllowsTransparency = root.AllowsTransparency;
-                    this.Background = root.Background;
-                    this.ResizeMode = root.ResizeMode;
-                    this.WindowStartupLocation = root.WindowStartupLocation;
-                    this.SnapsToDevicePixels = root.SnapsToDevicePixels;
-                    this.UseLayoutRounding = root.UseLayoutRounding;
-
-                    // Bind all controls from root before detaching content
-                    btnStateToggle = (System.Windows.Controls.Button)root.FindName("btnStateToggle");
-                    tbStatusText = (TextBlock)root.FindName("tbStatusText");
-                    statusGlow = (DropShadowEffect)root.FindName("statusGlow");
-                    cbDevices = (System.Windows.Controls.ComboBox)root.FindName("cbDevices");
-                    borderHotkey = (Border)root.FindName("borderHotkey");
-                    glowHotkey = (DropShadowEffect)root.FindName("glowHotkey");
-                    tbHotkey = (TextBlock)root.FindName("tbHotkey");
-                    btnRecordHotkey = (System.Windows.Controls.Button)root.FindName("btnRecordHotkey");
-                    cbEnableOsd = (System.Windows.Controls.CheckBox)root.FindName("cbEnableOsd");
-                    sliderOsdDuration = (Slider)root.FindName("sliderOsdDuration");
-                    txtOsdDuration = (System.Windows.Controls.TextBox)root.FindName("txtOsdDuration");
-                    cbStartup = (System.Windows.Controls.CheckBox)root.FindName("cbStartup");
-                    cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
-                    cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
-                    cbRunAsAdmin = (System.Windows.Controls.CheckBox)root.FindName("cbRunAsAdmin");
-                    cbSoundFeedback = (System.Windows.Controls.CheckBox)root.FindName("cbSoundFeedback");
-                    tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
-                    borderWarning = (Border)root.FindName("borderWarning");
-                    tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
-                    contentScrollViewer = (ScrollViewer)root.FindName("contentScrollViewer");
-
-                    // Event hooks
-                    var titleBar = (Border)root.FindName("borderTitleBar");
-                    if (titleBar != null) titleBar.MouseLeftButtonDown += TitleBar_MouseLeftButtonDown;
-                    var btnMin = (System.Windows.Controls.Button)root.FindName("btnMinimize");
-                    if (btnMin != null) btnMin.Click += MinimizeButton_Click;
-                    var btnCls = (System.Windows.Controls.Button)root.FindName("btnClose");
-                    if (btnCls != null) btnCls.Click += CloseButton_Click;
-                    var btnOpenFolder = (System.Windows.Controls.Button)root.FindName("btnOpenFolder");
-                    if (btnOpenFolder != null) btnOpenFolder.Click += BtnOpenDataFolder_Click;
-                    var btnChangeFolder = (System.Windows.Controls.Button)root.FindName("btnChangeFolder");
-                    if (btnChangeFolder != null) btnChangeFolder.Click += BtnChangeDataFolder_Click;
-                    var btnResetData = (System.Windows.Controls.Button)root.FindName("btnResetData");
-                    if (btnResetData != null) btnResetData.Click += BtnResetSettings_Click;
-
-                    var imgIcon = (System.Windows.Controls.Image)root.FindName("imgAppIcon");
-                    imgAppIcon = imgIcon;
-                    if (imgIcon != null)
+                    using (StreamReader sr = new StreamReader(stream))
                     {
-                        try
-                        {
-                            using (Stream? iconStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.app.ico"))
-                            {
-                                if (iconStream != null)
-                                {
-                                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(iconStream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                                    imgIcon.Source = decoder.Frames[0];
-                                    this.Icon = decoder.Frames[0];
-                                }
-                            }
-                        }
-                        catch { }
+                        xaml = sr.ReadToEnd();
                     }
-
-                    // Now safely detach content and attach to this Window
-                    var content = root.Content;
-                    root.Content = null;
-                    this.Content = content;
                 }
             }
+        }
+
+        if (!string.IsNullOrEmpty(xaml))
+        {
+            xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
+            xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
+            root = (Window)XamlReader.Parse(xaml);
+            
+            this.Resources = root.Resources;
+            this.Title = root.Title;
+            this.Width = root.Width;
+            if (!double.IsNaN(root.Height)) this.Height = root.Height;
+            this.SizeToContent = root.SizeToContent;
+            this.WindowStyle = root.WindowStyle;
+            this.AllowsTransparency = root.AllowsTransparency;
+            this.Background = root.Background;
+            this.ResizeMode = root.ResizeMode;
+            this.WindowStartupLocation = root.WindowStartupLocation;
+            this.SnapsToDevicePixels = root.SnapsToDevicePixels;
+            this.UseLayoutRounding = root.UseLayoutRounding;
+
+            // Bind all controls from root before detaching content
+            btnStateToggle = (System.Windows.Controls.Button)root.FindName("btnStateToggle");
+            tbStatusText = (TextBlock)root.FindName("tbStatusText");
+            dotStatus = root.FindName("dotStatus") as System.Windows.Shapes.Ellipse;
+            dotGlow = root.FindName("dotGlow") as DropShadowEffect;
+            statusGlow = (DropShadowEffect)root.FindName("statusGlow") ?? dotGlow!;
+            borderStatusCapsule = root.FindName("borderStatusCapsule") as Border;
+            btnHeroHotkey = root.FindName("btnHeroHotkey") as System.Windows.Controls.Button;
+            tbHeroHotkey = root.FindName("tbHeroHotkey") as TextBlock;
+            btnTitleTheme = root.FindName("btnTitleTheme") as System.Windows.Controls.Button;
+            pathTitleTheme = root.FindName("pathTitleTheme") as System.Windows.Shapes.Path;
+            titleBarIcon = root.FindName("titleBarIcon") as System.Windows.Shapes.Path;
+
+            cbDevices = (System.Windows.Controls.ComboBox)root.FindName("cbDevices");
+            borderHotkey = (Border)root.FindName("borderHotkey");
+            glowHotkey = (DropShadowEffect)root.FindName("glowHotkey");
+            tbHotkey = (TextBlock)root.FindName("tbHotkey");
+            btnRecordHotkey = (System.Windows.Controls.Button)root.FindName("btnRecordHotkey");
+            cbEnableOsd = (System.Windows.Controls.CheckBox)root.FindName("cbEnableOsd");
+            sliderOsdDuration = (Slider)root.FindName("sliderOsdDuration");
+            txtOsdDuration = (System.Windows.Controls.TextBox)root.FindName("txtOsdDuration");
+            cbStartup = (System.Windows.Controls.CheckBox)root.FindName("cbStartup");
+            cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
+            cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
+            cbRunAsAdmin = (System.Windows.Controls.CheckBox)root.FindName("cbRunAsAdmin");
+            cbSoundFeedback = (System.Windows.Controls.CheckBox)root.FindName("cbSoundFeedback");
+            tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
+            borderWarning = (Border)root.FindName("borderWarning");
+            tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
+            contentScrollViewer = (ScrollViewer)root.FindName("contentScrollViewer");
+
+            // Event hooks
+            var titleBar = (Border)root.FindName("borderTitleBar");
+            if (titleBar != null) titleBar.MouseLeftButtonDown += TitleBar_MouseLeftButtonDown;
+            btnMin = (System.Windows.Controls.Button)root.FindName("btnMinimize");
+            if (btnMin != null) btnMin.Click += MinimizeButton_Click;
+            btnCls = (System.Windows.Controls.Button)root.FindName("btnClose");
+            if (btnCls != null) btnCls.Click += CloseButton_Click;
+            if (btnTitleTheme != null) btnTitleTheme.Click += BtnTitleTheme_Click;
+            if (btnHeroHotkey != null) btnHeroHotkey.Click += BtnRecordHotkey_Click;
+            var btnOpenFolder = (System.Windows.Controls.Button)root.FindName("btnOpenFolder");
+            if (btnOpenFolder != null) btnOpenFolder.Click += BtnOpenDataFolder_Click;
+            var btnChangeFolder = (System.Windows.Controls.Button)root.FindName("btnChangeFolder");
+            if (btnChangeFolder != null) btnChangeFolder.Click += BtnChangeDataFolder_Click;
+            var btnResetData = (System.Windows.Controls.Button)root.FindName("btnResetData");
+            if (btnResetData != null) btnResetData.Click += BtnResetSettings_Click;
+
+            var imgIcon = (System.Windows.Controls.Image)root.FindName("imgAppIcon");
+            imgAppIcon = imgIcon;
+            if (imgIcon != null)
+            {
+                try
+                {
+                    using (Stream? iconStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.app.ico"))
+                    {
+                        if (iconStream != null)
+                        {
+                            var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(iconStream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                            imgIcon.Source = decoder.Frames[0];
+                            this.Icon = decoder.Frames[0];
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Now safely detach content and attach to this Window
+            var content = root.Content;
+            root.Content = null;
+            this.Content = content;
         }
 
         if (btnStateToggle != null) btnStateToggle.Click += BtnStateToggle_Click;
@@ -452,13 +488,13 @@ public partial class MainWindow : Window
 
         if (AdminManager.IsRunningAsAdmin())
         {
-            imgAppIcon.ToolTip = "Mic Mute (Administrator - Game Mode Active)";
-            tbStatusText.ToolTip = "Administrator Mode Active: In-game hotkeys enabled for Valorant";
+            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute (Administrator - Elevated Mode Active)";
+            tbStatusText.ToolTip = "Administrator Mode Active: In-game hotkeys enabled over games and elevated windows";
         }
         else
         {
-            imgAppIcon.ToolTip = "Mic Mute (Standard User)";
-            tbStatusText.ToolTip = "Tip: Enable 'Run as Administrator' below to use hotkeys inside Valorant";
+            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute (Standard User)";
+            tbStatusText.ToolTip = "Tip: Enable 'Run as Administrator' below to use hotkeys inside games and elevated windows";
         }
 
     }
@@ -558,37 +594,62 @@ public partial class MainWindow : Window
     {
         bool hasDevice = !string.IsNullOrEmpty(_audioController.CurrentDeviceId);
         btnStateToggle.IsEnabled = hasDevice;
+        bool isLight = SettingsManager.Load().LightMode;
+
         if (!hasDevice)
         {
             btnStateToggle.Tag = "Unavailable";
             tbStatusText.Text = "NO MICROPHONE";
-            tbStatusText.SetResourceReference(TextBlock.ForegroundProperty, "TextWhiteBrush");
-            if (tbStatusText.Effect is DropShadowEffect glow) glow.Opacity = 0;
+            tbStatusText.SetResourceReference(TextBlock.ForegroundProperty, "TextDimBrush");
+            if (dotStatus != null) dotStatus.Fill = (System.Windows.Media.Brush)FindResource("TextDimBrush");
+            if (dotGlow != null) dotGlow.Opacity = 0;
+            if (borderStatusCapsule != null)
+            {
+                borderStatusCapsule.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 100, 116, 139));
+                borderStatusCapsule.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 100, 116, 139));
+            }
             ShowWarningMessage("No active audio capture devices found.", "");
             borderWarning.Visibility = Visibility.Visible;
             return;
         }
-        bool isLight = SettingsManager.Load().LightMode;
+
         btnStateToggle.Tag = isMuted ? "Muted" : "Active";
-        tbStatusText.Text = isMuted ? "M U T E D" : "A C T I V E";
+        tbStatusText.Text = isMuted ? "MICROPHONE MUTED" : "MICROPHONE LIVE";
+
         if (isMuted)
         {
-            tbStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
-            if (tbStatusText.Effect is DropShadowEffect dropShadowEffect)
+            var redColor = System.Windows.Media.Color.FromRgb(239, 68, 68);
+            var redTextBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(220, 38, 38) : System.Windows.Media.Color.FromRgb(248, 113, 113));
+            tbStatusText.Foreground = redTextBrush;
+            if (dotStatus != null) dotStatus.Fill = new SolidColorBrush(redColor);
+            if (dotGlow != null)
             {
-                dropShadowEffect.Color = System.Windows.Media.Color.FromRgb(239, 68, 68);
-                dropShadowEffect.Opacity = isLight ? 0.0 : 0.4;
-                dropShadowEffect.BlurRadius = 8;
+                dotGlow.Color = redColor;
+                dotGlow.Opacity = isLight ? 0.3 : 0.8;
+                dotGlow.BlurRadius = 8;
+            }
+            if (borderStatusCapsule != null)
+            {
+                borderStatusCapsule.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(isLight ? (byte)25 : (byte)32, 239, 68, 68));
+                borderStatusCapsule.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(isLight ? (byte)80 : (byte)96, 239, 68, 68));
             }
         }
         else
         {
-            tbStatusText.Foreground = isLight ? (SolidColorBrush)Resources["AccentBrush"] : new SolidColorBrush(System.Windows.Media.Color.FromRgb(41, 127, 184));
-            if (tbStatusText.Effect is DropShadowEffect dropShadowEffect)
+            var activeColor = isLight ? System.Windows.Media.Color.FromRgb(15, 23, 42) : System.Windows.Media.Color.FromRgb(255, 255, 255);
+            var activeBrush = new SolidColorBrush(activeColor);
+            tbStatusText.Foreground = activeBrush;
+            if (dotStatus != null) dotStatus.Fill = activeBrush;
+            if (dotGlow != null)
             {
-                dropShadowEffect.Color = System.Windows.Media.Color.FromRgb(41, 127, 184);
-                dropShadowEffect.Opacity = isLight ? 0.0 : 0.4;
-                dropShadowEffect.BlurRadius = 8;
+                dotGlow.Color = activeColor;
+                dotGlow.Opacity = isLight ? 0.25 : 0.85;
+                dotGlow.BlurRadius = 8;
+            }
+            if (borderStatusCapsule != null)
+            {
+                borderStatusCapsule.Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(16, 15, 23, 42) : System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
+                borderStatusCapsule.BorderBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(40, 15, 23, 42) : System.Windows.Media.Color.FromArgb(80, 255, 255, 255));
             }
         }
     }
@@ -695,6 +756,11 @@ public partial class MainWindow : Window
         btnRecordHotkey.Content = "Cancel";
         tbHotkey.Text = "Press keys...";
         tbHotkey.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        if (tbHeroHotkey != null)
+        {
+            tbHeroHotkey.Text = "Press keys...";
+            tbHeroHotkey.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        }
         PreviewKeyDown += MainWindow_PreviewKeyDown;
     }
 
@@ -757,7 +823,9 @@ public partial class MainWindow : Window
             key == Key.LeftShift || key == Key.RightShift ||
             key == Key.LWin || key == Key.RWin)
         {
-            tbHotkey.Text = FormatHotkeyText(Key.None, modifiers);
+            string modifierText = FormatHotkeyText(Key.None, modifiers);
+            tbHotkey.Text = modifierText;
+            if (tbHeroHotkey != null) tbHeroHotkey.Text = modifierText;
         }
         else if (key == Key.Tab || key == Key.Enter || key == Key.Space || key == Key.Back || key == Key.Capital)
         {
@@ -785,8 +853,17 @@ public partial class MainWindow : Window
 
     private void DisplayHotkey(Key key, ModifierKeys modifiers)
     {
-        tbHotkey.Text = FormatHotkeyText(key, modifiers);
-        tbHotkey.SetResourceReference(TextBlock.ForegroundProperty, "TextWhiteBrush");
+        string hotkeyText = FormatHotkeyText(key, modifiers);
+        if (tbHotkey != null)
+        {
+            tbHotkey.Text = hotkeyText;
+            tbHotkey.SetResourceReference(TextBlock.ForegroundProperty, "KeycapTextBrush");
+        }
+        if (tbHeroHotkey != null)
+        {
+            tbHeroHotkey.Text = hotkeyText;
+            tbHeroHotkey.SetResourceReference(TextBlock.ForegroundProperty, "KeycapTextBrush");
+        }
     }
 
     private string FormatHotkeyText(Key key, ModifierKeys modifiers)
@@ -937,7 +1014,7 @@ public partial class MainWindow : Window
         if (!AdminManager.IsRunningAsAdmin())
         {
             var res = System.Windows.MessageBox.Show(
-                "Run as Administrator has been enabled for Valorant and in-game hotkey support.\n\nWould you like to restart MicMute as Administrator now to apply it immediately?",
+                "Run as Administrator has been enabled for elevated windows and game hotkey support.\n\nWould you like to restart MicMute as Administrator now to apply it immediately?",
                 "Restart as Administrator",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -968,62 +1045,229 @@ public partial class MainWindow : Window
         SettingsManager.Save(SettingsManager.Load() with { PlaySoundFeedback = false });
     }
 
+    public void BtnTitleTheme_Click(object sender, RoutedEventArgs e)
+    {
+        if (cbLightMode != null)
+        {
+            cbLightMode.IsChecked = !cbLightMode.IsChecked;
+        }
+    }
+
     private void SetLightMode(bool isLight)
     {
-        System.Windows.Media.Color color = isLight ? System.Windows.Media.Color.FromRgb(21, 90, 132) : System.Windows.Media.Color.FromRgb(41, 127, 184);
-        Resources["AccentColor"] = color;
-        Resources["AccentBrush"] = new SolidColorBrush(color);
-        Resources["AccentHoverBrush"] = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(26, 21, 90, 132) : System.Windows.Media.Color.FromArgb(26, 41, 127, 184));
+        System.Windows.Media.Color accentColor = isLight ? System.Windows.Media.Color.FromRgb(15, 23, 42) : System.Windows.Media.Color.FromRgb(255, 255, 255);
+        Resources["AccentColor"] = accentColor;
+        Resources["AccentBrush"] = new SolidColorBrush(accentColor);
+        Resources["AccentHoverBrush"] = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(20, 15, 23, 42) : System.Windows.Media.Color.FromArgb(37, 255, 255, 255));
+
+        var themeGlyphBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(15, 23, 42) : System.Windows.Media.Color.FromRgb(248, 250, 252));
+        if (pathTitleTheme != null)
+        {
+            pathTitleTheme.Fill = themeGlyphBrush;
+            pathTitleTheme.Data = Geometry.Parse(isLight
+                ? "M12.3,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22C16.82,22 20.84,18.6 21.8,14C22.07,12.7 20.93,11.59 19.63,11.83C15.82,12.54 12,9.66 12,5.77C12,4.42 12.92,3.26 14.26,3.03C14.77,2.94 15.08,2.44 14.8,2C14.07,2 13.18,2 12.3,2Z"
+                : "M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z");
+        }
+        if (titleBarIcon != null)
+        {
+            titleBarIcon.Fill = themeGlyphBrush;
+        }
+        if (btnMin != null)
+        {
+            btnMin.Foreground = themeGlyphBrush;
+        }
+        if (btnCls != null)
+        {
+            btnCls.Foreground = themeGlyphBrush;
+        }
+
         if (isLight)
         {
-            Resources["WindowBgBrush"] = new LinearGradientBrush(System.Windows.Media.Color.FromArgb(250, 241, 245, 249), System.Windows.Media.Color.FromArgb(250, 226, 234, 242), new Point(0.0, 0.0), new Point(1.0, 1.0));
-            Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 0, 0, 0));
-            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(245, 255, 255, 255));
+            Resources["WindowBgBrush"] = new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(248, 248, 250, 252),
+                System.Windows.Media.Color.FromArgb(248, 226, 232, 240),
+                new Point(0.0, 0.0), new Point(1.0, 1.0));
+            Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 0, 0, 0));
+            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(240, 255, 255, 255));
             Resources["InputBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
             Resources["TitleBarBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 255, 255, 255));
-            Resources["TitleTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
-            Resources["TextWhiteBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
-            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 116, 139));
+            Resources["TitleTextBrush"] = themeGlyphBrush;
+            Resources["TextWhiteBrush"] = themeGlyphBrush; // dark text in light mode
+            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)); // dark slate
             Resources["TextDimBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(148, 163, 184));
-            Resources["BorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(203, 213, 225));
-            Resources["ToggleOffBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(203, 213, 225));
-            Resources["ToggleOffBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(148, 163, 184));
-            LinearGradientBrush value = new LinearGradientBrush(System.Windows.Media.Color.FromArgb(255, 224, 242, 254), System.Windows.Media.Color.FromArgb(255, 186, 230, 253), new Point(0.0, 0.0), new Point(1.0, 1.0));
-            LinearGradientBrush value2 = new LinearGradientBrush(System.Windows.Media.Color.FromArgb(255, 56, 189, 248), System.Windows.Media.Color.FromArgb(255, 14, 165, 233), new Point(0.0, 0.0), new Point(0.0, 1.0));
-            Resources["RecordGlassBrush"] = value;
-            Resources["RecordGlassBorderBrush"] = value2;
+            Resources["BorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 0, 0, 0));
+            Resources["DividerBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 0, 0, 0));
+
+            // Liquid Switches (Black Liquid in Light Mode)
+            Resources["ToggleOnBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+            Resources["ToggleOnBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+            Resources["ToggleOffBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(226, 232, 240));
+            Resources["ToggleOffBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(203, 213, 225));
+            Resources["ToggleKnobBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+            Resources["ToggleKnobBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(203, 213, 225));
+            Resources["ToggleKnobActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["ToggleKnobActiveBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(226, 232, 240));
+
+            // Liquid OSD Duration Slider (Black Liquid in Light Mode)
+            Resources["SliderTrackBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+            Resources["SliderTrackEmptyBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(226, 232, 240));
+            Resources["SliderTrackBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(203, 213, 225));
+            Resources["SliderThumbBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["SliderThumbBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+
+            // Jewel Ring
+            Resources["JewelRingBgBrush"] = new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(180, 255, 255, 255),
+                System.Windows.Media.Color.FromArgb(120, 241, 245, 249),
+                new Point(0.0, 0.0), new Point(1.0, 1.0));
+            Resources["JewelRingBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255));
+
+            // Hero Mute Button: Liquid Black Lens in Light Mode
+            var heroLensLight = new RadialGradientBrush
+            {
+                Center = new Point(0.35, 0.30),
+                GradientOrigin = new Point(0.35, 0.30),
+                RadiusX = 0.65,
+                RadiusY = 0.65
+            };
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(51, 65, 85), 0.0));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(30, 41, 59), 0.45));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(15, 23, 42), 0.85));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(2, 6, 23), 1.0));
+            Resources["HeroLensActiveBrush"] = heroLensLight;
+
+            var heroGlowLight = new RadialGradientBrush
+            {
+                Center = new Point(0.5, 0.5),
+                GradientOrigin = new Point(0.5, 0.5),
+                RadiusX = 0.5,
+                RadiusY = 0.5
+            };
+            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(50, 15, 23, 42), 0.0));
+            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 15, 23, 42), 1.0));
+            Resources["HeroGlowActiveBrush"] = heroGlowLight;
+            Resources["HeroIconActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+
+            // Monochrome Squircle Tiles: Pure Black Icon in Light Mode
+            Resources["SquircleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(16, 0, 0, 0));
+            Resources["SquircleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 0, 0, 0));
+            Resources["SquircleIconBrush"] = themeGlyphBrush;
+
+            // Keycaps
+            Resources["KeycapBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(241, 245, 249));
+            Resources["KeycapBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(203, 213, 225));
+            Resources["KeycapTextBrush"] = themeGlyphBrush;
+
+            // Status Capsule
+            Resources["StatusCapsuleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 15, 23, 42));
+            Resources["StatusCapsuleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 15, 23, 42));
+            Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
+            Resources["StatusDotBrush"] = themeGlyphBrush;
+
+            // Warning
             Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 239, 68, 68));
             Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
             Resources["WarningTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 38, 38));
+
+            // Scrollbars
             Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 0, 0, 0));
             Resources["ScrollBarThumbHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(80, 0, 0, 0));
             Resources["ScrollBarThumbDragBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(120, 0, 0, 0));
         }
         else
         {
-            Resources["WindowBgBrush"] = new LinearGradientBrush(System.Windows.Media.Color.FromArgb(235, 20, 30, 45), System.Windows.Media.Color.FromArgb(235, 10, 15, 25), new Point(0.0, 0.0), new Point(1.0, 1.0));
+            Resources["WindowBgBrush"] = new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(240, 15, 23, 42),
+                System.Windows.Media.Color.FromArgb(240, 2, 6, 23),
+                new Point(0.0, 0.0), new Point(1.0, 1.0));
             Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 255, 255, 255));
-            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
+            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 255, 255, 255));
             Resources["InputBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 41, 59));
             Resources["TitleBarBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0));
-            Resources["TitleTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 245, 247));
-            Resources["TextWhiteBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 245, 247));
-            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(134, 134, 139));
-            Resources["TextDimBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(134, 134, 139));
-            Resources["BorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 255, 255, 255));
-            Resources["ToggleOffBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(99, 99, 102));
-            Resources["ToggleOffBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(142, 142, 147));
-            LinearGradientBrush value3 = new LinearGradientBrush(System.Windows.Media.Color.FromArgb(160, 179, 224, 247), System.Windows.Media.Color.FromArgb(160, 129, 180, 214), new Point(0.0, 0.0), new Point(1.0, 1.0));
-            LinearGradientBrush value4 = new LinearGradientBrush(System.Windows.Media.Color.FromArgb(192, 74, 178, 235), System.Windows.Media.Color.FromArgb(192, 29, 120, 168), new Point(0.0, 0.0), new Point(0.0, 1.0));
-            Resources["RecordGlassBrush"] = value3;
-            Resources["RecordGlassBorderBrush"] = value4;
+            Resources["TitleTextBrush"] = themeGlyphBrush;
+            Resources["TextWhiteBrush"] = themeGlyphBrush;
+            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(148, 163, 184));
+            Resources["TextDimBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 116, 139));
+            Resources["BorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(37, 255, 255, 255));
+            Resources["DividerBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 255, 255, 255));
+
+            // Liquid Switches (White Liquid in Dark Mode)
+            Resources["ToggleOnBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["ToggleOnBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["ToggleOffBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(42, 55, 74));
+            Resources["ToggleOffBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105));
+            Resources["ToggleKnobBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["ToggleKnobBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(226, 232, 240));
+            Resources["ToggleKnobActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+            Resources["ToggleKnobActiveBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(51, 65, 85));
+
+            // Liquid OSD Duration Slider (White Liquid in Dark Mode)
+            Resources["SliderTrackBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["SliderTrackEmptyBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 41, 59));
+            Resources["SliderTrackBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(51, 65, 85));
+            Resources["SliderThumbBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["SliderThumbBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+
+            // Jewel Ring
+            Resources["JewelRingBgBrush"] = new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(37, 255, 255, 255),
+                System.Windows.Media.Color.FromArgb(6, 255, 255, 255),
+                new Point(0.0, 0.0), new Point(1.0, 1.0));
+            Resources["JewelRingBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(69, 255, 255, 255));
+
+            // Hero Mute Button: Liquid White Lens in Dark Mode
+            var heroLensDark = new RadialGradientBrush
+            {
+                Center = new Point(0.35, 0.30),
+                GradientOrigin = new Point(0.35, 0.30),
+                RadiusX = 0.65,
+                RadiusY = 0.65
+            };
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(255, 255, 255), 0.0));
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(241, 245, 249), 0.45));
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(226, 232, 240), 0.85));
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(203, 213, 225), 1.0));
+            Resources["HeroLensActiveBrush"] = heroLensDark;
+
+            var heroGlowDark = new RadialGradientBrush
+            {
+                Center = new Point(0.5, 0.5),
+                GradientOrigin = new Point(0.5, 0.5),
+                RadiusX = 0.5,
+                RadiusY = 0.5
+            };
+            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(144, 255, 255, 255), 0.0));
+            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 1.0));
+            Resources["HeroGlowActiveBrush"] = heroGlowDark;
+            Resources["HeroIconActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42));
+
+            // Monochrome Squircle Tiles: Pure White Icon in Dark Mode
+            Resources["SquircleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(22, 255, 255, 255));
+            Resources["SquircleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(38, 255, 255, 255));
+            Resources["SquircleIconBrush"] = themeGlyphBrush;
+
+            // Keycaps
+            Resources["KeycapBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 41, 59));
+            Resources["KeycapBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105));
+            Resources["KeycapTextBrush"] = themeGlyphBrush;
+
+            // Status Capsule
+            Resources["StatusCapsuleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
+            Resources["StatusCapsuleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(80, 255, 255, 255));
+            Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
+            Resources["StatusDotBrush"] = themeGlyphBrush;
+
+            // Warning
             Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(26, 255, 69, 58));
             Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
             Resources["WarningTextBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
+
+            // Scrollbars
             Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, 255, 255, 255));
             Resources["ScrollBarThumbHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(85, 255, 255, 255));
             Resources["ScrollBarThumbDragBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 255, 255, 255));
         }
+
         if (_audioController != null)
         {
             UpdateMuteStateUI(_audioController.IsMuted);

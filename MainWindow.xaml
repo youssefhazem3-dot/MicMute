@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Mic Mute"
-        Width="350"
+        Width="352"
         SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -13,43 +13,94 @@
         UseLayoutRounding="True">
 
     <Window.Resources>
-        <!-- Dynamic Theme Brushes -->
-        <Color x:Key="AccentColor">#155A84</Color>
-        <SolidColorBrush x:Key="AccentBrush" Color="#297FB8" />
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#1A297FB8" />
+        <!-- ========================================== -->
+        <!-- Dynamic Theme Brushes (iOS Liquid Glass)   -->
+        <!-- ========================================== -->
+        <Color x:Key="AccentColor">#FFFFFF</Color>
+        <SolidColorBrush x:Key="AccentBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#25FFFFFF" />
+
         <LinearGradientBrush x:Key="WindowBgBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#EB141E2D" Offset="0.0" />
-            <GradientStop Color="#EB0A0F19" Offset="1.0" />
+            <GradientStop Color="#F00F172A" Offset="0.0" />
+            <GradientStop Color="#F0020617" Offset="1.0" />
         </LinearGradientBrush>
-        <SolidColorBrush x:Key="CardBgBrush" Color="#1CFFFFFF" />
+
+        <SolidColorBrush x:Key="CardBgBrush" Color="#12FFFFFF" />
         <SolidColorBrush x:Key="InputBgBrush" Color="#1E293B" />
         <SolidColorBrush x:Key="TitleBarBgBrush" Color="#00000000" />
-        <SolidColorBrush x:Key="TitleTextBrush" Color="#F5F5F7" />
-        <SolidColorBrush x:Key="TextWhiteBrush" Color="#F5F5F7" />
-        <SolidColorBrush x:Key="TextGrayBrush" Color="#86868B" />
-        <SolidColorBrush x:Key="TextDimBrush" Color="#86868B" />
-        <SolidColorBrush x:Key="BorderBrush" Color="#32FFFFFF" />
-        <SolidColorBrush x:Key="ToggleOffBrush" Color="#636366" />
-        <SolidColorBrush x:Key="ToggleOffBorderBrush" Color="#8E8E93" />
-        <LinearGradientBrush x:Key="RecordGlassBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#A0B3E0F7" Offset="0.0" />
-            <GradientStop Color="#A081B4D6" Offset="1.0" />
+        <SolidColorBrush x:Key="TitleTextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="TextWhiteBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="TextGrayBrush" Color="#94A3B8" />
+        <SolidColorBrush x:Key="TextDimBrush" Color="#64748B" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#25FFFFFF" />
+        <SolidColorBrush x:Key="DividerBrush" Color="#18FFFFFF" />
+
+        <!-- Liquid Switch Brushes (White Liquid in Dark, Black Liquid in Light) -->
+        <SolidColorBrush x:Key="ToggleOnBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ToggleOnBorderBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ToggleOffBrush" Color="#2A374A" />
+        <SolidColorBrush x:Key="ToggleOffBorderBrush" Color="#475569" />
+        <SolidColorBrush x:Key="ToggleKnobBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ToggleKnobBorderBrush" Color="#E2E8F0" />
+        <SolidColorBrush x:Key="ToggleKnobActiveBrush" Color="#0F172A" />
+        <SolidColorBrush x:Key="ToggleKnobActiveBorderBrush" Color="#334155" />
+
+        <!-- Liquid Slider Brushes -->
+        <SolidColorBrush x:Key="SliderTrackBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SliderTrackEmptyBrush" Color="#1E293B" />
+        <SolidColorBrush x:Key="SliderTrackBorderBrush" Color="#334155" />
+        <SolidColorBrush x:Key="SliderThumbBgBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SliderThumbBorderBrush" Color="#0F172A" />
+
+        <!-- Jewel-Cut Outer Ring for Mute Button -->
+        <LinearGradientBrush x:Key="JewelRingBgBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#25FFFFFF" Offset="0.0" />
+            <GradientStop Color="#06FFFFFF" Offset="1.0" />
         </LinearGradientBrush>
-        <LinearGradientBrush x:Key="RecordGlassBorderBrush" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#C04AB2EB" Offset="0.0" />
-            <GradientStop Color="#C01D78A8" Offset="1.0" />
-        </LinearGradientBrush>
-        <SolidColorBrush x:Key="WarningBgBrush" Color="#1AFF453A" />
-        <SolidColorBrush x:Key="WarningBorderBrush" Color="#FF453A" />
-        <SolidColorBrush x:Key="WarningTextBrush" Color="#FF453A" />
-        <SolidColorBrush x:Key="CaptionButtonHoverBrush" Color="#1AFFFFFF" />
+        <SolidColorBrush x:Key="JewelRingBorderBrush" Color="#45FFFFFF" />
+
+        <!-- Liquid Hero Mute Button Brushes -->
+        <RadialGradientBrush x:Key="HeroLensActiveBrush" Center="0.35,0.30" GradientOrigin="0.35,0.30" RadiusX="0.65" RadiusY="0.65">
+            <GradientStop Color="#FFFFFFFF" Offset="0.0" />
+            <GradientStop Color="#FFF1F5F9" Offset="0.45" />
+            <GradientStop Color="#FFE2E8F0" Offset="0.85" />
+            <GradientStop Color="#FFCBD5E1" Offset="1.0" />
+        </RadialGradientBrush>
+        <RadialGradientBrush x:Key="HeroGlowActiveBrush" Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+            <GradientStop Color="#90FFFFFF" Offset="0.0" />
+            <GradientStop Color="#00FFFFFF" Offset="1.0" />
+        </RadialGradientBrush>
+        <SolidColorBrush x:Key="HeroIconActiveBrush" Color="#0F172A" />
+
+        <!-- Monochrome Squircle Icon Tiles -->
+        <SolidColorBrush x:Key="SquircleBgBrush" Color="#16FFFFFF" />
+        <SolidColorBrush x:Key="SquircleBorderBrush" Color="#26FFFFFF" />
+        <SolidColorBrush x:Key="SquircleIconBrush" Color="#F8FAFC" />
+
+        <!-- Status Capsule Brushes -->
+        <SolidColorBrush x:Key="StatusCapsuleBgBrush" Color="#20FFFFFF" />
+        <SolidColorBrush x:Key="StatusCapsuleBorderBrush" Color="#60FFFFFF" />
+        <SolidColorBrush x:Key="StatusCapsuleTextBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="StatusDotBrush" Color="#FFFFFF" />
+
+        <!-- Keycap Chip Brushes -->
+        <SolidColorBrush x:Key="KeycapBgBrush" Color="#1E293B" />
+        <SolidColorBrush x:Key="KeycapBorderBrush" Color="#475569" />
+        <SolidColorBrush x:Key="KeycapTextBrush" Color="#F8FAFC" />
+
+        <SolidColorBrush x:Key="WarningBgBrush" Color="#20EF4444" />
+        <SolidColorBrush x:Key="WarningBorderBrush" Color="#EF4444" />
+        <SolidColorBrush x:Key="WarningTextBrush" Color="#F87171" />
+        <SolidColorBrush x:Key="CaptionButtonHoverBrush" Color="#18FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#30FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#55FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbDragBrush" Color="#80FFFFFF" />
 
-        <!-- Windows 11 Style Minimize Caption Button -->
+        <!-- ========================================== -->
+        <!-- Windows 11 Native Caption Buttons          -->
+        <!-- ========================================== -->
         <Style x:Key="Win11MinimizeButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="46" />
+            <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="32" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}" />
@@ -58,9 +109,10 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bg" Background="{TemplateBinding Background}">
-                            <Path Data="M 0,5 L 10,5"
-                                  Stroke="{TemplateBinding Foreground}"
-                                  StrokeThickness="1"
+                            <Path x:Name="minLine"
+                                  Data="M 0,5 L 10,5"
+                                  Stroke="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Foreground}"
+                                  StrokeThickness="1.2"
                                   SnapsToDevicePixels="True"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center" />
@@ -78,9 +130,8 @@
             </Setter>
         </Style>
 
-        <!-- Windows 11 Style Close Caption Button with Red Hover -->
         <Style x:Key="Win11CloseButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="46" />
+            <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="32" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}" />
@@ -91,8 +142,8 @@
                         <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="0,20,0,0">
                             <Path x:Name="cross"
                                   Data="M 1,1 L 9,9 M 9,1 L 1,9"
-                                  Stroke="{TemplateBinding Foreground}"
-                                  StrokeThickness="1"
+                                  Stroke="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Foreground}"
+                                  StrokeThickness="1.2"
                                   SnapsToDevicePixels="True"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center" />
@@ -112,49 +163,95 @@
             </Setter>
         </Style>
 
-        <!-- iOS Style Smooth Toggle Switch -->
+        <!-- Title Bar Theme Toggle Button Style -->
+        <Style x:Key="TitleThemeButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6" Padding="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ========================================== -->
+        <!-- CHUNKY LIQUID GLASS TOGGLE SWITCH (52x30)  -->
+        <!-- ========================================== -->
         <Style x:Key="ToggleSwitchStyle" TargetType="CheckBox">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
-                        <Grid Width="46" Height="26" SnapsToDevicePixels="True">
+                        <Grid Width="52" Height="30" SnapsToDevicePixels="True">
+                            <!-- Liquid Track -->
                             <Border x:Name="track"
+                                    Width="52" Height="30"
                                     Background="{DynamicResource ToggleOffBrush}"
                                     BorderBrush="{DynamicResource ToggleOffBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="13">
+                                    BorderThickness="1.2"
+                                    CornerRadius="15">
                                 <Border.Effect>
-                                    <DropShadowEffect x:Name="glow" BlurRadius="6" ShadowDepth="0" Opacity="0" Color="{DynamicResource AccentColor}" />
+                                    <DropShadowEffect x:Name="glow" BlurRadius="14" ShadowDepth="0" Opacity="0" Color="{DynamicResource AccentColor}" />
                                 </Border.Effect>
                             </Border>
+
+                            <!-- Crystal Droplet Knob -->
                             <Border x:Name="knob"
-                                    Width="22" Height="22"
-                                    CornerRadius="11"
-                                    Background="White"
+                                    Width="24" Height="24"
+                                    CornerRadius="12"
+                                    Background="{DynamicResource ToggleKnobBrush}"
+                                    BorderBrush="{DynamicResource ToggleKnobBorderBrush}"
+                                    BorderThickness="0.8"
                                     HorizontalAlignment="Left"
-                                    Margin="2,2,0,2">
+                                    Margin="3,3,0,3">
                                 <Border.Effect>
-                                    <DropShadowEffect BlurRadius="3" ShadowDepth="1" Opacity="0.15" Color="Black" />
+                                    <DropShadowEffect BlurRadius="5" ShadowDepth="1.5" Opacity="0.3" Color="Black" />
                                 </Border.Effect>
+                                <!-- Overhead Specular Crescent Highlight -->
+                                <Border Height="5" Margin="4,1.5,4,0" VerticalAlignment="Top" CornerRadius="2.5">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#F0FFFFFF" Offset="0.0" />
+                                            <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
                             </Border>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="track" Property="Background" Value="{DynamicResource AccentBrush}" />
-                                <Setter TargetName="track" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="track" Property="Background" Value="{DynamicResource ToggleOnBrush}" />
+                                <Setter TargetName="track" Property="BorderBrush" Value="{DynamicResource ToggleOnBorderBrush}" />
+                                <Setter TargetName="knob" Property="Background" Value="{DynamicResource ToggleKnobActiveBrush}" />
+                                <Setter TargetName="knob" Property="BorderBrush" Value="{DynamicResource ToggleKnobActiveBorderBrush}" />
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <ThicknessAnimation Storyboard.TargetName="knob"
                                                                 Storyboard.TargetProperty="Margin"
-                                                                To="22,2,0,2"
-                                                                Duration="0:0:0.15">
+                                                                To="25,3,0,3"
+                                                                Duration="0:0:0.18">
                                                 <ThicknessAnimation.EasingFunction>
                                                     <QuadraticEase EasingMode="EaseOut" />
                                                 </ThicknessAnimation.EasingFunction>
                                             </ThicknessAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="glow"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.6"
+                                                             Duration="0:0:0.18" />
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -163,28 +260,16 @@
                                         <Storyboard>
                                             <ThicknessAnimation Storyboard.TargetName="knob"
                                                                 Storyboard.TargetProperty="Margin"
-                                                                To="2,2,0,2"
-                                                                Duration="0:0:0.15">
+                                                                To="3,3,0,3"
+                                                                Duration="0:0:0.18">
                                                 <ThicknessAnimation.EasingFunction>
                                                     <QuadraticEase EasingMode="EaseOut" />
                                                 </ThicknessAnimation.EasingFunction>
                                             </ThicknessAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="glow" Storyboard.TargetProperty="Opacity" To="0.35" Duration="0:0:0.15" />
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="glow" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.15" />
+                                            <DoubleAnimation Storyboard.TargetName="glow"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0"
+                                                             Duration="0:0:0.18" />
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -195,22 +280,261 @@
             </Setter>
         </Style>
 
-        <!-- Harmonized Modern ComboBox Style -->
+        <!-- ========================================== -->
+        <!-- LIQUID GLASS OSD DURATION SLIDER           -->
+        <!-- ========================================== -->
+        <Style x:Key="ModernSliderStyle" TargetType="Slider">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center" ClipToBounds="False">
+                            <Track x:Name="PART_Track" ClipToBounds="False">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="8"
+                                                        Background="{DynamicResource SliderTrackBrush}"
+                                                        BorderBrush="{DynamicResource SliderTrackBorderBrush}"
+                                                        BorderThickness="0.8"
+                                                        CornerRadius="4,0,0,4">
+                                                    <!-- Liquid Specular Sheen -->
+                                                    <Border Height="3" Margin="2,1,0,0" VerticalAlignment="Top" CornerRadius="1.5,0,0,0">
+                                                        <Border.Background>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                <GradientStop Color="#80FFFFFF" Offset="0.0" />
+                                                                <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                                            </LinearGradientBrush>
+                                                        </Border.Background>
+                                                    </Border>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="8"
+                                                        Background="{DynamicResource SliderTrackEmptyBrush}"
+                                                        BorderBrush="{DynamicResource SliderTrackBorderBrush}"
+                                                        BorderThickness="0.8"
+                                                        CornerRadius="0,4,4,0" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="22" Height="24">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Grid Background="Transparent">
+                                                    <!-- Crystal Bead Thumb with Liquid Specular Rim -->
+                                                    <Border x:Name="thumbCircle"
+                                                            Width="18" Height="18"
+                                                            CornerRadius="9"
+                                                            Background="{DynamicResource SliderThumbBgBrush}"
+                                                            BorderBrush="{DynamicResource SliderThumbBorderBrush}"
+                                                            BorderThickness="2"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center">
+                                                        <Border.Effect>
+                                                            <DropShadowEffect BlurRadius="6" ShadowDepth="1.5" Opacity="0.3" Color="Black" />
+                                                        </Border.Effect>
+                                                        <!-- Top Specular Crescent Highlight -->
+                                                        <Border Height="4" Margin="3,1,3,0" VerticalAlignment="Top" CornerRadius="2">
+                                                            <Border.Background>
+                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                    <GradientStop Color="#E0FFFFFF" Offset="0.0" />
+                                                                    <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                                                </LinearGradientBrush>
+                                                            </Border.Background>
+                                                        </Border>
+                                                    </Border>
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Cursor" Value="Hand" />
+                                                        <Setter TargetName="thumbCircle" Property="Width" Value="20" />
+                                                        <Setter TargetName="thumbCircle" Property="Height" Value="20" />
+                                                        <Setter TargetName="thumbCircle" Property="CornerRadius" Value="10" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="thumbCircle" Property="Width" Value="20" />
+                                                        <Setter TargetName="thumbCircle" Property="Height" Value="20" />
+                                                        <Setter TargetName="thumbCircle" Property="CornerRadius" Value="10" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ========================================== -->
+        <!-- LIQUID LENS MUTE BUTTON                    -->
+        <!-- ========================================== -->
+        <Style x:Key="MicToggleButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="96" />
+            <Setter Property="Height" Value="96" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <!-- Dynamic Ambient Halo -->
+                            <Ellipse x:Name="glow"
+                                     Width="92" Height="92"
+                                     Opacity="0.45"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                        <GradientStop Color="#9038BDF8" Offset="0.0" />
+                                        <GradientStop Color="#0038BDF8" Offset="1.0" />
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+
+                            <!-- Outer Jewel-Cut Glass Bevel Ring -->
+                            <Border x:Name="outerJewelRing"
+                                    Width="86" Height="86"
+                                    CornerRadius="43"
+                                    BorderBrush="{DynamicResource JewelRingBorderBrush}"
+                                    BorderThickness="1.5"
+                                    Background="{DynamicResource JewelRingBgBrush}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.35" Color="Black" />
+                                </Border.Effect>
+                            </Border>
+
+                            <!-- Inner Fluid Refraction Lens Core -->
+                            <Border x:Name="lens"
+                                    Width="68" Height="68"
+                                    CornerRadius="34"
+                                    BorderBrush="#85FFFFFF"
+                                    BorderThickness="1">
+                                <Border.Background>
+                                    <RadialGradientBrush Center="0.35,0.30" GradientOrigin="0.35,0.30" RadiusX="0.65" RadiusY="0.65">
+                                        <GradientStop Color="#FFFFFFFF" Offset="0.0" />
+                                        <GradientStop Color="#FFF1F5F9" Offset="0.45" />
+                                        <GradientStop Color="#FFE2E8F0" Offset="0.85" />
+                                        <GradientStop Color="#FFCBD5E1" Offset="1.0" />
+                                    </RadialGradientBrush>
+                                </Border.Background>
+                                <Grid>
+                                    <!-- Overhead Specular Crescent Highlight -->
+                                    <Border Height="22" Margin="10,2,10,0" VerticalAlignment="Top" CornerRadius="12,12,6,6">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#CCFFFFFF" Offset="0.0" />
+                                                <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+
+                                    <!-- Razor-Sharp Vector Microphone Cutout -->
+                                    <Grid Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Path x:Name="iconPath"
+                                              Fill="{DynamicResource HeroIconActiveBrush}"
+                                              Stretch="Uniform"
+                                              Width="24" Height="24"
+                                              Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z">
+                                            <Path.Effect>
+                                                <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.3" Color="Black" />
+                                            </Path.Effect>
+                                        </Path>
+                                        <!-- Clean Diagonal Slash Line for Muted State -->
+                                        <Line x:Name="slashBg"
+                                              X1="2" Y1="2" X2="22" Y2="22"
+                                              Stroke="#80000000"
+                                              StrokeThickness="4.5"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Visibility="Collapsed" />
+                                        <Line x:Name="slash"
+                                              X1="2" Y1="2" X2="22" Y2="22"
+                                              Stroke="#FFFFFF"
+                                              StrokeThickness="2.2"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Visibility="Collapsed" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Tag" Value="Active">
+                                <Setter TargetName="slashBg" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="slash" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="glow" Property="Fill" Value="{DynamicResource HeroGlowActiveBrush}" />
+                                <Setter TargetName="lens" Property="Background" Value="{DynamicResource HeroLensActiveBrush}" />
+                                <Setter TargetName="iconPath" Property="Fill" Value="{DynamicResource HeroIconActiveBrush}" />
+                            </Trigger>
+
+                            <Trigger Property="Tag" Value="Muted">
+                                <Setter TargetName="lens" Property="Background">
+                                    <Setter.Value>
+                                        <RadialGradientBrush Center="0.35,0.30" GradientOrigin="0.35,0.30" RadiusX="0.65" RadiusY="0.65">
+                                            <GradientStop Color="#FFF87171" Offset="0.0" />
+                                            <GradientStop Color="#FFEF4444" Offset="0.45" />
+                                            <GradientStop Color="#FFDC2626" Offset="0.85" />
+                                            <GradientStop Color="#FF991B1B" Offset="1.0" />
+                                        </RadialGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="glow" Property="Fill">
+                                    <Setter.Value>
+                                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                            <GradientStop Color="#90EF4444" Offset="0.0" />
+                                            <GradientStop Color="#00EF4444" Offset="1.0" />
+                                        </RadialGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="slashBg" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="slash" Property="Visibility" Value="Visible" />
+                            </Trigger>
+
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="outerJewelRing" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.03" ScaleY="1.03" CenterX="43" CenterY="43" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern ComboBox Style -->
         <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox">
-            <Setter Property="Height" Value="36" />
+            <Setter Property="Height" Value="34" />
             <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
             <Setter Property="Background" Value="{DynamicResource InputBgBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
-                        <Setter Property="FontSize" Value="12" />
-                        <Setter Property="Padding" Value="10,8" />
+                        <Setter Property="FontSize" Value="11.5" />
+                        <Setter Property="Padding" Value="10,7" />
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ComboBoxItem">
@@ -267,7 +591,7 @@
                                                                   VerticalAlignment="Center" />
                                                 <Path Grid.Column="1"
                                                       Data="M 0 0 L 4 4 L 8 0 Z"
-                                                      Fill="{DynamicResource TextWhiteBrush}"
+                                                      Fill="{DynamicResource TextGrayBrush}"
                                                       HorizontalAlignment="Center"
                                                       VerticalAlignment="Center" />
                                             </Grid>
@@ -308,244 +632,6 @@
             </Setter>
         </Style>
 
-        <!-- Modern Slider Style with Perfect Circular Radial Glow Halo -->
-        <Style x:Key="ModernSliderStyle" TargetType="Slider">
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Height" Value="28" />
-            <Setter Property="ClipToBounds" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Slider">
-                        <Grid VerticalAlignment="Center" ClipToBounds="False">
-                            <Track x:Name="PART_Track" ClipToBounds="False">
-                                <Track.DecreaseRepeatButton>
-                                    <RepeatButton Command="Slider.DecreaseLarge">
-                                        <RepeatButton.Template>
-                                            <ControlTemplate TargetType="RepeatButton">
-                                                <Border Height="4" Background="{DynamicResource AccentBrush}" CornerRadius="2,0,0,2" />
-                                            </ControlTemplate>
-                                        </RepeatButton.Template>
-                                    </RepeatButton>
-                                </Track.DecreaseRepeatButton>
-                                <Track.IncreaseRepeatButton>
-                                    <RepeatButton Command="Slider.IncreaseLarge">
-                                        <RepeatButton.Template>
-                                            <ControlTemplate TargetType="RepeatButton">
-                                                <Border Height="4" Background="{DynamicResource BorderBrush}" CornerRadius="0,2,2,0" />
-                                            </ControlTemplate>
-                                        </RepeatButton.Template>
-                                    </RepeatButton>
-                                </Track.IncreaseRepeatButton>
-                                                                                                                                                                <Track.Thumb>
-                                    <Thumb Width="16" Height="24">
-                                        <Thumb.Template>
-                                            <ControlTemplate TargetType="Thumb">
-                                                <Grid Background="Transparent">
-                                                    <!-- Solid Accent Thumb (No White Ring, No Glow) -->
-                                                    <Ellipse x:Name="thumbCircle"
-                                                             Width="13" Height="13"
-                                                             Fill="{DynamicResource AccentBrush}"
-                                                             HorizontalAlignment="Center"
-                                                             VerticalAlignment="Center" />
-                                                </Grid>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Cursor" Value="Hand" />
-                                                        <Setter TargetName="thumbCircle" Property="Width" Value="15" />
-                                                        <Setter TargetName="thumbCircle" Property="Height" Value="15" />
-                                                    </Trigger>
-                                                    <Trigger Property="IsDragging" Value="True">
-                                                        <Setter TargetName="thumbCircle" Property="Width" Value="15" />
-                                                        <Setter TargetName="thumbCircle" Property="Height" Value="15" />
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Thumb.Template>
-                                    </Thumb>
-                                </Track.Thumb>
-                            </Track>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Big Mic Toggle Button Style -->
-        <Style x:Key="MicToggleButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="96" />
-            <Setter Property="Height" Value="96" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid>
-                            <Ellipse x:Name="glow"
-                                     Width="88" Height="88"
-                                     Opacity="0.4"
-                                     RenderTransformOrigin="0.5,0.5">
-                                <Ellipse.Fill>
-                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-                                        <GradientStop Color="#800091FF" Offset="0.0" />
-                                        <GradientStop Color="#000091FF" Offset="1.0" />
-                                    </RadialGradientBrush>
-                                </Ellipse.Fill>
-                                <Ellipse.RenderTransform>
-                                    <ScaleTransform ScaleX="1.0" ScaleY="1.0" />
-                                </Ellipse.RenderTransform>
-                            </Ellipse>
-
-                            <Border Width="82" Height="82"
-                                    CornerRadius="41"
-                                    BorderBrush="#801A5C80"
-                                    BorderThickness="1.2">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                        <GradientStop Color="#FFA8D5F0" Offset="0.0" />
-                                        <GradientStop Color="#FF6B9EC0" Offset="1.0" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="6" ShadowDepth="1.5" Opacity="0.25" Color="Black" />
-                                </Border.Effect>
-                            </Border>
-
-                            <Border x:Name="lens"
-                                    Width="62" Height="62"
-                                    CornerRadius="31"
-                                    BorderBrush="#80FFFFFF"
-                                    BorderThickness="1">
-                                <Border.Background>
-                                    <RadialGradientBrush Center="0.5,0.4" GradientOrigin="0.5,0.4" RadiusX="0.5" RadiusY="0.5">
-                                        <GradientStop Color="#FFEBF5FA" Offset="0.0" />
-                                        <GradientStop Color="#FF90BCDB" Offset="0.75" />
-                                        <GradientStop Color="#FF4A82A6" Offset="1.0" />
-                                    </RadialGradientBrush>
-                                </Border.Background>
-                            </Border>
-
-                            <Grid Width="21" Height="21" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Path x:Name="iconPath"
-                                      Fill="#164B6E"
-                                      Stretch="Uniform"
-                                      Width="21" Height="21"
-                                      Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
-                                <Line x:Name="slashBg"
-                                      X1="3" Y1="3" X2="23" Y2="23"
-                                      Stroke="#FFFCE4EC"
-                                      StrokeThickness="4.5"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      Visibility="Collapsed" />
-                                <Line x:Name="slash"
-                                      X1="3" Y1="3" X2="23" Y2="23"
-                                      Stroke="#E53935"
-                                      StrokeThickness="2.0"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      Visibility="Collapsed" />
-                            </Grid>
-                        </Grid>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Tag" Value="Active">
-                                <Setter TargetName="iconPath" Property="Fill" Value="#164B6E" />
-                                <Setter TargetName="glow" Property="Fill">
-                                    <Setter.Value>
-                                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-                                            <GradientStop Color="#800091FF" Offset="0.0" />
-                                            <GradientStop Color="#000091FF" Offset="1.0" />
-                                        </RadialGradientBrush>
-                                    </Setter.Value>
-                                </Setter>
-                                <Setter TargetName="slashBg" Property="Visibility" Value="Collapsed" />
-                                <Setter TargetName="slash" Property="Visibility" Value="Collapsed" />
-                            </Trigger>
-
-                            <Trigger Property="Tag" Value="Muted">
-                                <Setter TargetName="lens" Property="Background">
-                                    <Setter.Value>
-                                        <RadialGradientBrush Center="0.5,0.4" GradientOrigin="0.5,0.4" RadiusX="0.5" RadiusY="0.5">
-                                            <GradientStop Color="#FFFCE4EC" Offset="0.0" />
-                                            <GradientStop Color="#FFF48FB1" Offset="0.75" />
-                                            <GradientStop Color="#FFE91E63" Offset="1.0" />
-                                        </RadialGradientBrush>
-                                    </Setter.Value>
-                                </Setter>
-                                <Setter TargetName="iconPath" Property="Fill" Value="#880E4F" />
-                                <Setter TargetName="glow" Property="Fill">
-                                    <Setter.Value>
-                                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-                                            <GradientStop Color="#80FF453A" Offset="0.0" />
-                                            <GradientStop Color="#00FF453A" Offset="1.0" />
-                                        </RadialGradientBrush>
-                                    </Setter.Value>
-                                </Setter>
-                                <Setter TargetName="slashBg" Property="Visibility" Value="Visible" />
-                                <Setter TargetName="slash" Property="Visibility" Value="Visible" />
-                            </Trigger>
-
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.03" Duration="0:0:0.1" />
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.03" Duration="0:0:0.1" />
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.1" />
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.1" />
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Record Glass Button Style -->
-        <Style x:Key="RecordGlassButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="96" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="outerBorder"
-                                Background="{DynamicResource RecordGlassBrush}"
-                                BorderBrush="{DynamicResource RecordGlassBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="17"
-                                Padding="3">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.1" Color="Black" />
-                            </Border.Effect>
-                            <Border x:Name="innerBorder"
-                                    Background="{DynamicResource AccentHoverBrush}"
-                                    CornerRadius="14">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="outerBorder" Property="Opacity" Value="0.9" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <!-- Secondary Action Button Style -->
         <Style x:Key="SecondaryActionButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
@@ -553,7 +639,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Padding" Value="10,5" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -579,23 +665,17 @@
             </Setter>
         </Style>
 
-        <!-- Sleek Modern ScrollBar Thumb Style -->
+        <!-- Sleek Modern ScrollViewer & ScrollBar -->
         <Style x:Key="ModernScrollThumbStyle" TargetType="Thumb">
             <Setter Property="OverridesDefaultStyle" Value="True" />
             <Setter Property="IsTabStop" Value="False" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
-                        <Border x:Name="thumbBorder"
-                                Background="{DynamicResource ScrollBarThumbBrush}"
-                                CornerRadius="2.5"
-                                Margin="0,2,0,2" />
+                        <Border x:Name="thumbBorder" Background="{DynamicResource ScrollBarThumbBrush}" CornerRadius="2.5" Margin="0,2,0,2" />
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="thumbBorder" Property="Background" Value="{DynamicResource ScrollBarThumbHoverBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsDragging" Value="True">
-                                <Setter TargetName="thumbBorder" Property="Background" Value="{DynamicResource ScrollBarThumbDragBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -603,7 +683,6 @@
             </Setter>
         </Style>
 
-        <!-- Sleek Modern ScrollBar Style -->
         <Style x:Key="ModernScrollBarStyle" TargetType="ScrollBar">
             <Setter Property="OverridesDefaultStyle" Value="True" />
             <Setter Property="Width" Value="5" />
@@ -629,7 +708,6 @@
             </Setter>
         </Style>
 
-        <!-- Modern ScrollViewer Style -->
         <Style x:Key="ModernScrollViewerStyle" TargetType="ScrollViewer">
             <Setter Property="OverridesDefaultStyle" Value="True" />
             <Setter Property="Template">
@@ -652,13 +730,13 @@
         </Style>
     </Window.Resources>
 
-    <!-- Main Outer Window Border -->
+    <!-- Outer Window Frame (iOS Liquid Glass Shell) -->
     <Border Background="{DynamicResource WindowBgBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1.5"
             CornerRadius="20">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.25" Color="Black" />
+            <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.35" Color="Black" />
         </Border.Effect>
 
         <Grid>
@@ -667,32 +745,54 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Custom Title Bar with Windows 11 Native Caption Controls -->
+            <!-- Custom Title Bar with Windows 11 Native Controls & Theme Switcher -->
             <Border x:Name="borderTitleBar" Grid.Row="0"
                     Background="{DynamicResource TitleBarBgBrush}"
                     CornerRadius="20,20,0,0"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
-                    <!-- Left: App Icon & Title -->
+                    <!-- Left: App Vector Icon & Title (Icon dynamically follows Theme!) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0">
-                        <Image x:Name="imgAppIcon" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Mic Mute"
+                        <Path x:Name="titleBarIcon"
+                              Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"
+                              Fill="{DynamicResource TitleTextBrush}"
+                              Stretch="Uniform"
+                              Width="13" Height="13"
+                              VerticalAlignment="Center"
+                              Margin="0,0,7,0" />
+                        <TextBlock Text="MicMute"
                                    Foreground="{DynamicResource TitleTextBrush}"
-                                   FontFamily="Segoe UI"
-                                   FontWeight="SemiBold"
-                                   FontSize="12.5"
+                                   FontFamily="Segoe UI Variable Display, Segoe UI"
+                                   FontWeight="Bold"
+                                   FontSize="12"
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- Right: Windows 11 Minimize & Close Buttons -->
+                    <!-- Hidden legacy Image for backward compat -->
+                    <Image x:Name="imgAppIcon" Width="0" Height="0" Visibility="Collapsed" />
+
+                    <!-- Right: Quick Theme Button + Windows 11 Caption Controls -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                        <!-- Theme Toggle Button in Titlebar -->
+                        <Button x:Name="btnTitleTheme"
+                                Style="{StaticResource TitleThemeButtonStyle}"
+                                ToolTip="Toggle Theme (Light / Dark)"
+                                Click="BtnTitleTheme_Click">
+                            <Path x:Name="pathTitleTheme"
+                                  Width="13" Height="13"
+                                  Stretch="Uniform"
+                                  Fill="{DynamicResource TitleTextBrush}"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z" />
+                        </Button>
                         <Button x:Name="btnMinimize" Style="{StaticResource Win11MinimizeButtonStyle}" ToolTip="Minimize" Click="MinimizeButton_Click" />
                         <Button x:Name="btnClose" Style="{StaticResource Win11CloseButtonStyle}" ToolTip="Close" Click="CloseButton_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- Content Area -->
+            <!-- Main Body Content -->
             <ScrollViewer Grid.Row="1"
                           x:Name="contentScrollViewer"
                           Style="{StaticResource ModernScrollViewerStyle}"
@@ -701,368 +801,521 @@
                           HorizontalScrollBarVisibility="Disabled"
                           CanContentScroll="False"
                           PanningMode="VerticalOnly">
-                <StackPanel Margin="16,0,16,16">
-                <!-- Big Central Button & Status -->
-                <StackPanel HorizontalAlignment="Center" Margin="0,4,0,14">
-                    <Button x:Name="btnStateToggle"
-                            Style="{StaticResource MicToggleButtonStyle}"
-                            Tag="Active"
-                            Click="BtnStateToggle_Click" />
+                <StackPanel Margin="14,0,14,14">
+                    
+                    <!-- HERO SECTION: Liquid Lens Button & Precision Capsule -->
+                    <StackPanel HorizontalAlignment="Center" Margin="0,2,0,12">
+                        <Button x:Name="btnStateToggle"
+                                Style="{StaticResource MicToggleButtonStyle}"
+                                Tag="Active"
+                                Click="BtnStateToggle_Click" />
 
-                    <TextBlock x:Name="tbStatusText"
-                               Text="A C T I V E"
-                               Foreground="#00A3FF"
-                               FontFamily="Segoe UI"
-                               FontWeight="SemiBold"
-                               FontSize="10.5"
-                               HorizontalAlignment="Center"
-                               Margin="0,6,0,0">
-                        <TextBlock.Effect>
-                            <DropShadowEffect x:Name="statusGlow" BlurRadius="12" ShadowDepth="0" Opacity="0.9" Color="#00A3FF" />
-                        </TextBlock.Effect>
-                    </TextBlock>
-                </StackPanel>
-
-                <!-- Section 1: Microphone Selection (Harmonized Borders) -->
-                <Border Background="{DynamicResource CardBgBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="14"
-                        Padding="14,10"
-                        Margin="0,0,0,10">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
-                            <Path Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"
-                                  Fill="{DynamicResource TextGrayBrush}"
-                                  Stretch="Uniform"
-                                  Width="12.5" Height="13.5"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,6,0" />
-                            <TextBlock Text="Microphone Selection"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       FontSize="12.5"
-                                       FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                        <ComboBox x:Name="cbDevices"
-                                  Style="{StaticResource ModernComboBoxStyle}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Name}"
-                                               Foreground="{DynamicResource TextWhiteBrush}"
-                                               VerticalAlignment="Center"
-                                               FontSize="12" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
-                </Border>
-
-                <!-- Section 2: Shortcut Key -->
-                <Border Background="{DynamicResource CardBgBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="14"
-                        Padding="14,10"
-                        Margin="0,0,0,10">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
-                            <Path Data="M19,10H5V8H19V10M19,13H5V11H19V13M19,16H5V14H19V16Z"
-                                  Fill="{DynamicResource TextGrayBrush}"
-                                  Stretch="Uniform"
-                                  Width="13" Height="9"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,6,0" />
-                            <TextBlock Text="Shortcut Key"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       FontSize="12.5"
-                                       FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <Border x:Name="borderHotkey"
-                                    Grid.Column="0"
-                                    Background="{DynamicResource InputBgBrush}"
-                                    BorderBrush="{DynamicResource BorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="8"
-                                    Padding="14,6">
-                                <Border.Effect>
-                                    <DropShadowEffect x:Name="glowHotkey" BlurRadius="6" ShadowDepth="0" Opacity="0" Color="{DynamicResource AccentColor}" />
-                                </Border.Effect>
-                                <TextBlock x:Name="tbHotkey"
-                                           Text="F1"
-                                           Foreground="{DynamicResource TextWhiteBrush}"
-                                           FontWeight="SemiBold"
-                                           HorizontalAlignment="Center"
+                        <!-- High-Precision Jewel Status Capsule -->
+                        <Border x:Name="borderStatusCapsule"
+                                Background="{DynamicResource StatusCapsuleBgBrush}"
+                                BorderBrush="{DynamicResource StatusCapsuleBorderBrush}"
+                                BorderThickness="1.2"
+                                CornerRadius="12"
+                                Padding="12,3"
+                                HorizontalAlignment="Center"
+                                Margin="0,6,0,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Ellipse x:Name="dotStatus"
+                                         Width="7" Height="7"
+                                         Fill="{DynamicResource StatusDotBrush}"
+                                         Margin="0,0,6,0"
+                                         VerticalAlignment="Center">
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect x:Name="dotGlow" BlurRadius="6" ShadowDepth="0" Color="{DynamicResource AccentColor}" Opacity="0.8" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                                <TextBlock x:Name="tbStatusText"
+                                           Text="MICROPHONE LIVE"
+                                           Foreground="{DynamicResource StatusCapsuleTextBrush}"
+                                           FontFamily="Segoe UI Variable Display, Segoe UI"
+                                           FontWeight="Bold"
+                                           FontSize="10.5"
                                            VerticalAlignment="Center" />
-                            </Border>
-
-                            <Button x:Name="btnRecordHotkey"
-                                    Grid.Column="1"
-                                    Content="Record"
-                                    Style="{StaticResource RecordGlassButtonStyle}"
-                                    Margin="10,0,0,0"
-                                    Click="BtnRecordHotkey_Click" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Section 3: Preferences / Settings Card -->
-                <Border Background="{DynamicResource CardBgBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="14"
-                        Padding="14,10"
-                        Margin="0,0,0,10">
-                    <StackPanel>
-                        <!-- OSD Option -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="On-Screen Display (OSD)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
-                                <TextBlock Text="Show visual popup when toggled" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
                             </StackPanel>
-                            <CheckBox x:Name="cbEnableOsd"
-                                      Grid.Column="1"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      VerticalAlignment="Center"
-                                      Checked="CbEnableOsd_Checked"
-                                      Unchecked="CbEnableOsd_Unchecked" />
-                        </Grid>
-
-                        <!-- OSD Duration Slider -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Duration" Foreground="{DynamicResource TextGrayBrush}" FontSize="11" FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <Slider x:Name="sliderOsdDuration"
-                                    Grid.Column="1"
-                                    Style="{StaticResource ModernSliderStyle}"
-                                    Minimum="0.1" Maximum="30.0"
-                                    TickFrequency="0.1"
-                                    IsSnapToTickEnabled="True"
-                                    VerticalAlignment="Center"
-                                    ValueChanged="SliderOsdDuration_ValueChanged" />
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                                <Border Background="{DynamicResource InputBgBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Padding="4,1">
-                                    <TextBox x:Name="txtOsdDuration"
-                                             Width="32"
-                                             Text="1.5"
-                                             Background="Transparent"
-                                             Foreground="{DynamicResource TextWhiteBrush}"
-                                             BorderThickness="0"
-                                             FontSize="11"
-                                             FontWeight="SemiBold"
-                                             TextAlignment="Right"
-                                             VerticalAlignment="Center"
-                                             LostFocus="TxtOsdDuration_LostFocus"
-                                             KeyDown="TxtOsdDuration_KeyDown"
-                                             TextChanged="TxtOsdDuration_TextChanged" />
-                                </Border>
-                                <TextBlock Text=" s" Foreground="{DynamicResource TextGrayBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Grid>
-
-                        <Separator Background="{DynamicResource BorderBrush}" Margin="0,0,0,10" />
-
-                        <!-- Run on Startup Option -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Run on Windows Startup" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
-                                <TextBlock Text="Launch minimized in system tray" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <CheckBox x:Name="cbStartup"
-                                      Grid.Column="1"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      VerticalAlignment="Center"
-                                      Checked="CbStartup_Checked"
-                                      Unchecked="CbStartup_Unchecked" />
-                        </Grid>
-
-                        <!-- Start Minimized Option -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Start Minimized" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
-                                <TextBlock Text="Always hide main window at startup" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <CheckBox x:Name="cbStartMinimized"
-                                      Grid.Column="1"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      VerticalAlignment="Center"
-                                      Checked="CbStartMinimized_Checked"
-                                      Unchecked="CbStartMinimized_Unchecked" />
-                        </Grid>
-
-                        <!-- Light Mode Option -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Light Mode" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
-                                <TextBlock Text="Use light theme instead of dark slate" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <CheckBox x:Name="cbLightMode"
-                                      Grid.Column="1"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      VerticalAlignment="Center"
-                                      Checked="CbLightMode_Checked"
-                                      Unchecked="CbLightMode_Unchecked" />
-                        </Grid>
-
-                        <Separator Background="{DynamicResource BorderBrush}" Margin="0,10,0,10" />
-
-                        <!-- Run as Administrator / Game Mode Option -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
-                                    <Border Background="#1E3A8A" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock Text="VALORANT / GAMES" Foreground="#60A5FA" FontSize="9" FontWeight="Bold" />
-                                    </Border>
-                                </StackPanel>
-                                <TextBlock Text="Enables hotkeys over games and elevated windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <CheckBox x:Name="cbRunAsAdmin"
-                                      Grid.Column="1"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      VerticalAlignment="Center"
-                                      Checked="CbRunAsAdmin_Checked"
-                                      Unchecked="CbRunAsAdmin_Unchecked" />
-                        </Grid>
-
-                        <Separator Background="{DynamicResource BorderBrush}" Margin="0,10,0,10" />
-
-                        <!-- Audio Chime Feedback Option -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Sound Effects (Audio Chime)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12.5" FontWeight="SemiBold" />
-                                <TextBlock Text="Play acoustic click when muting and unmuting" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <CheckBox x:Name="cbSoundFeedback"
-                                      Grid.Column="1"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      VerticalAlignment="Center"
-                                      Checked="CbSoundFeedback_Checked"
-                                      Unchecked="CbSoundFeedback_Unchecked" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Section 4: Data & Storage Location -->
-                <Border Background="{DynamicResource CardBgBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="14"
-                        Padding="14,10"
-                        Margin="0,0,0,10">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
-                            <Path Data="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"
-                                  Fill="{DynamicResource TextGrayBrush}"
-                                  Stretch="Uniform"
-                                  Width="13" Height="11"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,6,0" />
-                            <TextBlock Text="Data &amp; Storage Location"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       FontSize="12.5"
-                                       FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <Border Background="{DynamicResource InputBgBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="10,6"
-                                Margin="0,0,0,8">
-                            <TextBlock x:Name="tbStoragePath"
-                                       Text="%APPDATA%\MicMute"
-                                       Foreground="{DynamicResource TextGrayBrush}"
-                                       FontSize="10.5"
-                                       TextTrimming="CharacterEllipsis"
-                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
                         </Border>
 
+                        <!-- Changeable Hotkey Chip Button: "Press [ Insert ] to toggle" -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
+                            <TextBlock Text="Press " Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                            <Button x:Name="btnHeroHotkey"
+                                    Cursor="Hand"
+                                    Background="{DynamicResource KeycapBgBrush}"
+                                    BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="6,1.5"
+                                    Margin="2,0"
+                                    Click="BtnRecordHotkey_Click"
+                                    ToolTip="Click to change shortcut key">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="5"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="tbHeroHotkey"
+                                               Text="Insert"
+                                               Foreground="{DynamicResource KeycapTextBrush}"
+                                               FontFamily="Consolas, Segoe UI Variable Text, Segoe UI"
+                                               FontWeight="Bold"
+                                               FontSize="10" />
+                                    <TextBlock Text=" ✎" Foreground="{DynamicResource TextDimBrush}" FontSize="8" VerticalAlignment="Center" Margin="2,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text=" to toggle" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- GROUP 1: Audio Input & Hotkey (iOS Inset Squircle Group) -->
+                    <Border Background="{DynamicResource CardBgBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="12,10"
+                            Margin="0,0,0,10">
+                        <StackPanel>
+                            <!-- Row 1: Microphone Selection -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                
+                                <!-- Monochrome Squircle Tile -->
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"
+                                          Fill="{DynamicResource SquircleIconBrush}"
+                                          Stretch="Uniform"
+                                          Width="13" Height="13"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Microphone Input" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Active capture audio device" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                </StackPanel>
+                            </Grid>
+
+                            <ComboBox x:Name="cbDevices"
+                                      Style="{StaticResource ModernComboBoxStyle}"
+                                      Margin="0,0,0,8">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}"
+                                                   Foreground="{DynamicResource TextWhiteBrush}"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="11.5" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
+
+                            <!-- Row 2: Shortcut Key -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Monochrome Squircle Tile -->
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M19,10H5V8H19V10M19,13H5V11H19V13M19,16H5V14H19V16Z"
+                                          Fill="{DynamicResource SquircleIconBrush}"
+                                          Stretch="Uniform"
+                                          Width="13" Height="9"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Shortcut Key" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Global toggle hotkey" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="borderHotkey"
+                                            Background="{DynamicResource KeycapBgBrush}"
+                                            BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="10,4"
+                                            Margin="0,0,6,0">
+                                        <TextBlock x:Name="tbHotkey"
+                                                   Text="Insert"
+                                                   Foreground="{DynamicResource KeycapTextBrush}"
+                                                   FontFamily="Consolas, Segoe UI"
+                                                   FontWeight="Bold"
+                                                   FontSize="11" />
+                                    </Border>
+                                    <Button x:Name="btnRecordHotkey"
+                                            Content="Record"
+                                            Style="{StaticResource SecondaryActionButtonStyle}"
+                                            Click="BtnRecordHotkey_Click" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- GROUP 2: Behaviors & System Settings (iOS Inset Squircle Group) -->
+                    <Border Background="{DynamicResource CardBgBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="12,10"
+                            Margin="0,0,0,10">
+                        <StackPanel>
+                            <!-- Row 1: On-Screen Display (OSD) -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                                          Stroke="{DynamicResource SquircleIconBrush}"
+                                          StrokeThickness="1.5"
+                                          Stretch="Uniform"
+                                          Width="13" Height="13"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="On-Screen Display (OSD)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Visual HUD popup when toggled" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                </StackPanel>
+
+                                <!-- Chunky Liquid Toggle Switch -->
+                                <CheckBox x:Name="cbEnableOsd"
+                                          Grid.Column="2"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="CbEnableOsd_Checked"
+                                          Unchecked="CbEnableOsd_Unchecked" />
+                            </Grid>
+
+                            <!-- High-Contrast OSD Duration Slider -->
+                            <Grid Margin="37,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Duration" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Slider x:Name="sliderOsdDuration"
+                                        Grid.Column="1"
+                                        Style="{StaticResource ModernSliderStyle}"
+                                        Minimum="0.1" Maximum="10.0"
+                                        TickFrequency="0.1"
+                                        IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center"
+                                        ValueChanged="SliderOsdDuration_ValueChanged" />
+                                <Border Grid.Column="2"
+                                        Width="54" Height="24"
+                                        Background="{DynamicResource KeycapBgBrush}"
+                                        BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center">
+                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="txtOsdDuration"
+                                                 Grid.Column="0"
+                                                 Width="28"
+                                                 Text="0.3"
+                                                 Background="Transparent"
+                                                 Foreground="{DynamicResource TextWhiteBrush}"
+                                                 BorderThickness="0"
+                                                 FontSize="10.5"
+                                                 FontWeight="Bold"
+                                                 TextAlignment="Right"
+                                                 VerticalAlignment="Center"
+                                                 Padding="0"
+                                                 LostFocus="TxtOsdDuration_LostFocus"
+                                                 KeyDown="TxtOsdDuration_KeyDown"
+                                                 TextChanged="TxtOsdDuration_TextChanged" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="s"
+                                                   Foreground="{DynamicResource TextGrayBrush}"
+                                                   FontSize="10"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Margin="2,0,0,0" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
+
+                            <!-- Row 2: Audio Feedback (Chime) -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                                          Stroke="{DynamicResource SquircleIconBrush}"
+                                          StrokeThickness="1.4"
+                                          Stretch="Uniform"
+                                          Width="13" Height="13"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Sound Effects (Audio Chime)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Play acoustic sound on mute / unmute" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                </StackPanel>
+
+                                <CheckBox x:Name="cbSoundFeedback"
+                                          Grid.Column="2"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="CbSoundFeedback_Checked"
+                                          Unchecked="CbSoundFeedback_Unchecked" />
+                            </Grid>
+
+                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
+
+                            <!-- Row 3: Run on Windows Startup -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M13 10V3L4 14h7v7l9-11h-7z"
+                                          Fill="{DynamicResource SquircleIconBrush}"
+                                          Stretch="Uniform"
+                                          Width="12" Height="13"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Run on Windows Startup" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Launch automatically with Windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                </StackPanel>
+
+                                <CheckBox x:Name="cbStartup"
+                                          Grid.Column="2"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="CbStartup_Checked"
+                                          Unchecked="CbStartup_Unchecked" />
+                            </Grid>
+
+                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
+
+                            <!-- Row 4: Start Minimized -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M19 13l-7 7-7-7m14-8l-7 7-7-7"
+                                          Stroke="{DynamicResource SquircleIconBrush}"
+                                          StrokeThickness="1.5"
+                                          Stretch="Uniform"
+                                          Width="12" Height="12"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Start Minimized" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Always hide main window to tray" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                </StackPanel>
+
+                                <CheckBox x:Name="cbStartMinimized"
+                                          Grid.Column="2"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="CbStartMinimized_Checked"
+                                          Unchecked="CbStartMinimized_Unchecked" />
+                            </Grid>
+
+                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
+
+                            <!-- Row 5: Run as Administrator -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Width="28" Height="28"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path Data="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                                          Stroke="{DynamicResource SquircleIconBrush}"
+                                          StrokeThickness="1.4"
+                                          Stretch="Uniform"
+                                          Width="13" Height="13"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Enables hotkeys over games and elevated windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                </StackPanel>
+
+                                <CheckBox x:Name="cbRunAsAdmin"
+                                          Grid.Column="2"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="CbRunAsAdmin_Checked"
+                                          Unchecked="CbRunAsAdmin_Unchecked" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Hidden legacy checkbox to preserve settings binding -->
+                    <CheckBox x:Name="cbLightMode" Visibility="Collapsed" />
+
+                    <!-- COMPACT FOOTER: Data & Storage Disclosure -->
+                    <Border Background="{DynamicResource CardBgBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,6"
+                            Margin="0,0,0,6">
                         <Grid>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="6" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="6" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0"
-                                    x:Name="btnOpenFolder" Content="Open Folder"
-                                    Style="{StaticResource SecondaryActionButtonStyle}"
-                                    Click="BtnOpenDataFolder_Click" />
+                            <Path Grid.Column="0"
+                                  Data="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"
+                                  Fill="{DynamicResource TextGrayBrush}"
+                                  Stretch="Uniform"
+                                  Width="12" Height="10"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,6,0" />
 
-                            <Button Grid.Column="2"
-                                    x:Name="btnChangeFolder" Content="Change..."
-                                    Style="{StaticResource SecondaryActionButtonStyle}"
-                                    Click="BtnChangeDataFolder_Click" />
+                            <TextBlock x:Name="tbStoragePath"
+                                       Grid.Column="1"
+                                       Text="%APPDATA%\MicMute"
+                                       Foreground="{DynamicResource TextGrayBrush}"
+                                       FontSize="10"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"
+                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
 
-                            <Button Grid.Column="4"
-                                    x:Name="btnResetData" Content="Reset Data"
-                                    Style="{StaticResource SecondaryActionButtonStyle}"
-                                    Click="BtnResetSettings_Click" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="btnOpenFolder" Content="Open"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Padding="6,2" FontSize="10"
+                                        Click="BtnOpenDataFolder_Click" />
+                                <Button x:Name="btnChangeFolder" Content="Change"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Padding="6,2" FontSize="10" Margin="4,0,0,0"
+                                        Click="BtnChangeDataFolder_Click" />
+                                <Button x:Name="btnResetData" Content="Reset"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Padding="6,2" FontSize="10" Margin="4,0,0,0"
+                                        Click="BtnResetSettings_Click" />
+                            </StackPanel>
                         </Grid>
-                    </StackPanel>
-                </Border>
+                    </Border>
 
-                <!-- Warning / Notification Box -->
-                <Border x:Name="borderWarning"
-                        Visibility="Collapsed"
-                        Background="{DynamicResource WarningBgBrush}"
-                        BorderBrush="{DynamicResource WarningBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        Padding="12,6">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="tbWarningMessage" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    </Grid>
-                </Border>
-            </StackPanel>
+                    <!-- Warning / Notification Box -->
+                    <Border x:Name="borderWarning"
+                            Visibility="Collapsed"
+                            Background="{DynamicResource WarningBgBrush}"
+                            BorderBrush="{DynamicResource WarningBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="10,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="⚠️" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="tbWarningMessage" Grid.Column="1" Foreground="{DynamicResource WarningTextBrush}" FontSize="10.5" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                </StackPanel>
             </ScrollViewer>
         </Grid>
     </Border>
