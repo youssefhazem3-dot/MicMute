@@ -21,6 +21,7 @@ static class UiCases
         test(nameof(DispatcherCoalescesRefreshesAndCancelsDisposedWork), DispatcherCoalescesRefreshesAndCancelsDisposedWork);
         test(nameof(RefreshBurstDoesNotFloodDispatcher), RefreshBurstDoesNotFloodDispatcher);
         test(nameof(LosingFocusCancelsShortcutRecording), LosingFocusCancelsShortcutRecording);
+        test(nameof(PressingEscapeCancelsShortcutRecording), PressingEscapeCancelsShortcutRecording);
         test(nameof(MissingMicrophoneIsNotShownAsActive), MissingMicrophoneIsNotShownAsActive);
         test(nameof(TemporaryStatusCannotOverwriteNewerAudioWarning), TemporaryStatusCannotOverwriteNewerAudioWarning);
         test(nameof(AdaptiveMaxHeightAdaptsToTaskbarAndScreenSize), AdaptiveMaxHeightAdaptsToTaskbarAndScreenSize);
@@ -68,6 +69,29 @@ static class UiCases
             Check.Equal("Cancel", window.btnRecordHotkey.Content as string);
             window.LoseFocus();
             Check.Equal("Record", window.btnRecordHotkey.Content as string, "deactivation must restore the saved shortcut");
+        }
+        finally { window.Close(); }
+    }
+
+    private static void PressingEscapeCancelsShortcutRecording()
+    {
+        using var audio = new AudioController();
+        var window = new RecordingWindow(audio);
+        try
+        {
+            window.btnRecordHotkey.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Check.Equal("Cancel", window.btnRecordHotkey.Content as string);
+            var source = System.Windows.PresentationSource.FromVisual(window) ?? new System.Windows.Interop.HwndSource(0, 0, 0, 0, 0, "", IntPtr.Zero);
+            var keyEvent = new System.Windows.Input.KeyEventArgs(
+                System.Windows.Input.Keyboard.PrimaryDevice,
+                source,
+                0,
+                System.Windows.Input.Key.Escape)
+            {
+                RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent
+            };
+            window.RaiseEvent(keyEvent);
+            Check.Equal("Record", window.btnRecordHotkey.Content as string, "Escape must cancel recording without modifying shortcut");
         }
         finally { window.Close(); }
     }

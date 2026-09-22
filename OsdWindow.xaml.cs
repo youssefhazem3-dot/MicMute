@@ -175,12 +175,12 @@ public partial class OsdWindow : Window
 
         IntPtr handle = new WindowInteropHelper(_instance).EnsureHandle();
 
+        _instance.PositionOnActiveScreen(handle);
+
         if (!_instance.IsVisible)
         {
             _instance.Show();
         }
-
-        _instance.PositionOnActiveScreen(handle);
 
         double safeDuration = double.IsFinite(durationSeconds)
             ? Math.Clamp(durationSeconds, UiBehavior.MinimumOsdDuration, UiBehavior.MaximumOsdDuration)
@@ -192,19 +192,31 @@ public partial class OsdWindow : Window
     {
         try
         {
-            var screen = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
+            var screen = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position) ?? System.Windows.Forms.Screen.PrimaryScreen;
+            if (screen == null) return;
             var bounds = screen.Bounds;
-            if (!GetWindowRect(handle, out RECT nativeRect))
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+            double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+            int width = (int)Math.Round((this.Width > 0 ? this.Width : 140.0) * scaleX);
+            int height = (int)Math.Round((this.Height > 0 ? this.Height : 140.0) * scaleY);
+            if (GetWindowRect(handle, out RECT nativeRect))
             {
-                return;
+                int curW = nativeRect.Right - nativeRect.Left;
+                int curH = nativeRect.Bottom - nativeRect.Top;
+                if (curW > 0 && curH > 0)
+                {
+                    width = curW;
+                    height = curH;
+                }
             }
-            var size = new PixelSize(nativeRect.Right - nativeRect.Left, nativeRect.Bottom - nativeRect.Top);
+            var size = new PixelSize(width, height);
             PixelRect target = UiBehavior.CenterInPixels(new PixelRect(bounds.Left, bounds.Top, bounds.Width, bounds.Height), size);
-            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
         }
         catch
         {
-            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
     }
 

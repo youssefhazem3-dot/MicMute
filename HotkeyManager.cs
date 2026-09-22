@@ -120,9 +120,9 @@ public class HotkeyManager : IDisposable
     private static bool IsKeyDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
     private static ModifierKeys PhysicalModifiers() =>
-        (IsKeyDown(0x11) ? ModifierKeys.Control : ModifierKeys.None) |
-        (IsKeyDown(0x12) ? ModifierKeys.Alt : ModifierKeys.None) |
-        (IsKeyDown(0x10) ? ModifierKeys.Shift : ModifierKeys.None) |
+        (IsKeyDown(0x11) || IsKeyDown(0xA2) || IsKeyDown(0xA3) ? ModifierKeys.Control : ModifierKeys.None) |
+        (IsKeyDown(0x12) || IsKeyDown(0xA4) || IsKeyDown(0xA5) ? ModifierKeys.Alt : ModifierKeys.None) |
+        (IsKeyDown(0x10) || IsKeyDown(0xA0) || IsKeyDown(0xA1) ? ModifierKeys.Shift : ModifierKeys.None) |
         (IsKeyDown(0x5B) || IsKeyDown(0x5C) ? ModifierKeys.Windows : ModifierKeys.None);
 
     private void PollLoop()

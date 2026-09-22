@@ -497,26 +497,44 @@ public partial class MainWindow : Window
 
     private void RefreshDeviceList()
     {
-        if (_isUpdatingDeviceList)
+        if (_isUpdatingDeviceList || _isDisposed)
         {
             return;
         }
         _isUpdatingDeviceList = true;
-        try
+        Task.Run(() =>
         {
-            List<AudioDevice> captureDevices = _audioController.GetCaptureDevices();
-            cbDevices.ItemsSource = captureDevices;
-            string currentId = _audioController.CurrentDeviceId;
-            AudioDevice? audioDevice = captureDevices.FirstOrDefault((AudioDevice d) => d.Id == currentId);
-            if (audioDevice != null)
+            try
             {
-                cbDevices.SelectedItem = audioDevice;
+                List<AudioDevice> captureDevices = _audioController.GetCaptureDevices();
+                string currentId = _audioController.CurrentDeviceId;
+                if (_isDisposed || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+                Dispatcher.BeginInvoke((Action)delegate
+                {
+                    if (_isDisposed) return;
+                    try
+                    {
+                        cbDevices.ItemsSource = captureDevices;
+                        AudioDevice? audioDevice = captureDevices.FirstOrDefault((AudioDevice d) => d.Id == currentId);
+                        if (audioDevice != null)
+                        {
+                            cbDevices.SelectedItem = audioDevice;
+                        }
+                    }
+                    finally
+                    {
+                        _isUpdatingDeviceList = false;
+                    }
+                });
             }
-        }
-        finally
-        {
-            _isUpdatingDeviceList = false;
-        }
+            catch
+            {
+                if (!_isDisposed && !Dispatcher.HasShutdownStarted)
+                {
+                    Dispatcher.BeginInvoke((Action)delegate { _isUpdatingDeviceList = false; });
+                }
+            }
+        });
     }
 
     private void CbDevices_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -728,6 +746,11 @@ public partial class MainWindow : Window
         {
             key = e.SystemKey;
         }
+        if (key == Key.Escape)
+        {
+            StopRecordingHotkey(success: false);
+            return;
+        }
         ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
         if (key == Key.LeftCtrl || key == Key.RightCtrl ||
             key == Key.LeftAlt || key == Key.RightAlt ||
@@ -735,6 +758,15 @@ public partial class MainWindow : Window
             key == Key.LWin || key == Key.RWin)
         {
             tbHotkey.Text = FormatHotkeyText(Key.None, modifiers);
+        }
+        else if (key == Key.Tab || key == Key.Enter || key == Key.Space || key == Key.Back || key == Key.Capital)
+        {
+            if (modifiers == ModifierKeys.None)
+            {
+                ShowTemporaryStatus("Single key '" + key + "' cannot be used alone. Combine with Ctrl, Alt, or Shift.");
+                return;
+            }
+            StopRecordingHotkey(success: true, key, modifiers);
         }
         else
         {

@@ -12,12 +12,12 @@ if(!$SkipTests){
 }
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $stage=Join-Path $projectRoot ".artifacts/publish-$stamp"
-$arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained','false','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
+$arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true','-p:EnableCompressionInSingleFile=true','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
 if($NoRestore){$arguments+='--no-restore'}
 & $DotnetPath @arguments
 if($LASTEXITCODE -ne 0){throw 'Publish failed; package was not updated.'}
-$files=@(Get-ChildItem -LiteralPath $stage -File | Where-Object {$_.Extension -in @('.exe','.dll','.json','.ico')})
-foreach($required in @('MicMute.exe','MicMute.dll','MicMute.deps.json','MicMute.runtimeconfig.json','app.ico')){
+$files=@(Get-ChildItem -LiteralPath $stage -File | Where-Object {$_.Extension -in @('.exe','.ico')})
+foreach($required in @('MicMute.exe')){
     if($required -notin $files.Name){throw "Missing release artifact: $required"}
 }
 # Verify that launching the SDK-generated host will not open a console window.

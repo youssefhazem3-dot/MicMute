@@ -78,7 +78,10 @@ internal sealed class HotkeyState
                 _pollNeedsRelease = false;
                 // WH_KEYBOARD_LL is called before the asynchronous state changes. Its
                 // initial stale-up snapshot cannot release a native-owned press.
-                if (_held && _pollConfirmedDown)
+                // But once the key is confirmed down OR sufficient time has elapsed
+                // (past any initial stale snapshot), an up sample must clear the hold.
+                int timeSinceEvent = unchecked((int)(timestamp - _lastEventTime));
+                if (_held && (_pollConfirmedDown || timeSinceEvent >= 40))
                 {
                     _held = false;
                     _lastEventTime = timestamp;
@@ -111,7 +114,7 @@ internal sealed class HotkeyModifiers
     public void Reset(Func<int, bool> isDown)
     {
         Array.Clear(_keys);
-        foreach (int vk in new[] { 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C })
+        foreach (int vk in new[] { 0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C })
             _keys[vk] = isDown(vk);
     }
 
@@ -121,8 +124,8 @@ internal sealed class HotkeyModifiers
     }
 
     public ModifierKeys Current =>
-        ((_keys[0xA0] || _keys[0xA1]) ? ModifierKeys.Shift : ModifierKeys.None) |
-        ((_keys[0xA2] || _keys[0xA3]) ? ModifierKeys.Control : ModifierKeys.None) |
-        ((_keys[0xA4] || _keys[0xA5]) ? ModifierKeys.Alt : ModifierKeys.None) |
+        ((_keys[0x10] || _keys[0xA0] || _keys[0xA1]) ? ModifierKeys.Shift : ModifierKeys.None) |
+        ((_keys[0x11] || _keys[0xA2] || _keys[0xA3]) ? ModifierKeys.Control : ModifierKeys.None) |
+        ((_keys[0x12] || _keys[0xA4] || _keys[0xA5]) ? ModifierKeys.Alt : ModifierKeys.None) |
         ((_keys[0x5B] || _keys[0x5C]) ? ModifierKeys.Windows : ModifierKeys.None);
 }

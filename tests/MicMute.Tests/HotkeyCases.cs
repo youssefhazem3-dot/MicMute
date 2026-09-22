@@ -138,6 +138,31 @@ static class HotkeyCases
             Check.True(state.Observe(HotkeySource.Hook, V, true, ModifierKeys.None, 5), "after wrap");
         });
         test("hotkeys: malformed raw input never reads stale keyboard bytes", RawPackets);
+        test("hotkeys: generic modifier keys match required chord", () =>
+        {
+            var mods = new HotkeyModifiers();
+            mods.Reset(vk => false);
+            mods.Observe(0x11, true); // VK_CONTROL generic
+            Check.Equal(ModifierKeys.Control, mods.Current, "VK_CONTROL maps to Control modifier");
+
+            mods.Reset(vk => false);
+            mods.Observe(0x10, true); // VK_SHIFT generic
+            Check.Equal(ModifierKeys.Shift, mods.Current, "VK_SHIFT maps to Shift modifier");
+
+            mods.Reset(vk => false);
+            mods.Observe(0x12, true); // VK_MENU generic
+            Check.Equal(ModifierKeys.Alt, mods.Current, "VK_MENU maps to Alt modifier");
+        });
+        test("hotkeys: physical poll recovers hold after dropped native up without sticking", () =>
+        {
+            var state = Bound();
+            Check.True(state.Observe(HotkeySource.Hook, V, true, ModifierKeys.None, 100), "hook down");
+            // Native up is dropped/missed. Poll never saw down (e.g. fast tap).
+            // Poll runs after 50ms and sees key is physically up.
+            state.Poll(V, false, ModifierKeys.None, 150);
+            // Verify hold was released and next press works immediately:
+            Check.True(state.Observe(HotkeySource.Hook, V, true, ModifierKeys.None, 160), "recovered hold allows next press");
+        });
     }
 
     private static HotkeyState Bound(ModifierKeys modifiers = ModifierKeys.None)

@@ -12,7 +12,7 @@
 
 <br />
 
-[Features](#-key-features) • [Installation](#-installation--downloads) • [Building](#-building-from-source) • [Architecture](#-architecture--tech-stack) • [Configuration](#-data-storage--portable-mode)
+[Features](#-key-features) • [Installation](#-installation--downloads) • [Latest Fixes](#-latest-bugs-fixed) • [Building](#-building-from-source) • [Architecture](#-architecture--tech-stack) • [Configuration](#-data-storage--portable-mode)
 
 </div>
 
@@ -39,15 +39,30 @@
 
 ---
 
+## 🐛 Latest Bugs Fixed
+
+Here is a concise summary of the latest stability improvements and fixes:
+
+* **Stuck Hotkeys Fixed:** Resolved an issue where rapid presses or dropped native release events caused shortcuts to become unresponsive or stuck.
+* **Generic Modifier Support:** Full compatibility with generic `Ctrl`, `Shift`, and `Alt` virtual keys across Remote Desktop, virtual machines, and mouse/macro software.
+* **Instant Mute/Unmute Response:** Removed UI thread latency during volume state updates so the tray icon and toggle respond immediately.
+* **Comprehensive Device Fallback:** Added automatic audio capture endpoint fallback across all Windows roles (`Communications`, `Console`, `Multimedia`).
+* **OSD Multi-Monitor & DPI Fix:** Eliminated screen jumping and display flickering on launch; added per-monitor DPI coordinate scaling.
+* **Safer Shortcut Recording:** Pressing `Escape` now cleanly cancels shortcut recording, and core typing/navigation keys (`Tab`, `Enter`, `Space`, `Backspace`, `CapsLock`) are protected from accidental binding.
+* **No UI Freezing on Device Hotplug:** Headset connection/disconnection device enumeration now runs asynchronously in the background.
+* **Single Standalone Executable:** Packaged into a single self-contained `.exe` with zero external runtime requirements (no .NET 8 desktop runtime installation needed).
+
+---
+
 ## 🚀 Installation & Downloads
 
-### Option 1: Standalone Clean Package (Recommended)
+### Option 1: Standalone Single-File Executable (Recommended)
 
 [![Download MicMute.zip](https://img.shields.io/badge/Direct%20Download-MicMute.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)
 
-1. Download **[`MicMute.zip`](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)** (instant direct download, no setup required).
-2. Extract the archive anywhere on your system.
-3. Install the **.NET 8 Windows Desktop Runtime (x64)** if it is not already installed. This package is framework-dependent; keep its DLL and JSON files beside the executable.
+1. Download **[`MicMute.zip`](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)** or the standalone **`MicMute.exe`** directly.
+2. Extract or place `MicMute.exe` anywhere on your system.
+3. **No runtime required:** MicMute is 100% self-contained into a single `.exe` file. You do **not** need to install the .NET 8 Desktop Runtime or keep extra DLL/JSON files around!
 4. Double-click `MicMute.exe`. It starts in the tray by default; double-click the tray icon to open the panel, or run `MicMute.exe --show`.
 
 ### Option 2: Clone & Build

@@ -17,9 +17,11 @@
     <RootNamespace>MicMute</RootNamespace>
     <AssemblyName>MicMute</AssemblyName>
 
-    <PublishSingleFile>false</PublishSingleFile>
-    <SelfContained>false</SelfContained>
+    <PublishSingleFile Condition="'$(PublishSingleFile)' == ''">false</PublishSingleFile>
+    <SelfContained Condition="'$(PublishSingleFile)' == 'true'">true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>

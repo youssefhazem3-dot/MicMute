@@ -46,7 +46,15 @@ public class AudioController : IMMNotificationClient, IDisposable
         {
             if (!_dispatcher.CheckAccess()) { Dispatch(() => IsMuted = value); return; }
             if (_disposed || _currentDevice == null) return;
-            try { _currentDevice.AudioEndpointVolume.Mute = value; }
+            try
+            {
+                _currentDevice.AudioEndpointVolume.Mute = value;
+                if (_lastReportedMuteState != value)
+                {
+                    _lastReportedMuteState = value;
+                    MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, true));
+                }
+            }
             catch (Exception ex) { WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message); }
         }
     }
@@ -109,6 +117,16 @@ public class AudioController : IMMNotificationClient, IDisposable
             try { candidate = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; }
             catch { candidate = null; }
         }
+        if (candidate == null)
+        {
+            try { candidate = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); fallback = true; }
+            catch { candidate = null; }
+        }
+        if (candidate == null)
+        {
+            try { candidate = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; }
+            catch { candidate = null; }
+        }
 
         // Do not activate a second endpoint-volume listener merely to inspect the candidate.
         if (candidate != null && _currentDevice != null && _volumeHandler != null)
@@ -165,13 +183,9 @@ public class AudioController : IMMNotificationClient, IDisposable
         Dispatch(() =>
         {
             if (!ReferenceEquals(expected, _currentDevice)) return;
-            try
-            {
-                if (expected.AudioEndpointVolume.Mute != muted || _lastReportedMuteState == muted) return;
-                _lastReportedMuteState = muted;
-                MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, true));
-            }
-            catch (Exception ex) { WarningNotification?.Invoke(this, "Could not read microphone state: " + ex.Message); }
+            if (_lastReportedMuteState == muted) return;
+            _lastReportedMuteState = muted;
+            MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, true));
         });
     }
 
@@ -206,7 +220,8 @@ public class AudioController : IMMNotificationClient, IDisposable
     public void OnDeviceRemoved(string deviceId) => NotifyDevicesChanged();
     public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
     {
-        if (flow == DataFlow.Capture && role == Role.Communications) NotifyDevicesChanged();
+        if (flow == DataFlow.Capture && (role == Role.Communications || role == Role.Console || role == Role.Multimedia))
+            NotifyDevicesChanged();
     }
     public void OnPropertyValueChanged(string deviceId, PropertyKey key)
     {
