@@ -2,99 +2,100 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Mic Mute"
-        Width="352"
+        Width="412"
         SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
         WindowStartupLocation="Manual"
+        FontFamily="SF Pro Display, SF Pro Text, SF Pro, -apple-system, BlinkMacSystemFont, Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI, sans-serif"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True">
 
     <Window.Resources>
         <!-- ========================================== -->
-        <!-- Dynamic Theme Brushes (iOS Liquid Glass)   -->
+        <!-- Dynamic Theme Brushes (Apple Liquid Glass) -->
         <!-- ========================================== -->
         <Color x:Key="AccentColor">#FFFFFF</Color>
         <SolidColorBrush x:Key="AccentBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#25FFFFFF" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#22FFFFFF" />
 
         <LinearGradientBrush x:Key="WindowBgBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#F00F172A" Offset="0.0" />
-            <GradientStop Color="#F0020617" Offset="1.0" />
+            <GradientStop Color="#F218181B" Offset="0.0" />
+            <GradientStop Color="#F209090B" Offset="1.0" />
         </LinearGradientBrush>
 
-        <SolidColorBrush x:Key="CardBgBrush" Color="#12FFFFFF" />
-        <SolidColorBrush x:Key="InputBgBrush" Color="#1E293B" />
+        <SolidColorBrush x:Key="CardBgBrush" Color="#14FFFFFF" />
+        <SolidColorBrush x:Key="InputBgBrush" Color="#18181B" />
         <SolidColorBrush x:Key="TitleBarBgBrush" Color="#00000000" />
-        <SolidColorBrush x:Key="TitleTextBrush" Color="#F8FAFC" />
-        <SolidColorBrush x:Key="TextWhiteBrush" Color="#F8FAFC" />
-        <SolidColorBrush x:Key="TextGrayBrush" Color="#94A3B8" />
-        <SolidColorBrush x:Key="TextDimBrush" Color="#64748B" />
-        <SolidColorBrush x:Key="BorderBrush" Color="#25FFFFFF" />
-        <SolidColorBrush x:Key="DividerBrush" Color="#18FFFFFF" />
+        <SolidColorBrush x:Key="TitleTextBrush" Color="#F4F4F5" />
+        <SolidColorBrush x:Key="TextWhiteBrush" Color="#F4F4F5" />
+        <SolidColorBrush x:Key="TextGrayBrush" Color="#A1A1AA" />
+        <SolidColorBrush x:Key="TextDimBrush" Color="#71717A" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#1FFFFFFF" />
+        <SolidColorBrush x:Key="DividerBrush" Color="#14FFFFFF" />
 
-        <!-- Liquid Switch Brushes (White Liquid in Dark, Black Liquid in Light) -->
-        <SolidColorBrush x:Key="ToggleOnBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="ToggleOnBorderBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="ToggleOffBrush" Color="#2A374A" />
-        <SolidColorBrush x:Key="ToggleOffBorderBrush" Color="#475569" />
-        <SolidColorBrush x:Key="ToggleKnobBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="ToggleKnobBorderBrush" Color="#E2E8F0" />
-        <SolidColorBrush x:Key="ToggleKnobActiveBrush" Color="#0F172A" />
-        <SolidColorBrush x:Key="ToggleKnobActiveBorderBrush" Color="#334155" />
+        <!-- Liquid Switch Brushes (Soft Silver-White in Dark Mode, Soft Graphite in Light Mode) -->
+        <SolidColorBrush x:Key="ToggleOnBrush" Color="#B8C0CC" />
+        <SolidColorBrush x:Key="ToggleOnBorderBrush" Color="#B8C0CC" />
+        <SolidColorBrush x:Key="ToggleOffBrush" Color="#1C1C1F" />
+        <SolidColorBrush x:Key="ToggleOffBorderBrush" Color="#3F3F46" />
+        <SolidColorBrush x:Key="ToggleKnobBrush" Color="#E4E4E7" />
+        <SolidColorBrush x:Key="ToggleKnobBorderBrush" Color="#A1A1AA" />
+        <SolidColorBrush x:Key="ToggleKnobActiveBrush" Color="#18181B" />
+        <SolidColorBrush x:Key="ToggleKnobActiveBorderBrush" Color="#27272A" />
 
         <!-- Liquid Slider Brushes -->
-        <SolidColorBrush x:Key="SliderTrackBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="SliderTrackEmptyBrush" Color="#1E293B" />
-        <SolidColorBrush x:Key="SliderTrackBorderBrush" Color="#334155" />
+        <SolidColorBrush x:Key="SliderTrackBrush" Color="#B8C0CC" />
+        <SolidColorBrush x:Key="SliderTrackEmptyBrush" Color="#27272A" />
+        <SolidColorBrush x:Key="SliderTrackBorderBrush" Color="#3F3F46" />
         <SolidColorBrush x:Key="SliderThumbBgBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="SliderThumbBorderBrush" Color="#0F172A" />
+        <SolidColorBrush x:Key="SliderThumbBorderBrush" Color="#18181B" />
 
         <!-- Jewel-Cut Outer Ring for Mute Button -->
         <LinearGradientBrush x:Key="JewelRingBgBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#25FFFFFF" Offset="0.0" />
-            <GradientStop Color="#06FFFFFF" Offset="1.0" />
+            <GradientStop Color="#22FFFFFF" Offset="0.0" />
+            <GradientStop Color="#05FFFFFF" Offset="1.0" />
         </LinearGradientBrush>
-        <SolidColorBrush x:Key="JewelRingBorderBrush" Color="#45FFFFFF" />
+        <SolidColorBrush x:Key="JewelRingBorderBrush" Color="#3DFFFFFF" />
 
         <!-- Liquid Hero Mute Button Brushes -->
         <RadialGradientBrush x:Key="HeroLensActiveBrush" Center="0.35,0.30" GradientOrigin="0.35,0.30" RadiusX="0.65" RadiusY="0.65">
             <GradientStop Color="#FFFFFFFF" Offset="0.0" />
-            <GradientStop Color="#FFF1F5F9" Offset="0.45" />
-            <GradientStop Color="#FFE2E8F0" Offset="0.85" />
-            <GradientStop Color="#FFCBD5E1" Offset="1.0" />
+            <GradientStop Color="#FFE4E4E7" Offset="0.45" />
+            <GradientStop Color="#FFD4D4D8" Offset="0.85" />
+            <GradientStop Color="#FFA1A1AA" Offset="1.0" />
         </RadialGradientBrush>
         <RadialGradientBrush x:Key="HeroGlowActiveBrush" Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-            <GradientStop Color="#90FFFFFF" Offset="0.0" />
+            <GradientStop Color="#80FFFFFF" Offset="0.0" />
             <GradientStop Color="#00FFFFFF" Offset="1.0" />
         </RadialGradientBrush>
-        <SolidColorBrush x:Key="HeroIconActiveBrush" Color="#0F172A" />
+        <SolidColorBrush x:Key="HeroIconActiveBrush" Color="#18181B" />
 
         <!-- Monochrome Squircle Icon Tiles -->
-        <SolidColorBrush x:Key="SquircleBgBrush" Color="#16FFFFFF" />
-        <SolidColorBrush x:Key="SquircleBorderBrush" Color="#26FFFFFF" />
-        <SolidColorBrush x:Key="SquircleIconBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="SquircleBgBrush" Color="#14FFFFFF" />
+        <SolidColorBrush x:Key="SquircleBorderBrush" Color="#24FFFFFF" />
+        <SolidColorBrush x:Key="SquircleIconBrush" Color="#F4F4F5" />
 
         <!-- Status Capsule Brushes -->
-        <SolidColorBrush x:Key="StatusCapsuleBgBrush" Color="#20FFFFFF" />
-        <SolidColorBrush x:Key="StatusCapsuleBorderBrush" Color="#60FFFFFF" />
+        <SolidColorBrush x:Key="StatusCapsuleBgBrush" Color="#1AFFFFFF" />
+        <SolidColorBrush x:Key="StatusCapsuleBorderBrush" Color="#00000000" />
         <SolidColorBrush x:Key="StatusCapsuleTextBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="StatusDotBrush" Color="#FFFFFF" />
 
         <!-- Keycap Chip Brushes -->
-        <SolidColorBrush x:Key="KeycapBgBrush" Color="#1E293B" />
-        <SolidColorBrush x:Key="KeycapBorderBrush" Color="#475569" />
-        <SolidColorBrush x:Key="KeycapTextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="KeycapBgBrush" Color="#27272A" />
+        <SolidColorBrush x:Key="KeycapBorderBrush" Color="#3F3F46" />
+        <SolidColorBrush x:Key="KeycapTextBrush" Color="#F4F4F5" />
 
         <SolidColorBrush x:Key="WarningBgBrush" Color="#20EF4444" />
         <SolidColorBrush x:Key="WarningBorderBrush" Color="#EF4444" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#F87171" />
         <SolidColorBrush x:Key="CaptionButtonHoverBrush" Color="#18FFFFFF" />
-        <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#30FFFFFF" />
-        <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#55FFFFFF" />
-        <SolidColorBrush x:Key="ScrollBarThumbDragBrush" Color="#80FFFFFF" />
+        <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#25FFFFFF" />
+        <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#45FFFFFF" />
+        <SolidColorBrush x:Key="ScrollBarThumbDragBrush" Color="#70FFFFFF" />
 
         <!-- ========================================== -->
         <!-- Windows 11 Native Caption Buttons          -->
@@ -196,7 +197,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <Grid Width="52" Height="30" SnapsToDevicePixels="True">
-                            <!-- Liquid Track -->
+                            <!-- Liquid Glass Track & Recessed Trench -->
                             <Border x:Name="track"
                                     Width="52" Height="30"
                                     Background="{DynamicResource ToggleOffBrush}"
@@ -204,11 +205,30 @@
                                     BorderThickness="1.2"
                                     CornerRadius="15">
                                 <Border.Effect>
-                                    <DropShadowEffect x:Name="glow" BlurRadius="14" ShadowDepth="0" Opacity="0" Color="{DynamicResource AccentColor}" />
+                                    <DropShadowEffect x:Name="glow" BlurRadius="12" ShadowDepth="0" Opacity="0" Color="{DynamicResource AccentColor}" />
                                 </Border.Effect>
+                                <!-- Trench Depth & Refraction Overlay -->
+                                <Grid>
+                                    <Border Height="8" VerticalAlignment="Top" CornerRadius="14,14,0,0" Opacity="0.25">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#000000" Offset="0.0" />
+                                                <GradientStop Color="#00000000" Offset="1.0" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <Border Height="4" VerticalAlignment="Bottom" CornerRadius="0,0,14,14" Opacity="0.18">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                                <GradientStop Color="#FFFFFF" Offset="0.0" />
+                                                <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                </Grid>
                             </Border>
 
-                            <!-- Crystal Droplet Knob -->
+                            <!-- Crystal Droplet Knob with Hardware-Accelerated Fluid Motion -->
                             <Border x:Name="knob"
                                     Width="24" Height="24"
                                     CornerRadius="12"
@@ -217,6 +237,12 @@
                                     BorderThickness="0.8"
                                     HorizontalAlignment="Left"
                                     Margin="3,3,0,3">
+                                <Border.RenderTransform>
+                                    <TransformGroup>
+                                        <TranslateTransform x:Name="knobTrans" X="0" />
+                                        <ScaleTransform x:Name="knobScale" ScaleX="1.0" ScaleY="1.0" CenterX="12" CenterY="12" />
+                                    </TransformGroup>
+                                </Border.RenderTransform>
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="5" ShadowDepth="1.5" Opacity="0.3" Color="Black" />
                                 </Border.Effect>
@@ -240,36 +266,44 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <ThicknessAnimation Storyboard.TargetName="knob"
-                                                                Storyboard.TargetProperty="Margin"
-                                                                To="25,3,0,3"
-                                                                Duration="0:0:0.18">
-                                                <ThicknessAnimation.EasingFunction>
-                                                    <QuadraticEase EasingMode="EaseOut" />
-                                                </ThicknessAnimation.EasingFunction>
-                                            </ThicknessAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="knobTrans"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="22"
+                                                             Duration="0:0:0.22">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobScale" Storyboard.TargetProperty="ScaleX">
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.09" Value="1.15" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" />
+                                            </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimation Storyboard.TargetName="glow"
                                                              Storyboard.TargetProperty="Opacity"
-                                                             To="0.6"
-                                                             Duration="0:0:0.18" />
+                                                             To="0.45"
+                                                             Duration="0:0:0.20" />
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <ThicknessAnimation Storyboard.TargetName="knob"
-                                                                Storyboard.TargetProperty="Margin"
-                                                                To="3,3,0,3"
-                                                                Duration="0:0:0.18">
-                                                <ThicknessAnimation.EasingFunction>
-                                                    <QuadraticEase EasingMode="EaseOut" />
-                                                </ThicknessAnimation.EasingFunction>
-                                            </ThicknessAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="knobTrans"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="0"
+                                                             Duration="0:0:0.22">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobScale" Storyboard.TargetProperty="ScaleX">
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.09" Value="1.15" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" />
+                                            </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimation Storyboard.TargetName="glow"
                                                              Storyboard.TargetProperty="Opacity"
                                                              To="0"
-                                                             Duration="0:0:0.18" />
+                                                             Duration="0:0:0.20" />
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -392,7 +426,11 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid>
+                        <Grid x:Name="rootGrid" RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <ScaleTransform x:Name="gridScale" ScaleX="1.0" ScaleY="1.0" />
+                            </Grid.RenderTransform>
+
                             <!-- Dynamic Ambient Halo -->
                             <Ellipse x:Name="glow"
                                      Width="92" Height="92"
@@ -427,9 +465,9 @@
                                 <Border.Background>
                                     <RadialGradientBrush Center="0.35,0.30" GradientOrigin="0.35,0.30" RadiusX="0.65" RadiusY="0.65">
                                         <GradientStop Color="#FFFFFFFF" Offset="0.0" />
-                                        <GradientStop Color="#FFF1F5F9" Offset="0.45" />
-                                        <GradientStop Color="#FFE2E8F0" Offset="0.85" />
-                                        <GradientStop Color="#FFCBD5E1" Offset="1.0" />
+                                        <GradientStop Color="#FFE4E4E7" Offset="0.45" />
+                                        <GradientStop Color="#FFD4D4D8" Offset="0.85" />
+                                        <GradientStop Color="#FFA1A1AA" Offset="1.0" />
                                     </RadialGradientBrush>
                                 </Border.Background>
                                 <Grid>
@@ -507,11 +545,61 @@
                             </Trigger>
 
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="outerJewelRing" Property="RenderTransform">
-                                    <Setter.Value>
-                                        <ScaleTransform ScaleX="1.03" ScaleY="1.03" CenterX="43" CenterY="43" />
-                                    </Setter.Value>
-                                </Setter>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="1.03" Duration="0:0:0.15">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="1.03" Duration="0:0:0.15">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="1.00" Duration="0:0:0.18">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="1.00" Duration="0:0:0.18">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="0.89" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="0.89" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX">
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.14" Value="1.08" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.26" Value="0.97" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.38" Value="1.00" />
+                                            </DoubleAnimationUsingKeyFrames>
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY">
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.14" Value="1.08" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.26" Value="0.97" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.38" Value="1.00" />
+                                            </DoubleAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -519,7 +607,7 @@
             </Setter>
         </Style>
 
-        <!-- Modern ComboBox Style -->
+        <!-- Modern ComboBox Style with Apple Frosted Glass Popover -->
         <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox">
             <Setter Property="Height" Value="34" />
             <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
@@ -540,20 +628,40 @@
                                 <ControlTemplate TargetType="ComboBoxItem">
                                     <Border x:Name="itemBorder"
                                             Background="Transparent"
-                                            CornerRadius="6"
-                                            Margin="2,1"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter Content="{TemplateBinding Content}"
-                                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                          TextBlock.Foreground="{DynamicResource TextWhiteBrush}" />
+                                            CornerRadius="7"
+                                            Margin="3,1.5"
+                                            Padding="10,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ContentPresenter Grid.Column="0"
+                                                              Content="{TemplateBinding Content}"
+                                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                              TextBlock.Foreground="{DynamicResource TextWhiteBrush}"
+                                                              VerticalAlignment="Center" />
+                                            <Path x:Name="checkIcon"
+                                                  Grid.Column="1"
+                                                  Data="M 1,5 L 4,8 L 9,2"
+                                                  Stroke="{DynamicResource TextWhiteBrush}"
+                                                  StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round"
+                                                  Visibility="Collapsed"
+                                                  VerticalAlignment="Center"
+                                                  Margin="6,0,2,0" />
+                                        </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
                                         </Trigger>
                                         <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource AccentBrush}" />
-                                            <Setter Property="TextElement.Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                                            <Setter TargetName="itemBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                                            <Setter TargetName="itemBorder" Property="BorderThickness" Value="1" />
+                                            <Setter TargetName="checkIcon" Property="Visibility" Value="Visible" />
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -612,16 +720,17 @@
                                    PopupAnimation="Slide">
                                 <Border x:Name="dropDownBorder"
                                         MinWidth="{Binding ActualWidth, ElementName=toggle}"
-                                        MaxHeight="200"
+                                        MaxHeight="220"
                                         Background="{DynamicResource InputBgBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="8"
-                                        Margin="0,4,0,0">
+                                        CornerRadius="10"
+                                        Padding="4"
+                                        Margin="0,4,0,8">
                                     <Border.Effect>
-                                        <DropShadowEffect BlurRadius="12" ShadowDepth="4" Opacity="0.35" Color="Black" />
+                                        <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.55" Color="Black" />
                                     </Border.Effect>
-                                    <ScrollViewer SnapsToDevicePixels="True">
+                                    <ScrollViewer SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
                                     </ScrollViewer>
                                 </Border>
@@ -632,15 +741,16 @@
             </Setter>
         </Style>
 
-        <!-- Secondary Action Button Style -->
+        <!-- Secondary Action Button Style (Aligned 28px Height) -->
         <Style x:Key="SecondaryActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="28" />
             <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
             <Setter Property="Background" Value="{DynamicResource InputBgBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
@@ -810,13 +920,12 @@
                                 Tag="Active"
                                 Click="BtnStateToggle_Click" />
 
-                        <!-- High-Precision Jewel Status Capsule -->
+                        <!-- High-Precision Jewel Status Capsule (Borderless Liquid Pill) -->
                         <Border x:Name="borderStatusCapsule"
                                 Background="{DynamicResource StatusCapsuleBgBrush}"
-                                BorderBrush="{DynamicResource StatusCapsuleBorderBrush}"
-                                BorderThickness="1.2"
+                                BorderThickness="0"
                                 CornerRadius="12"
-                                Padding="12,3"
+                                Padding="14,4"
                                 HorizontalAlignment="Center"
                                 Margin="0,6,0,0">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -839,39 +948,24 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Changeable Hotkey Chip Button: "Press [ Insert ] to toggle" -->
+                        <!-- Display-only Hotkey Pill: "Press [ Insert ] to toggle" -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
                             <TextBlock Text="Press " Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
-                            <Button x:Name="btnHeroHotkey"
-                                    Cursor="Hand"
-                                    Background="{DynamicResource KeycapBgBrush}"
+                            <Border Background="{DynamicResource KeycapBgBrush}"
                                     BorderBrush="{DynamicResource KeycapBorderBrush}"
                                     BorderThickness="1"
-                                    Padding="6,1.5"
+                                    CornerRadius="5"
+                                    Padding="7,2"
                                     Margin="2,0"
-                                    Click="BtnRecordHotkey_Click"
-                                    ToolTip="Click to change shortcut key">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="5"
-                                                Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock x:Name="tbHeroHotkey"
-                                               Text="Insert"
-                                               Foreground="{DynamicResource KeycapTextBrush}"
-                                               FontFamily="Consolas, Segoe UI Variable Text, Segoe UI"
-                                               FontWeight="Bold"
-                                               FontSize="10" />
-                                    <TextBlock Text=" ✎" Foreground="{DynamicResource TextDimBrush}" FontSize="8" VerticalAlignment="Center" Margin="2,0,0,0" />
-                                </StackPanel>
-                            </Button>
+                                    VerticalAlignment="Center">
+                                <TextBlock x:Name="tbHeroHotkey"
+                                           Text="Insert"
+                                           Foreground="{DynamicResource KeycapTextBrush}"
+                                           FontFamily="Consolas, Segoe UI Variable Text, Segoe UI"
+                                           FontWeight="Bold"
+                                           FontSize="10"
+                                           VerticalAlignment="Center" />
+                            </Border>
                             <TextBlock Text=" to toggle" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
                         </StackPanel>
                     </StackPanel>
@@ -961,23 +1055,29 @@
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border x:Name="borderHotkey"
+                                            Height="28"
                                             Background="{DynamicResource KeycapBgBrush}"
                                             BorderBrush="{DynamicResource KeycapBorderBrush}"
                                             BorderThickness="1"
                                             CornerRadius="6"
-                                            Padding="10,4"
-                                            Margin="0,0,6,0">
+                                            Padding="10,0"
+                                            Margin="0,0,6,0"
+                                            VerticalAlignment="Center">
                                         <TextBlock x:Name="tbHotkey"
                                                    Text="Insert"
                                                    Foreground="{DynamicResource KeycapTextBrush}"
                                                    FontFamily="Consolas, Segoe UI"
                                                    FontWeight="Bold"
-                                                   FontSize="11" />
+                                                   FontSize="11"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center" />
                                     </Border>
                                     <Button x:Name="btnRecordHotkey"
+                                            Height="28"
                                             Content="Record"
                                             Style="{StaticResource SecondaryActionButtonStyle}"
-                                            Click="BtnRecordHotkey_Click" />
+                                            Click="BtnRecordHotkey_Click"
+                                            VerticalAlignment="Center" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -1231,9 +1331,12 @@
                                           VerticalAlignment="Center" />
                                 </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
                                     <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Enables hotkeys over games and elevated windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                    <TextBlock Text="Enables hotkeys over games and elevated windows"
+                                               Foreground="{DynamicResource TextGrayBrush}"
+                                               FontSize="9.5"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
                                 <CheckBox x:Name="cbRunAsAdmin"
