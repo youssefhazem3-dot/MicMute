@@ -56,9 +56,11 @@ public partial class MainWindow : Window
     internal System.Windows.Controls.Button btnRecordHotkey = null!;
     internal System.Windows.Controls.CheckBox cbEnableOsd = null!;
     internal Slider sliderOsdDuration = null!;
+    internal Border? borderOsdDurationKeycap;
     internal System.Windows.Controls.TextBox txtOsdDuration = null!;
     internal Grid? panelSoundVolume;
     internal Slider sliderSoundVolume = null!;
+    internal Border? borderSoundVolumeKeycap;
     internal System.Windows.Controls.TextBox txtSoundVolume = null!;
     internal System.Windows.Controls.CheckBox cbStartup = null!;
     internal System.Windows.Controls.CheckBox cbStartMinimized = null!;
@@ -186,6 +188,7 @@ public partial class MainWindow : Window
                 sliderOsdDuration.Minimum = UiBehavior.MinimumOsdDuration;
                 sliderOsdDuration.Maximum = UiBehavior.MaximumOsdDuration;
             }
+            borderOsdDurationKeycap = root.FindName("borderOsdDurationKeycap") as Border;
             txtOsdDuration = (System.Windows.Controls.TextBox)root.FindName("txtOsdDuration");
             cbStartup = (System.Windows.Controls.CheckBox)root.FindName("cbStartup");
             cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
@@ -199,6 +202,7 @@ public partial class MainWindow : Window
                 sliderSoundVolume.Minimum = UiBehavior.MinimumSoundVolume;
                 sliderSoundVolume.Maximum = UiBehavior.MaximumSoundVolume;
             }
+            borderSoundVolumeKeycap = root.FindName("borderSoundVolumeKeycap") as Border;
             txtSoundVolume = (System.Windows.Controls.TextBox)root.FindName("txtSoundVolume");
             tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
             borderWarning = (Border)root.FindName("borderWarning");
@@ -256,9 +260,31 @@ public partial class MainWindow : Window
             cbEnableOsd.Unchecked += CbEnableOsd_Unchecked;
         }
         if (sliderOsdDuration != null) sliderOsdDuration.ValueChanged += SliderOsdDuration_ValueChanged;
+        if (borderOsdDurationKeycap != null)
+        {
+            borderOsdDurationKeycap.MouseLeftButtonDown += (s, e) =>
+            {
+                txtOsdDuration?.Focus();
+                txtOsdDuration?.SelectAll();
+                e.Handled = true;
+            };
+        }
         if (txtOsdDuration != null)
         {
-            txtOsdDuration.GotFocus += (s, e) => _osdDurationBeforeEdit = SettingsManager.Load().OsdDuration;
+            txtOsdDuration.PreviewMouseLeftButtonDown += (s, e) =>
+            {
+                if (!txtOsdDuration.IsKeyboardFocused)
+                {
+                    txtOsdDuration.Focus();
+                    txtOsdDuration.SelectAll();
+                    e.Handled = true;
+                }
+            };
+            txtOsdDuration.GotFocus += (s, e) =>
+            {
+                _osdDurationBeforeEdit = SettingsManager.Load().OsdDuration;
+                txtOsdDuration.SelectAll();
+            };
             txtOsdDuration.LostFocus += TxtOsdDuration_LostFocus;
             txtOsdDuration.KeyDown += TxtOsdDuration_KeyDown;
             txtOsdDuration.TextChanged += TxtOsdDuration_TextChanged;
@@ -289,9 +315,31 @@ public partial class MainWindow : Window
             cbSoundFeedback.Unchecked += CbSoundFeedback_Unchecked;
         }
         if (sliderSoundVolume != null) sliderSoundVolume.ValueChanged += SliderSoundVolume_ValueChanged;
+        if (borderSoundVolumeKeycap != null)
+        {
+            borderSoundVolumeKeycap.MouseLeftButtonDown += (s, e) =>
+            {
+                txtSoundVolume?.Focus();
+                txtSoundVolume?.SelectAll();
+                e.Handled = true;
+            };
+        }
         if (txtSoundVolume != null)
         {
-            txtSoundVolume.GotFocus += (s, e) => _soundVolumeBeforeEdit = SettingsManager.Load().SoundVolume;
+            txtSoundVolume.PreviewMouseLeftButtonDown += (s, e) =>
+            {
+                if (!txtSoundVolume.IsKeyboardFocused)
+                {
+                    txtSoundVolume.Focus();
+                    txtSoundVolume.SelectAll();
+                    e.Handled = true;
+                }
+            };
+            txtSoundVolume.GotFocus += (s, e) =>
+            {
+                _soundVolumeBeforeEdit = SettingsManager.Load().SoundVolume;
+                txtSoundVolume.SelectAll();
+            };
             txtSoundVolume.LostFocus += TxtSoundVolume_LostFocus;
             txtSoundVolume.KeyDown += TxtSoundVolume_KeyDown;
             txtSoundVolume.TextChanged += TxtSoundVolume_TextChanged;
@@ -1456,10 +1504,13 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Enter)
         {
-            btnStateToggle.Focus();
+            e.Handled = true;
+            CommitOsdDurationText();
+            this.Focus();
         }
         else if (e.Key == Key.Escape)
         {
+            e.Handled = true;
             double restoreVal = _osdDurationBeforeEdit ?? SettingsManager.Load().OsdDuration;
             SettingsManager.Save(SettingsManager.Load() with { OsdDuration = restoreVal });
             _isUpdatingOsdTextFromSlider = true;
@@ -1467,7 +1518,7 @@ public partial class MainWindow : Window
             txtOsdDuration.Text = UiBehavior.FormatOsdDuration(restoreVal, CultureInfo.CurrentCulture);
             _isUpdatingOsdTextFromSlider = false;
             _osdDurationBeforeEdit = null;
-            btnStateToggle.Focus();
+            this.Focus();
         }
     }
 
@@ -1495,15 +1546,16 @@ public partial class MainWindow : Window
     private void CommitOsdDurationText()
     {
         _osdDurationBeforeEdit = null;
-        if (UiBehavior.TryParseOsdDuration(txtOsdDuration.Text, CultureInfo.CurrentCulture, out var result))
+        if (UiBehavior.TryParseAnyNumber(txtOsdDuration.Text, out double anyVal))
         {
+            double clamped = Math.Clamp(anyVal, UiBehavior.MinimumOsdDuration, UiBehavior.MaximumOsdDuration);
             SettingsManager.Save(SettingsManager.Load() with
             {
-                OsdDuration = result
+                OsdDuration = clamped
             });
             _isUpdatingOsdTextFromSlider = true;
-            sliderOsdDuration.Value = result;
-            txtOsdDuration.Text = UiBehavior.FormatOsdDuration(result, CultureInfo.CurrentCulture);
+            sliderOsdDuration.Value = clamped;
+            txtOsdDuration.Text = UiBehavior.FormatOsdDuration(clamped, CultureInfo.CurrentCulture);
             _isUpdatingOsdTextFromSlider = false;
         }
         else
@@ -1541,10 +1593,13 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Enter)
         {
-            btnStateToggle.Focus();
+            e.Handled = true;
+            CommitSoundVolumeText();
+            this.Focus();
         }
         else if (e.Key == Key.Escape)
         {
+            e.Handled = true;
             int restoreVal = _soundVolumeBeforeEdit ?? SettingsManager.Load().SoundVolume;
             SettingsManager.Save(SettingsManager.Load() with { SoundVolume = restoreVal });
             AudioFeedback.SetVolume(restoreVal);
@@ -1553,7 +1608,7 @@ public partial class MainWindow : Window
             txtSoundVolume.Text = UiBehavior.FormatSoundVolume(restoreVal);
             _isUpdatingSoundVolumeTextFromSlider = false;
             _soundVolumeBeforeEdit = null;
-            btnStateToggle.Focus();
+            this.Focus();
         }
     }
 
@@ -1582,16 +1637,19 @@ public partial class MainWindow : Window
     private void CommitSoundVolumeText()
     {
         _soundVolumeBeforeEdit = null;
-        if (UiBehavior.TryParseSoundVolume(txtSoundVolume.Text, out var result))
+        string candidate = txtSoundVolume.Text.Trim().TrimEnd('%').Trim();
+        if (int.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out int anyInt) ||
+            int.TryParse(candidate, NumberStyles.Integer, CultureInfo.CurrentCulture, out anyInt))
         {
+            int clamped = Math.Clamp(anyInt, UiBehavior.MinimumSoundVolume, UiBehavior.MaximumSoundVolume);
             SettingsManager.Save(SettingsManager.Load() with
             {
-                SoundVolume = result
+                SoundVolume = clamped
             });
-            AudioFeedback.SetVolume(result);
+            AudioFeedback.SetVolume(clamped);
             _isUpdatingSoundVolumeTextFromSlider = true;
-            sliderSoundVolume.Value = result;
-            txtSoundVolume.Text = UiBehavior.FormatSoundVolume(result);
+            sliderSoundVolume.Value = clamped;
+            txtSoundVolume.Text = UiBehavior.FormatSoundVolume(clamped);
             _isUpdatingSoundVolumeTextFromSlider = false;
         }
         else

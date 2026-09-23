@@ -45,13 +45,44 @@ public static class UiBehavior
             candidate = candidate.Substring(0, candidate.Length - 1).Trim();
         }
 
+        string normalized = candidate.Replace(',', '.');
         if (!double.TryParse(candidate, styles, culture, out duration)
+            && !double.TryParse(normalized, styles, CultureInfo.InvariantCulture, out duration)
             && !double.TryParse(candidate, styles, CultureInfo.InvariantCulture, out duration))
         {
             return false;
         }
 
         return double.IsFinite(duration) && duration >= MinimumOsdDuration && duration <= MaximumOsdDuration;
+    }
+
+    public static bool TryParseAnyNumber(string? text, out double value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        string candidate = text.Trim();
+        if (candidate.EndsWith("seconds", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate.Substring(0, candidate.Length - 7).Trim();
+        }
+        else if (candidate.EndsWith("sec", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate.Substring(0, candidate.Length - 3).Trim();
+        }
+        else if (candidate.EndsWith("s", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate.Substring(0, candidate.Length - 1).Trim();
+        }
+
+        const NumberStyles styles = NumberStyles.Float;
+        string normalized = candidate.Replace(',', '.');
+        if (double.TryParse(candidate, styles, CultureInfo.CurrentCulture, out value) ||
+            double.TryParse(normalized, styles, CultureInfo.InvariantCulture, out value) ||
+            double.TryParse(candidate, styles, CultureInfo.InvariantCulture, out value))
+        {
+            return double.IsFinite(value);
+        }
+        return false;
     }
 
     public static string FormatOsdDuration(double duration, CultureInfo culture)

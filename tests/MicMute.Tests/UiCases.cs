@@ -55,6 +55,8 @@ static class UiCases
         test(nameof(ComboBoxDropdownHasSmoothAnimationAndRotatingChevron), ComboBoxDropdownHasSmoothAnimationAndRotatingChevron);
         test(nameof(HeroHotkeySynchronizesWithSettingsAndLiveChanges), HeroHotkeySynchronizesWithSettingsAndLiveChanges);
         test(nameof(AppExitAndTeardownHandlesFailuresGracefullyWithoutHanging), AppExitAndTeardownHandlesFailuresGracefullyWithoutHanging);
+        test(nameof(OsdWindowCornersHaveNoClippedDropShadowArtifacts), OsdWindowCornersHaveNoClippedDropShadowArtifacts);
+        test(nameof(OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction), OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -625,10 +627,9 @@ static class UiCases
         Check.Equal("Toggle Mute", menu.Items[0].Text);
         Check.Equal("Open App", menu.Items[1].Text);
         Check.Equal("Quit", menu.Items[2].Text);
-
         var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
-        // Compact width: should comfortably fit the items without excessive empty gap (between 145 and 180)
-        Check.True(preferredSize.Width >= 145 && preferredSize.Width <= 180, $"Menu preferred width {preferredSize.Width} must be compact");
+        // Compact width: should comfortably fit the items without excessive empty gap on the right (between 115 and 135)
+        Check.True(preferredSize.Width >= 115 && preferredSize.Width <= 135, $"Menu preferred width {preferredSize.Width} must be compact and gap-free");
         // Compact height: 3 items (30px each) + padding should be between 85px and 105px (previously bloated to >135px)
         Check.True(preferredSize.Height >= 85 && preferredSize.Height <= 105, $"Menu preferred height {preferredSize.Height} must be compact and under 105px");
 
@@ -1231,5 +1232,101 @@ static class UiCases
         window.Closing -= handler;
         window.Close();
         Check.True(!closingCalled, "Window should close cleanly without being intercepted by hide-to-tray");
+    }
+
+    private static void OsdWindowCornersHaveNoClippedDropShadowArtifacts()
+    {
+        using var stream = typeof(OsdWindow).Assembly.GetManifestResourceStream("MicMute.OsdWindow.xaml");
+        Check.True(stream != null, "OsdWindow.xaml resource must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // The circular OSD border must not have a DropShadowEffect which causes sharp rectangular clipping artifacts in the corners
+        Check.True(!rawXaml.Contains("<DropShadowEffect"), "OsdWindow.xaml must not contain DropShadowEffect");
+        Check.True(!rawXaml.Contains("<Border.Effect>"), "OsdWindow.xaml must not contain <Border.Effect>");
+
+        // Verify runtime instance has null effect
+        var window = new OsdWindow();
+        try
+        {
+            Check.True(window.borderPanel.Effect == null, "OsdWindow borderPanel must have null effect to prevent corner clipping");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.borderOsdDurationKeycap != null, "borderOsdDurationKeycap must be bound");
+            Check.True(window.borderSoundVolumeKeycap != null, "borderSoundVolumeKeycap must be bound");
+            Check.Equal(34.0, window.txtOsdDuration.Width);
+            Check.Equal(34.0, window.txtSoundVolume.Width);
+
+            var source = System.Windows.PresentationSource.FromVisual(window) ?? new System.Windows.Interop.HwndSource(0, 0, 0, 0, 0, "", IntPtr.Zero);
+            void PressEnter(System.Windows.UIElement element)
+            {
+                var enterEvent = new System.Windows.Input.KeyEventArgs(
+                    System.Windows.Input.Keyboard.PrimaryDevice,
+                    source,
+                    0,
+                    System.Windows.Input.Key.Enter)
+                {
+                    RoutedEvent = System.Windows.UIElement.KeyDownEvent
+                };
+                element.RaiseEvent(enterEvent);
+            }
+
+            // Test 1: Enter on txtOsdDuration clamps valid numbers, updates slider, and commits
+            window.txtOsdDuration.Text = "2";
+            PressEnter(window.txtOsdDuration);
+            Check.Equal("2.0", window.txtOsdDuration.Text.Replace(',', '.'));
+            Check.Equal(2.0, window.sliderOsdDuration.Value);
+            Check.Equal(2.0, SettingsManager.Load().OsdDuration);
+
+            // Test 2: Enter on txtOsdDuration clamps below minimum (0 -> 0.1)
+            window.txtOsdDuration.Text = "0";
+            PressEnter(window.txtOsdDuration);
+            Check.Equal("0.1", window.txtOsdDuration.Text.Replace(',', '.'));
+            Check.Equal(0.1, window.sliderOsdDuration.Value);
+            Check.Equal(0.1, SettingsManager.Load().OsdDuration);
+
+            // Test 3: Enter on txtOsdDuration clamps above maximum (50 -> 30.0)
+            window.txtOsdDuration.Text = "50";
+            PressEnter(window.txtOsdDuration);
+            Check.Equal("30.0", window.txtOsdDuration.Text.Replace(',', '.'));
+            Check.Equal(30.0, window.sliderOsdDuration.Value);
+            Check.Equal(30.0, SettingsManager.Load().OsdDuration);
+
+            // Test 4: Enter on txtOsdDuration supports comma as decimal separator ("1,5" -> 1.5)
+            window.txtOsdDuration.Text = "1,5";
+            PressEnter(window.txtOsdDuration);
+            Check.Equal("1.5", window.txtOsdDuration.Text.Replace(',', '.'));
+            Check.Equal(1.5, window.sliderOsdDuration.Value);
+            Check.Equal(1.5, SettingsManager.Load().OsdDuration);
+
+            // Test 5: Enter on txtSoundVolume clamps above maximum (120 -> 100)
+            window.txtSoundVolume.Text = "120";
+            PressEnter(window.txtSoundVolume);
+            Check.Equal("100", window.txtSoundVolume.Text);
+            Check.Equal(100.0, window.sliderSoundVolume.Value);
+            Check.Equal(100, SettingsManager.Load().SoundVolume);
+
+            // Test 6: Enter on txtSoundVolume clamps below minimum (-10 -> 0)
+            window.txtSoundVolume.Text = "-10";
+            PressEnter(window.txtSoundVolume);
+            Check.Equal("0", window.txtSoundVolume.Text);
+            Check.Equal(0.0, window.sliderSoundVolume.Value);
+            Check.Equal(0, SettingsManager.Load().SoundVolume);
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 }

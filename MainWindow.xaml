@@ -1290,13 +1290,15 @@
                                         IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
                                         ValueChanged="SliderOsdDuration_ValueChanged" />
-                                <Border Grid.Column="2"
-                                        Width="54" Height="24"
+                                <Border x:Name="borderOsdDurationKeycap"
+                                        Grid.Column="2"
+                                        Width="58" Height="24"
                                         Background="{DynamicResource KeycapBgBrush}"
                                         BorderBrush="{DynamicResource KeycapBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="6"
                                         Margin="8,0,0,0"
+                                        Cursor="IBeam"
                                         VerticalAlignment="Center">
                                     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <Grid.ColumnDefinitions>
@@ -1305,7 +1307,8 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="txtOsdDuration"
                                                  Grid.Column="0"
-                                                 Width="28"
+                                                 Width="34"
+                                                 MinWidth="32"
                                                  Text="0.3"
                                                  Background="Transparent"
                                                  Foreground="{DynamicResource TextWhiteBrush}"
@@ -1385,13 +1388,15 @@
                                         IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
                                         ValueChanged="SliderSoundVolume_ValueChanged" />
-                                <Border Grid.Column="2"
-                                        Width="54" Height="24"
+                                <Border x:Name="borderSoundVolumeKeycap"
+                                        Grid.Column="2"
+                                        Width="58" Height="24"
                                         Background="{DynamicResource KeycapBgBrush}"
                                         BorderBrush="{DynamicResource KeycapBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="6"
                                         Margin="8,0,0,0"
+                                        Cursor="IBeam"
                                         VerticalAlignment="Center">
                                     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <Grid.ColumnDefinitions>
@@ -1400,7 +1405,8 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="txtSoundVolume"
                                                  Grid.Column="0"
-                                                 Width="28"
+                                                 Width="34"
+                                                 MinWidth="32"
                                                  Text="100"
                                                  Background="Transparent"
                                                  Foreground="{DynamicResource TextWhiteBrush}"

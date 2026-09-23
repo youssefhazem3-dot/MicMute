@@ -45,7 +45,7 @@ public partial class OsdWindow : Window
     internal Grid pathActive = null!;
     internal Grid pathMuted = null!;
     internal TextBlock tbStatus = null!;
-    internal DropShadowEffect osdShadow = null!;
+    internal DropShadowEffect? osdShadow;
     internal System.Windows.Shapes.Path activeGlyph = null!;
     internal System.Windows.Shapes.Path mutedGlyph = null!;
     internal System.Windows.Shapes.Line muteSlash = null!;
@@ -140,7 +140,7 @@ public partial class OsdWindow : Window
                     muteSlash = (System.Windows.Shapes.Line)root.FindName("muteSlash");
                     if (borderPanel != null)
                     {
-                        osdShadow = (DropShadowEffect)borderPanel.Effect;
+                        osdShadow = borderPanel.Effect as DropShadowEffect;
                     }
 
                     var content = root.Content;
@@ -303,7 +303,7 @@ public partial class OsdWindow : Window
         activeGlyph.Fill = isLight ? BrushLightActive : BrushActiveText;
         mutedGlyph.Fill = isLight ? BrushLightMuted : BrushMutedText;
         muteSlash.Stroke = isLight ? BrushLightMuted : BrushMutedText;
-        osdShadow.Opacity = isLight ? 0.25 : 0.45;
+        if (osdShadow != null) osdShadow.Opacity = isLight ? 0.25 : 0.45;
         UpdateState(_isMuted);
     }
 
@@ -317,7 +317,7 @@ public partial class OsdWindow : Window
             tbStatus.Text = "MUTED";
             tbStatus.Foreground = _lightMode ? BrushLightMuted : BrushMutedText;
             borderPanel.BorderBrush = _lightMode ? BrushLightMuted : BrushMutedBorder;
-            osdShadow.Color = _lightMode ? BrushLightMuted.Color : ColorMutedBorder;
+            if (osdShadow != null) osdShadow.Color = _lightMode ? BrushLightMuted.Color : ColorMutedBorder;
         }
         else
         {
@@ -326,7 +326,7 @@ public partial class OsdWindow : Window
             tbStatus.Text = "ACTIVE";
             tbStatus.Foreground = _lightMode ? BrushLightActive : BrushActiveText;
             borderPanel.BorderBrush = _lightMode ? BrushLightActive : BrushActiveBorder;
-            osdShadow.Color = _lightMode ? BrushLightActive.Color : ColorActive;
+            if (osdShadow != null) osdShadow.Color = _lightMode ? BrushLightActive.Color : ColorActive;
         }
     }
 

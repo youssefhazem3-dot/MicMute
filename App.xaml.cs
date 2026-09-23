@@ -147,11 +147,11 @@ public partial class App : System.Windows.Application
             foreach (ToolStripItem item in Items)
             {
                 if (!item.Available) continue;
-                System.Drawing.Size textSize = TextRenderer.MeasureText(item.Text, Font, System.Drawing.Size.Empty, TextFormatFlags.SingleLine);
+                System.Drawing.Size textSize = TextRenderer.MeasureText(item.Text, Font, System.Drawing.Size.Empty, TextFormatFlags.NoPadding);
                 if (textSize.Width > maxWidth) maxWidth = textSize.Width;
                 totalHeight += 30;
             }
-            int width = Math.Max(156, maxWidth + 52 + Padding.Horizontal);
+            int width = maxWidth + 36 + 16;
             return new System.Drawing.Size(width, totalHeight);
         }
     }
@@ -199,18 +199,18 @@ public partial class App : System.Windows.Application
             int fontHeight = font?.Height ?? 17;
 
             // Render vector outline icon
-            int iconX = 14 - e.Item.Bounds.X;
+            int iconX = 12 - e.Item.Bounds.X;
             int iconY = (e.Item.Height - 16) / 2;
             RenderMenuIcon(e.Graphics, e.Item.Text, iconX, iconY, textColor);
 
-            int leftOnMenu = 38;
+            int leftOnMenu = 36;
             int x = leftOnMenu - e.Item.Bounds.X;
             int y = (e.Item.Height - fontHeight) / 2;
 
-            Rectangle textRect = new Rectangle(x, y, Math.Max(0, e.ToolStrip.ClientRectangle.Width - leftOnMenu - 8), fontHeight);
+            Rectangle textRect = new Rectangle(x, y, Math.Max(0, e.ToolStrip.ClientRectangle.Width - leftOnMenu - 4), fontHeight);
             if (font != null)
             {
-                TextRenderer.DrawText(e.Graphics, e.Text ?? string.Empty, font, textRect, textColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+                TextRenderer.DrawText(e.Graphics, e.Text ?? string.Empty, font, textRect, textColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
         }
 

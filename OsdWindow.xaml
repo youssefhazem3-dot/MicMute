@@ -16,17 +16,11 @@
         UseLayoutRounding="True">
     <Grid>
         <Border x:Name="borderPanel"
+                Margin="2"
                 Background="#E50F141C"
                 BorderBrush="#94A3B8"
                 BorderThickness="1.5"
-                CornerRadius="70">
-            <Border.Effect>
-                <DropShadowEffect x:Name="osdShadow"
-                                  BlurRadius="18"
-                                  ShadowDepth="0"
-                                  Opacity="0.45"
-                                  Color="#94A3B8" />
-            </Border.Effect>
+                CornerRadius="68">
             <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="64" Height="64">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <!-- Active Microphone Icon in Neutral White-Grey / Slate aesthetic Matching App Logo (app.ico) -->
