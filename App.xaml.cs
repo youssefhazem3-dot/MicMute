@@ -77,6 +77,7 @@ public partial class App : System.Windows.Application
             DoubleBuffered = true;
             ShowImageMargin = false;
             ShowCheckMargin = false;
+            CanOverflow = false;
             Padding = new Padding(3, 4, 3, 4);
         }
 
@@ -99,6 +100,12 @@ public partial class App : System.Windows.Application
         {
             base.OnLayout(e);
             ApplyWindowRounding();
+            int contentWidth = ClientRectangle.Width - Padding.Horizontal;
+            foreach (ToolStripItem item in Items)
+            {
+                if (!item.Available) continue;
+                item.Size = new System.Drawing.Size(contentWidth, 30);
+            }
         }
 
         private void ApplyWindowRounding()
@@ -131,18 +138,11 @@ public partial class App : System.Windows.Application
             foreach (ToolStripItem item in Items)
             {
                 if (!item.Available) continue;
-                if (item is ToolStripSeparator)
-                {
-                    totalHeight += 7;
-                }
-                else
-                {
-                    System.Drawing.Size textSize = TextRenderer.MeasureText(item.Text, Font, System.Drawing.Size.Empty, TextFormatFlags.SingleLine);
-                    if (textSize.Width > maxWidth) maxWidth = textSize.Width;
-                    totalHeight += 26;
-                }
+                System.Drawing.Size textSize = TextRenderer.MeasureText(item.Text, Font, System.Drawing.Size.Empty, TextFormatFlags.SingleLine);
+                if (textSize.Width > maxWidth) maxWidth = textSize.Width;
+                totalHeight += 30;
             }
-            int width = Math.Max(152, maxWidth + 28 + Padding.Horizontal);
+            int width = Math.Max(156, maxWidth + 52 + Padding.Horizontal);
             return new System.Drawing.Size(width, totalHeight);
         }
     }
@@ -158,7 +158,7 @@ public partial class App : System.Windows.Application
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
         {
             bool lightMode = SettingsManager.Load().LightMode;
-            Color bgColor = lightMode ? Color.FromArgb(250, 250, 252) : Color.FromArgb(24, 24, 27);
+            Color bgColor = lightMode ? Color.FromArgb(250, 250, 252) : Color.FromArgb(28, 28, 32);
             using SolidBrush brush = new SolidBrush(bgColor);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
@@ -170,7 +170,7 @@ public partial class App : System.Windows.Application
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
         {
             bool lightMode = SettingsManager.Load().LightMode;
-            Color borderColor = lightMode ? Color.FromArgb(228, 228, 231) : Color.FromArgb(46, 46, 52);
+            Color borderColor = lightMode ? Color.FromArgb(228, 228, 231) : Color.FromArgb(45, 255, 255, 255);
             using Pen pen = new Pen(borderColor, 1f);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
@@ -189,7 +189,12 @@ public partial class App : System.Windows.Application
             Font font = e.TextFont ?? e.Item.Font;
             int fontHeight = font?.Height ?? 17;
 
-            int leftOnMenu = 14;
+            // Render vector outline icon
+            int iconX = 14 - e.Item.Bounds.X;
+            int iconY = (e.Item.Height - 16) / 2;
+            RenderMenuIcon(e.Graphics, e.Item.Text, iconX, iconY, textColor);
+
+            int leftOnMenu = 38;
             int x = leftOnMenu - e.Item.Bounds.X;
             int y = (e.Item.Height - fontHeight) / 2;
 
@@ -197,6 +202,63 @@ public partial class App : System.Windows.Application
             if (font != null)
             {
                 TextRenderer.DrawText(e.Graphics, e.Text ?? string.Empty, font, textRect, textColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+            }
+        }
+
+        private static void RenderMenuIcon(Graphics g, string? text, int iconX, int iconY, Color color)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            using Pen pen = new Pen(color, 1.25f)
+            {
+                StartCap = LineCap.Round,
+                EndCap = LineCap.Round,
+                LineJoin = LineJoin.Round
+            };
+
+            if (text == "Toggle Mute")
+            {
+                // Microphone outline: condenser capsule, cradle, stem, base
+                RectangleF capRect = new RectangleF(iconX + 5.5f, iconY + 1.5f, 5f, 7.5f);
+                using GraphicsPath micCap = CreateRoundedRectanglePath(capRect, 2.5f);
+                g.DrawPath(pen, micCap);
+
+                RectangleF cradleRect = new RectangleF(iconX + 3f, iconY + 4f, 10f, 6.5f);
+                g.DrawArc(pen, cradleRect, 0f, 180f);
+
+                g.DrawLine(pen, iconX + 8f, iconY + 10.5f, iconX + 8f, iconY + 13.5f);
+                g.DrawLine(pen, iconX + 5.5f, iconY + 13.5f, iconX + 10.5f, iconY + 13.5f);
+            }
+            else if (text == "Open App")
+            {
+                // Window outline with diagonal pop-out arrow
+                RectangleF winRect = new RectangleF(iconX + 1.5f, iconY + 2f, 13f, 11.5f);
+                using GraphicsPath winPath = CreateRoundedRectanglePath(winRect, 1.75f);
+                g.DrawPath(pen, winPath);
+
+                g.DrawLine(pen, iconX + 1.5f, iconY + 5.5f, iconX + 14.5f, iconY + 5.5f);
+
+                // Pop-out arrow ↗
+                g.DrawLine(pen, iconX + 5.5f, iconY + 10.5f, iconX + 10f, iconY + 7.5f);
+                g.DrawLine(pen, iconX + 7.5f, iconY + 7.5f, iconX + 10f, iconY + 7.5f);
+                g.DrawLine(pen, iconX + 10f, iconY + 7.5f, iconX + 10f, iconY + 10f);
+            }
+            else if (text == "Quit")
+            {
+                // Exit / Door bracket with centered 'x'
+                using GraphicsPath quitPath = new GraphicsPath();
+                quitPath.AddLine(iconX + 9.5f, iconY + 2.5f, iconX + 5.5f, iconY + 2.5f);
+                quitPath.AddArc(iconX + 3f, iconY + 2.5f, 5f, 5f, 270f, -90f);
+                quitPath.AddLine(iconX + 3f, iconY + 5f, iconX + 3f, iconY + 11f);
+                quitPath.AddArc(iconX + 3f, iconY + 8.5f, 5f, 5f, 180f, -90f);
+                quitPath.AddLine(iconX + 5.5f, iconY + 13.5f, iconX + 9.5f, iconY + 13.5f);
+                g.DrawPath(pen, quitPath);
+
+                // 'x' mark centered at (iconX + 10.5f, iconY + 8f)
+                g.DrawLine(pen, iconX + 8.5f, iconY + 6.5f, iconX + 12.5f, iconY + 9.5f);
+                g.DrawLine(pen, iconX + 8.5f, iconY + 9.5f, iconX + 12.5f, iconY + 6.5f);
             }
         }
 
@@ -214,7 +276,7 @@ public partial class App : System.Windows.Application
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 bool lightMode = SettingsManager.Load().LightMode;
-                Color hoverColor = lightMode ? Color.FromArgb(232, 232, 237) : Color.FromArgb(44, 44, 50);
+                Color hoverColor = lightMode ? Color.FromArgb(232, 232, 237) : Color.FromArgb(25, 255, 255, 255);
                 using SolidBrush brush = new SolidBrush(hoverColor);
                 
                 int x1 = 4 - e.Item.Bounds.X;
@@ -470,23 +532,20 @@ public partial class App : System.Windows.Application
         ToolStripMenuItem value = new ToolStripMenuItem("Toggle Mute", null, delegate
         {
             _audioController?.ToggleMute();
-        }) { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 3, 0, 3) };
+        }) { AutoSize = false, Height = 30, Margin = new Padding(0), Padding = new Padding(0) };
 
-        ToolStripMenuItem value2 = new ToolStripMenuItem("Open Control Panel", null, delegate
+        ToolStripMenuItem value2 = new ToolStripMenuItem("Open App", null, delegate
         {
             ShowWindow();
-        }) { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 3, 0, 3) };
-
-        ToolStripSeparator separator = new ToolStripSeparator { Margin = new Padding(0, 2, 0, 2) };
+        }) { AutoSize = false, Height = 30, Margin = new Padding(0), Padding = new Padding(0) };
 
         ToolStripMenuItem value3 = new ToolStripMenuItem("Quit", null, delegate
         {
             ExitApp();
-        }) { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 3, 0, 3) };
+        }) { AutoSize = false, Height = 30, Margin = new Padding(0), Padding = new Padding(0) };
 
         contextMenuStrip.Items.Add(value);
         contextMenuStrip.Items.Add(value2);
-        contextMenuStrip.Items.Add(separator);
         contextMenuStrip.Items.Add(value3);
         _notifyIcon.ContextMenuStrip = contextMenuStrip;
         UpdateTrayIcon(_audioController?.IsMuted ?? false);
@@ -641,12 +700,6 @@ public partial class App : System.Windows.Application
         return path;
     }
 
-    private static void FillRoundedRectangle(Graphics g, Brush brush, float x, float y, float width, float height, float radius)
-    {
-        using GraphicsPath graphicsPath = CreateRoundedRectanglePath(new RectangleF(x, y, width, height), radius);
-        g.FillPath(brush, graphicsPath);
-    }
-
     private void AudioController_MuteStateChanged(object? sender, MuteStateChangedEventArgs e)
     {
         DiagnosticLogger.LogAudio($"Event: MuteStateChanged -> {(e.IsMuted ? "MUTED [Chill Red]" : "LIVE [Active]")}");
@@ -696,6 +749,11 @@ public partial class App : System.Windows.Application
             System.Windows.MessageBox.Show("Settings could not be saved. MicMute will stay open so you can retry.\n\n" + ex.Message, "Save settings");
             return;
         }
+        if (_mainWindow != null)
+        {
+            _mainWindow.Closing -= MainWindow_Closing;
+            try { _mainWindow.Close(); } catch { }
+        }
         Shutdown();
     }
 
@@ -715,6 +773,11 @@ public partial class App : System.Windows.Application
         {
             DestroyIcon(_currentHIcon);
             _currentHIcon = IntPtr.Zero;
+        }
+        if (_mainWindow != null)
+        {
+            _mainWindow.Closing -= MainWindow_Closing;
+            try { _mainWindow.Close(); } catch { }
         }
         _audioController?.Dispose();
         try

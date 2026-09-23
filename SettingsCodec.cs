@@ -56,7 +56,8 @@ public static class SettingsCodec
                 CustomDataPath = GetString(root, "CustomDataPath", defaults.CustomDataPath),
                 UsePortableMode = GetBoolean(root, "UsePortableMode", defaults.UsePortableMode),
                 RunAsAdmin = GetBoolean(root, "RunAsAdmin", defaults.RunAsAdmin),
-                PlaySoundFeedback = GetBoolean(root, "PlaySoundFeedback", defaults.PlaySoundFeedback)
+                PlaySoundFeedback = GetBoolean(root, "PlaySoundFeedback", defaults.PlaySoundFeedback),
+                SoundVolume = GetInt(root, "SoundVolume", defaults.SoundVolume)
             });
         }
         catch (JsonException)
@@ -70,6 +71,7 @@ public static class SettingsCodec
         ArgumentNullException.ThrowIfNull(settings);
         double duration = settings.OsdDuration;
         duration = !double.IsFinite(duration) ? 1.5 : Math.Clamp(duration, 0.1, 30.0);
+        int volume = Math.Clamp(settings.SoundVolume, 0, 100);
         return settings with
         {
             SelectedDeviceId = RepairEndpointId(settings.SelectedDeviceId ?? string.Empty),
@@ -79,7 +81,8 @@ public static class SettingsCodec
                 && KeyInterop.VirtualKeyFromKey(settings.Hotkey) is > 0 and < 255
                 ? settings.Hotkey : Key.F1,
             HotkeyModifiers = ((int)settings.HotkeyModifiers & ~15) == 0 ? settings.HotkeyModifiers : ModifierKeys.None,
-            OsdDuration = duration
+            OsdDuration = duration,
+            SoundVolume = volume
         };
     }
 
@@ -118,6 +121,16 @@ public static class SettingsCodec
         if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out double number)) return number;
         return value.ValueKind == JsonValueKind.String &&
                double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static int GetInt(JsonElement root, string property, int fallback)
+    {
+        if (!TryGetProperty(root, property, out JsonElement value)) return fallback;
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number)) return number;
+        return value.ValueKind == JsonValueKind.String &&
+               int.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
             ? parsed
             : fallback;
     }

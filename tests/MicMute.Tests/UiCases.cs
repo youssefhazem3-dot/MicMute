@@ -42,6 +42,13 @@ static class UiCases
         test(nameof(MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones), MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones);
         test(nameof(MainWindowCornersHaveNoClippedDropShadowArtifacts), MainWindowCornersHaveNoClippedDropShadowArtifacts);
         test(nameof(SettingsLocationOptionsArePlacedUnderHeaderInEvenRow), SettingsLocationOptionsArePlacedUnderHeaderInEvenRow);
+        test(nameof(MainWindowLaunchesAtExactCenterOfScreenAcrossResolutions), MainWindowLaunchesAtExactCenterOfScreenAcrossResolutions);
+        test(nameof(SoundVolumeSliderBoundsAndFormatting), SoundVolumeSliderBoundsAndFormatting);
+        test(nameof(AudioFeedbackVolumeScaling), AudioFeedbackVolumeScaling);
+        test(nameof(ToggleSwitchHoverTriggersOnKnobOnly), ToggleSwitchHoverTriggersOnKnobOnly);
+        test(nameof(SoundVolumeSliderDimmingReflectsSoundFeedbackToggle), SoundVolumeSliderDimmingReflectsSoundFeedbackToggle);
+        test(nameof(InputBoxesSupportEscapeKeyToRevertAndLoseFocus), InputBoxesSupportEscapeKeyToRevertAndLoseFocus);
+        test(nameof(OsdWindowTargetingAndTopmostPersistence), OsdWindowTargetingAndTopmostPersistence);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -51,13 +58,26 @@ static class UiCases
         Check.Equal(1.5, currentCulture);
         Check.True(UiBehavior.TryParseOsdDuration("1.5", french, out double invariant), "invariant decimal fallback should parse");
         Check.Equal(1.5, invariant);
+        Check.True(UiBehavior.TryParseOsdDuration("30sec", CultureInfo.InvariantCulture, out double secVal), "sec suffix should parse");
+        Check.Equal(30.0, secVal);
+        Check.True(UiBehavior.TryParseOsdDuration("30s", CultureInfo.InvariantCulture, out double sVal), "s suffix should parse");
+        Check.Equal(30.0, sVal);
+        Check.True(UiBehavior.TryParseOsdDuration("30 seconds", CultureInfo.InvariantCulture, out double secondsVal), "seconds suffix should parse");
+        Check.Equal(30.0, secondsVal);
     }
 
     private static void OsdSliderCoversEveryAcceptedDuration()
     {
         using var audio = new AudioController();
         var window = new MainWindow(audio);
-        try { Check.Equal(UiBehavior.MaximumOsdDuration, window.sliderOsdDuration.Maximum); }
+        try
+        {
+            Check.Equal(UiBehavior.MinimumOsdDuration, window.sliderOsdDuration.Minimum);
+            Check.Equal(UiBehavior.MaximumOsdDuration, window.sliderOsdDuration.Maximum);
+            Check.Equal(30.0, window.sliderOsdDuration.Maximum);
+            window.sliderOsdDuration.Value = 30.0;
+            Check.Equal(30.0, window.sliderOsdDuration.Value);
+        }
         finally { window.Close(); }
     }
 
@@ -311,7 +331,7 @@ static class UiCases
         var window = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(xaml);
         try
         {
-            foreach (string name in new[] { "btnStateToggle", "cbDevices", "cbStartMinimized", "txtOsdDuration", "btnResetData", "tbStoragePath", "contentScrollViewer" })
+            foreach (string name in new[] { "btnStateToggle", "cbDevices", "cbStartMinimized", "txtOsdDuration", "sliderSoundVolume", "txtSoundVolume", "btnResetData", "tbStoragePath", "contentScrollViewer" })
                 Check.True(window.FindName(name) != null, "missing named control: " + name);
             Check.True(window.FindName("contentScrollViewer") is System.Windows.Controls.ScrollViewer, "contentScrollViewer must be a ScrollViewer");
         }
@@ -582,25 +602,27 @@ static class UiCases
             menu.Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
         }
 
-        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 3, 0, 3) };
-        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open Control Panel") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 3, 0, 3) };
-        var sep = new System.Windows.Forms.ToolStripSeparator { Margin = new System.Windows.Forms.Padding(0, 2, 0, 2) };
-        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 3, 0, 3) };
+        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = false, Height = 30, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0) };
+        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = false, Height = 30, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0) };
+        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = false, Height = 30, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0) };
 
         menu.Items.Add(item1);
         menu.Items.Add(item2);
-        menu.Items.Add(sep);
         menu.Items.Add(item3);
 
         Check.True(!menu.ShowImageMargin, "ShowImageMargin must be false");
         Check.True(!menu.ShowCheckMargin, "ShowCheckMargin must be false");
         Check.True(menu.Renderer is App.LiquidGlassMenuRenderer, "Renderer must be LiquidGlassMenuRenderer");
+        Check.Equal(3, menu.Items.Count);
+        Check.Equal("Toggle Mute", menu.Items[0].Text);
+        Check.Equal("Open App", menu.Items[1].Text);
+        Check.Equal("Quit", menu.Items[2].Text);
 
         var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
         // Compact width: should comfortably fit the items without excessive empty gap (between 145 and 180)
         Check.True(preferredSize.Width >= 145 && preferredSize.Width <= 180, $"Menu preferred width {preferredSize.Width} must be compact");
-        // Compact height: 3 items + separator + padding should be under 105px (previously bloated to >135px)
-        Check.True(preferredSize.Height >= 70 && preferredSize.Height <= 105, $"Menu preferred height {preferredSize.Height} must be compact and under 105px");
+        // Compact height: 3 items (30px each) + padding should be between 85px and 105px (previously bloated to >135px)
+        Check.True(preferredSize.Height >= 85 && preferredSize.Height <= 105, $"Menu preferred height {preferredSize.Height} must be compact and under 105px");
     }
 
     private static void MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones()
@@ -629,6 +651,23 @@ static class UiCases
         Check.True(mwXaml.Contains("#FFEF4444"), "MainWindow.xaml must use standard UI red #FFEF4444");
         Check.True(mwXaml.Contains("#FFF87171"), "MainWindow.xaml must use standard UI red highlight #FFF87171");
         Check.True(osdXaml.Contains("#F87171"), "OsdWindow.xaml must use standard UI red #F87171");
+
+        // Assert OsdWindow runtime brushes use standard UI red and not legacy muddy crimson
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static;
+        var lightMutedField = typeof(OsdWindow).GetField("BrushLightMuted", flags);
+        Check.True(lightMutedField != null, "BrushLightMuted field must exist on OsdWindow");
+        var lightMuted = (System.Windows.Media.SolidColorBrush)lightMutedField!.GetValue(null)!;
+        Check.Equal(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26), lightMuted.Color, "BrushLightMuted must be #DC2626");
+
+        var mutedBorderField = typeof(OsdWindow).GetField("BrushMutedBorder", flags);
+        Check.True(mutedBorderField != null, "BrushMutedBorder field must exist on OsdWindow");
+        var mutedBorder = (System.Windows.Media.SolidColorBrush)mutedBorderField!.GetValue(null)!;
+        Check.Equal(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26), mutedBorder.Color, "BrushMutedBorder must be #DC2626");
+
+        var mutedTextField = typeof(OsdWindow).GetField("BrushMutedText", flags);
+        Check.True(mutedTextField != null, "BrushMutedText field must exist on OsdWindow");
+        var mutedText = (System.Windows.Media.SolidColorBrush)mutedTextField!.GetValue(null)!;
+        Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedText.Color, "BrushMutedText must be #F87171");
     }
 
     private static void MainWindowCornersHaveNoClippedDropShadowArtifacts()
@@ -676,5 +715,343 @@ static class UiCases
         // 3. Verify all 3 buttons are in a grid with even spacing (* columns and 8px gaps)
         Check.True(rawXaml.Contains(@"<ColumnDefinition Width=""*"" />"), "Must contain * width columns for buttons");
         Check.True(rawXaml.Contains(@"<ColumnDefinition Width=""8"" />"), "Must contain even 8px gaps between buttons");
+    }
+
+    private static void MainWindowLaunchesAtExactCenterOfScreenAcrossResolutions()
+    {
+        // 1. Theoretical centering calculations across common resolutions
+        // 1080p (1920x1080, 48px taskbar -> 1032 work area)
+        var wa1080p = new DipRect(0, 0, 1920, 1032);
+        var bounds1080p = UiBehavior.CalculateCenteredWindowBounds(wa1080p, 412, 849);
+        Check.Equal(412.0, bounds1080p.Width);
+        Check.Equal(849.0, bounds1080p.Height);
+        Check.Equal(754.0, bounds1080p.Left);
+        Check.Equal(91.5, bounds1080p.Top);
+        double topSpace1080 = bounds1080p.Top - wa1080p.Top;
+        double bottomSpace1080 = (wa1080p.Top + wa1080p.Height) - (bounds1080p.Top + bounds1080p.Height);
+        Check.Equal(topSpace1080, bottomSpace1080, "1080p top and bottom margins must be identical");
+
+        // 1440p (2560x1440, 48px taskbar -> 1392 work area)
+        var wa1440p = new DipRect(0, 0, 2560, 1392);
+        var bounds1440p = UiBehavior.CalculateCenteredWindowBounds(wa1440p, 412, 849);
+        Check.Equal(1074.0, bounds1440p.Left);
+        Check.Equal(271.5, bounds1440p.Top);
+        double topSpace1440 = bounds1440p.Top - wa1440p.Top;
+        double bottomSpace1440 = (wa1440p.Top + wa1440p.Height) - (bounds1440p.Top + bounds1440p.Height);
+        Check.Equal(topSpace1440, bottomSpace1440, "1440p top and bottom margins must be identical");
+
+        // 4K (3840x2160, 48px taskbar -> 2112 work area)
+        var wa4K = new DipRect(0, 0, 3840, 2112);
+        var bounds4K = UiBehavior.CalculateCenteredWindowBounds(wa4K, 412, 849);
+        Check.Equal(1714.0, bounds4K.Left);
+        Check.Equal(631.5, bounds4K.Top);
+        double topSpace4K = bounds4K.Top - wa4K.Top;
+        double bottomSpace4K = (wa4K.Top + wa4K.Height) - (bounds4K.Top + bounds4K.Height);
+        Check.Equal(topSpace4K, bottomSpace4K, "4K top and bottom margins must be identical");
+
+        // Offset multi-monitor work area (e.g. secondary monitor at X: 1920, Y: 60, Size: 1920x1020)
+        var waSecondary = new DipRect(1920, 60, 1920, 1020);
+        var boundsSecondary = UiBehavior.CalculateCenteredWindowBounds(waSecondary, 412, 849);
+        Check.Equal(1920.0 + 754.0, boundsSecondary.Left);
+        double topSpaceSec = boundsSecondary.Top - waSecondary.Top;
+        double bottomSpaceSec = (waSecondary.Top + waSecondary.Height) - (boundsSecondary.Top + boundsSecondary.Height);
+        Check.Equal(topSpaceSec, bottomSpaceSec, "Secondary monitor top and bottom margins must be identical");
+
+        // 2. Real window instantiation and rendering test
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            var primary = System.Windows.Forms.Screen.PrimaryScreen;
+            double scaleX = 1.0, scaleY = 1.0;
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(window);
+            if (dpi.DpiScaleX > 0) scaleX = dpi.DpiScaleX;
+            if (dpi.DpiScaleY > 0) scaleY = dpi.DpiScaleY;
+
+            double workLeft = (primary?.WorkingArea.Left ?? 0) / scaleX;
+            double workTop = (primary?.WorkingArea.Top ?? 0) / scaleY;
+            double workWidth = (primary?.WorkingArea.Width ?? 1920) / scaleX;
+            double workHeight = (primary?.WorkingArea.Height ?? 1032) / scaleY;
+            var currentWorkArea = new DipRect(workLeft, workTop, workWidth, workHeight);
+
+            // On initialization before Show, window must already be centered, not pinned to top
+            if (workHeight > 750)
+            {
+                Check.True(window.Top > 20.0, $"Window Top ({window.Top}) must not be stuck at top (12px) on workHeight {workHeight}");
+            }
+
+            // Show window and verify final rendered centering
+            window.Show();
+            window.UpdateLayout();
+
+            double topMargin = window.Top - currentWorkArea.Top;
+            double bottomMargin = (currentWorkArea.Top + currentWorkArea.Height) - (window.Top + window.ActualHeight);
+            Check.True(Math.Abs(topMargin - bottomMargin) <= 2.0,
+                $"Window must be vertically centered: topMargin={topMargin}, bottomMargin={bottomMargin}");
+
+            double leftMargin = window.Left - currentWorkArea.Left;
+            double rightMargin = (currentWorkArea.Left + currentWorkArea.Width) - (window.Left + window.ActualWidth);
+            Check.True(Math.Abs(leftMargin - rightMargin) <= 2.0,
+                $"Window must be horizontally centered: leftMargin={leftMargin}, rightMargin={rightMargin}");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void SoundVolumeSliderBoundsAndFormatting()
+    {
+        // 1. Check constants
+        Check.Equal(0, UiBehavior.MinimumSoundVolume);
+        Check.Equal(100, UiBehavior.MaximumSoundVolume);
+        Check.Equal(100, UiBehavior.DefaultSoundVolume);
+
+        // 2. Formatting
+        Check.Equal("100", UiBehavior.FormatSoundVolume(100));
+        Check.Equal("50", UiBehavior.FormatSoundVolume(50));
+        Check.Equal("0", UiBehavior.FormatSoundVolume(0));
+        Check.Equal("0", UiBehavior.FormatSoundVolume(-10));
+        Check.Equal("100", UiBehavior.FormatSoundVolume(120));
+
+        // 3. Parsing
+        Check.True(UiBehavior.TryParseSoundVolume("100", out int v1) && v1 == 100);
+        Check.True(UiBehavior.TryParseSoundVolume("50", out int v2) && v2 == 50);
+        Check.True(UiBehavior.TryParseSoundVolume("0", out int v3) && v3 == 0);
+        Check.True(UiBehavior.TryParseSoundVolume(" 75% ", out int v4) && v4 == 75);
+        Check.True(UiBehavior.TryParseSoundVolume("25 %", out int v5) && v5 == 25);
+        Check.True(!UiBehavior.TryParseSoundVolume("-5", out _));
+        Check.True(!UiBehavior.TryParseSoundVolume("105", out _));
+        Check.True(!UiBehavior.TryParseSoundVolume("abc", out _));
+        Check.True(!UiBehavior.TryParseSoundVolume("", out _));
+        Check.True(!UiBehavior.TryParseSoundVolume("   ", out _));
+
+        // 4. Verify slider control bindings from embedded XAML
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string xaml = System.Text.RegularExpressions.Regex.Replace(reader.ReadToEnd(), @"\s+x:Class=""[^""]+""", "");
+        xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
+        var window = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(xaml);
+        try
+        {
+            var slider = window.FindName("sliderSoundVolume") as System.Windows.Controls.Slider;
+            Check.True(slider != null, "sliderSoundVolume must exist");
+            Check.Equal(0.0, slider!.Minimum);
+            Check.Equal(100.0, slider.Maximum);
+            Check.True(slider.IsSnapToTickEnabled);
+            Check.Equal(1.0, slider.TickFrequency);
+
+            var txt = window.FindName("txtSoundVolume") as System.Windows.Controls.TextBox;
+            Check.True(txt != null, "txtSoundVolume must exist");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void AudioFeedbackVolumeScaling()
+    {
+        AudioFeedback.Initialize();
+        AudioFeedback.SetVolume(75);
+        Check.Equal(75, AudioFeedback.CurrentVolume);
+
+        AudioFeedback.SetVolume(0);
+        Check.Equal(0, AudioFeedback.CurrentVolume);
+
+        // Verify Play at 0% does not throw and skips execution
+        AudioFeedback.Play(isMuted: true);
+        AudioFeedback.Play(isMuted: false);
+
+        // Verify ScaleWavVolume scales PCM samples linearly
+        byte[] testPcmWav = AudioFeedback.SynthesizeDiscordChimeBytes(isMuted: true, volume: 1.0);
+        byte[] halfPcmWav = AudioFeedback.ScaleWavVolume(testPcmWav, 0.5f);
+        byte[] zeroPcmWav = AudioFeedback.ScaleWavVolume(testPcmWav, 0.0f);
+
+        Check.True(testPcmWav.Length == halfPcmWav.Length, "WAV length must be preserved");
+        Check.True(testPcmWav.Length == zeroPcmWav.Length, "WAV length must be preserved");
+
+        // Verify maximum amplitude of halfPcm is roughly half of testPcm
+        short maxTest = 0;
+        short maxHalf = 0;
+        for (int i = 44; i + 1 < testPcmWav.Length; i += 2)
+        {
+            short s1 = Math.Abs(BitConverter.ToInt16(testPcmWav, i));
+            short s2 = Math.Abs(BitConverter.ToInt16(halfPcmWav, i));
+            if (s1 > maxTest) maxTest = s1;
+            if (s2 > maxHalf) maxHalf = s2;
+        }
+        Check.True(maxTest > 5000, "original chime must have audible amplitude");
+        Check.True(Math.Abs(maxHalf - (maxTest / 2)) < 50, "50% volume must scale samples to half");
+
+        // Verify zeroPcm is completely silent
+        short maxZero = 0;
+        for (int i = 44; i + 1 < zeroPcmWav.Length; i += 2)
+        {
+            short s0 = Math.Abs(BitConverter.ToInt16(zeroPcmWav, i));
+            if (s0 > maxZero) maxZero = s0;
+        }
+        Check.Equal((short)0, maxZero);
+
+        // Reset volume to 100%
+        AudioFeedback.SetVolume(100);
+        Check.Equal(100, AudioFeedback.CurrentVolume);
+    }
+
+    private static void ToggleSwitchHoverTriggersOnKnobOnly()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            var style = (System.Windows.Style)window.FindResource("ToggleSwitchStyle");
+            Check.True(style != null, "ToggleSwitchStyle must exist in resources");
+
+            foreach (var setter in style!.Setters)
+            {
+                if (setter is System.Windows.Setter s && s.Property == System.Windows.FrameworkElement.CursorProperty)
+                {
+                    Check.True(false, "ToggleSwitchStyle should not force Cursor=Hand across the entire button");
+                }
+            }
+
+            var template = window.cbEnableOsd.Template;
+            Check.True(template != null, "ToggleSwitchStyle must have a ControlTemplate");
+
+            bool foundKnobHoverTrigger = false;
+            bool foundRootHoverTrigger = false;
+            foreach (var triggerBase in template!.Triggers)
+            {
+                if (triggerBase is System.Windows.Trigger trigger &&
+                    trigger.Property == System.Windows.UIElement.IsMouseOverProperty)
+                {
+                    if (trigger.SourceName == "knob")
+                    {
+                        foundKnobHoverTrigger = true;
+                    }
+                    else if (string.IsNullOrEmpty(trigger.SourceName))
+                    {
+                        foundRootHoverTrigger = true;
+                    }
+                }
+            }
+
+            Check.True(foundKnobHoverTrigger, "ToggleSwitchStyle hover trigger must target the knob element");
+            Check.True(!foundRootHoverTrigger, "ToggleSwitchStyle must not trigger hover on the entire root CheckBox");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void SoundVolumeSliderDimmingReflectsSoundFeedbackToggle()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.panelSoundVolume != null, "panelSoundVolume must be bound");
+
+            // Enabled state
+            window.cbSoundFeedback.IsChecked = true;
+            Check.True(window.panelSoundVolume!.IsEnabled, "panelSoundVolume must be enabled when SoundFeedback is checked");
+            Check.Equal(1.0, window.panelSoundVolume.Opacity, "panelSoundVolume opacity must be 1.0 when enabled");
+
+            // Disabled state
+            window.cbSoundFeedback.IsChecked = false;
+            Check.True(!window.panelSoundVolume.IsEnabled, "panelSoundVolume must be disabled when SoundFeedback is unchecked");
+            Check.Equal(0.45, window.panelSoundVolume.Opacity, "panelSoundVolume opacity must be 0.45 when dimmed");
+
+            // Re-enabled state
+            window.cbSoundFeedback.IsChecked = true;
+            Check.True(window.panelSoundVolume.IsEnabled, "panelSoundVolume must re-enable when SoundFeedback is checked");
+            Check.Equal(1.0, window.panelSoundVolume.Opacity, "panelSoundVolume opacity must restore to 1.0");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void InputBoxesSupportEscapeKeyToRevertAndLoseFocus()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            var initialSettings = SettingsManager.Load();
+
+            // Test txtOsdDuration Escape handling
+            window.txtOsdDuration.Text = "99";
+            var source = System.Windows.PresentationSource.FromVisual(window) ?? new System.Windows.Interop.HwndSource(0, 0, 0, 0, 0, "", IntPtr.Zero);
+            var escOsd = new System.Windows.Input.KeyEventArgs(
+                System.Windows.Input.Keyboard.PrimaryDevice,
+                source,
+                0,
+                System.Windows.Input.Key.Escape)
+            {
+                RoutedEvent = System.Windows.UIElement.KeyDownEvent
+            };
+            window.txtOsdDuration.RaiseEvent(escOsd);
+            Check.Equal(UiBehavior.FormatOsdDuration(initialSettings.OsdDuration, CultureInfo.CurrentCulture), window.txtOsdDuration.Text);
+
+            // Test txtSoundVolume Escape handling
+            window.txtSoundVolume.Text = "99";
+            var escVol = new System.Windows.Input.KeyEventArgs(
+                System.Windows.Input.Keyboard.PrimaryDevice,
+                source,
+                0,
+                System.Windows.Input.Key.Escape)
+            {
+                RoutedEvent = System.Windows.UIElement.KeyDownEvent
+            };
+            window.txtSoundVolume.RaiseEvent(escVol);
+            Check.Equal(UiBehavior.FormatSoundVolume(initialSettings.SoundVolume), window.txtSoundVolume.Text);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void OsdWindowTargetingAndTopmostPersistence()
+    {
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static;
+        var swpFrameChanged = typeof(OsdWindow).GetField("SWP_FRAMECHANGED", flags);
+        Check.True(swpFrameChanged != null, "SWP_FRAMECHANGED must be defined");
+        Check.Equal((uint)0x0020, (uint)swpFrameChanged!.GetValue(null)!);
+
+        var swpNoOwnerZOrder = typeof(OsdWindow).GetField("SWP_NOOWNERZORDER", flags);
+        Check.True(swpNoOwnerZOrder != null, "SWP_NOOWNERZORDER must be defined");
+        Check.Equal((uint)0x0200, (uint)swpNoOwnerZOrder!.GetValue(null)!);
+
+        var getFgMethod = typeof(OsdWindow).GetMethod("GetForegroundWindow", flags);
+        Check.True(getFgMethod != null, "GetForegroundWindow P/Invoke must be defined on OsdWindow");
+
+        var window = new OsdWindow();
+        try
+        {
+            Check.True(window.Topmost, "OsdWindow must be configured as Topmost");
+            Check.True(!window.ShowActivated, "OsdWindow must not show activated so games keep focus");
+            Check.Equal(System.Windows.WindowStartupLocation.Manual, window.WindowStartupLocation);
+
+            IntPtr handle = new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+            Check.True(handle != IntPtr.Zero, "OsdWindow handle must be valid");
+
+            var positionMethod = typeof(OsdWindow).GetMethod("PositionOnActiveScreen", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Check.True(positionMethod != null, "PositionOnActiveScreen must exist");
+            positionMethod!.Invoke(window, new object[] { handle });
+
+            Check.True(!double.IsNaN(window.Left), "window.Left must be synchronized with DIP coordinates (not NaN)");
+            Check.True(!double.IsNaN(window.Top), "window.Top must be synchronized with DIP coordinates (not NaN)");
+            Check.True(double.IsFinite(window.Left), "window.Left must be finite");
+            Check.True(double.IsFinite(window.Top), "window.Top must be finite");
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 }

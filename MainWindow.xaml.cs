@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private bool _isUpdatingDeviceList;
     private bool _isInitialized;
     private bool _isUpdatingOsdTextFromSlider;
+    private bool _isUpdatingSoundVolumeTextFromSlider;
     private bool _contentLoaded;
     private bool _isReloadingSettings;
     private bool _isDisposed;
@@ -33,6 +34,9 @@ public partial class MainWindow : Window
     private readonly DispatcherDebouncer _statusDebouncer;
     private readonly LatestRefreshCoordinator<List<AudioDevice>> _deviceRefreshCoordinator;
     private readonly double _preferredWidth;
+    private bool _hasInitialCentered;
+    private double? _osdDurationBeforeEdit;
+    private int? _soundVolumeBeforeEdit;
 
     internal System.Windows.Controls.Button btnStateToggle = null!;
     internal TextBlock tbStatusText = null!;
@@ -40,8 +44,6 @@ public partial class MainWindow : Window
     internal Border? borderStatusCapsule;
     internal System.Windows.Shapes.Ellipse? dotStatus;
     internal DropShadowEffect? dotGlow;
-    internal System.Windows.Controls.Button? btnHeroHotkey;
-    internal TextBlock? tbHeroHotkey;
     internal System.Windows.Controls.Button? btnTitleTheme;
     internal System.Windows.Shapes.Path? pathTitleTheme;
     internal System.Windows.Shapes.Path? titleBarIcon;
@@ -49,12 +51,14 @@ public partial class MainWindow : Window
     internal System.Windows.Controls.Button? btnCls;
     internal System.Windows.Controls.ComboBox cbDevices = null!;
     internal Border borderHotkey = null!;
-    internal DropShadowEffect glowHotkey = null!;
     internal TextBlock tbHotkey = null!;
     internal System.Windows.Controls.Button btnRecordHotkey = null!;
     internal System.Windows.Controls.CheckBox cbEnableOsd = null!;
     internal Slider sliderOsdDuration = null!;
     internal System.Windows.Controls.TextBox txtOsdDuration = null!;
+    internal Grid? panelSoundVolume;
+    internal Slider sliderSoundVolume = null!;
+    internal System.Windows.Controls.TextBox txtSoundVolume = null!;
     internal System.Windows.Controls.CheckBox cbStartup = null!;
     internal System.Windows.Controls.CheckBox cbStartMinimized = null!;
     internal System.Windows.Controls.CheckBox cbLightMode = null!;
@@ -165,25 +169,35 @@ public partial class MainWindow : Window
             dotGlow = root.FindName("dotGlow") as DropShadowEffect;
             statusGlow = (DropShadowEffect)root.FindName("statusGlow") ?? dotGlow!;
             borderStatusCapsule = root.FindName("borderStatusCapsule") as Border;
-            btnHeroHotkey = root.FindName("btnHeroHotkey") as System.Windows.Controls.Button;
-            tbHeroHotkey = root.FindName("tbHeroHotkey") as TextBlock;
             btnTitleTheme = root.FindName("btnTitleTheme") as System.Windows.Controls.Button;
             pathTitleTheme = root.FindName("pathTitleTheme") as System.Windows.Shapes.Path;
             titleBarIcon = root.FindName("titleBarIcon") as System.Windows.Shapes.Path;
 
             cbDevices = (System.Windows.Controls.ComboBox)root.FindName("cbDevices");
             borderHotkey = (Border)root.FindName("borderHotkey");
-            glowHotkey = (DropShadowEffect)root.FindName("glowHotkey");
             tbHotkey = (TextBlock)root.FindName("tbHotkey");
             btnRecordHotkey = (System.Windows.Controls.Button)root.FindName("btnRecordHotkey");
             cbEnableOsd = (System.Windows.Controls.CheckBox)root.FindName("cbEnableOsd");
             sliderOsdDuration = (Slider)root.FindName("sliderOsdDuration");
+            if (sliderOsdDuration != null)
+            {
+                sliderOsdDuration.Minimum = UiBehavior.MinimumOsdDuration;
+                sliderOsdDuration.Maximum = UiBehavior.MaximumOsdDuration;
+            }
             txtOsdDuration = (System.Windows.Controls.TextBox)root.FindName("txtOsdDuration");
             cbStartup = (System.Windows.Controls.CheckBox)root.FindName("cbStartup");
             cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
             cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
             cbRunAsAdmin = (System.Windows.Controls.CheckBox)root.FindName("cbRunAsAdmin");
             cbSoundFeedback = (System.Windows.Controls.CheckBox)root.FindName("cbSoundFeedback");
+            panelSoundVolume = root.FindName("panelSoundVolume") as Grid;
+            sliderSoundVolume = (Slider)root.FindName("sliderSoundVolume");
+            if (sliderSoundVolume != null)
+            {
+                sliderSoundVolume.Minimum = UiBehavior.MinimumSoundVolume;
+                sliderSoundVolume.Maximum = UiBehavior.MaximumSoundVolume;
+            }
+            txtSoundVolume = (System.Windows.Controls.TextBox)root.FindName("txtSoundVolume");
             tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
             borderWarning = (Border)root.FindName("borderWarning");
             tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
@@ -242,6 +256,7 @@ public partial class MainWindow : Window
         if (sliderOsdDuration != null) sliderOsdDuration.ValueChanged += SliderOsdDuration_ValueChanged;
         if (txtOsdDuration != null)
         {
+            txtOsdDuration.GotFocus += (s, e) => _osdDurationBeforeEdit = SettingsManager.Load().OsdDuration;
             txtOsdDuration.LostFocus += TxtOsdDuration_LostFocus;
             txtOsdDuration.KeyDown += TxtOsdDuration_KeyDown;
             txtOsdDuration.TextChanged += TxtOsdDuration_TextChanged;
@@ -271,6 +286,14 @@ public partial class MainWindow : Window
             cbSoundFeedback.Checked += CbSoundFeedback_Checked;
             cbSoundFeedback.Unchecked += CbSoundFeedback_Unchecked;
         }
+        if (sliderSoundVolume != null) sliderSoundVolume.ValueChanged += SliderSoundVolume_ValueChanged;
+        if (txtSoundVolume != null)
+        {
+            txtSoundVolume.GotFocus += (s, e) => _soundVolumeBeforeEdit = SettingsManager.Load().SoundVolume;
+            txtSoundVolume.LostFocus += TxtSoundVolume_LostFocus;
+            txtSoundVolume.KeyDown += TxtSoundVolume_KeyDown;
+            txtSoundVolume.TextChanged += TxtSoundVolume_TextChanged;
+        }
         if (cbDevices != null && contentScrollViewer != null)
         {
             cbDevices.PreviewMouseWheel += (s, e) =>
@@ -292,6 +315,22 @@ public partial class MainWindow : Window
             sliderOsdDuration.PreviewMouseWheel += (s, e) =>
             {
                 if (!sliderOsdDuration.IsFocused)
+                {
+                    e.Handled = true;
+                    var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+                    {
+                        RoutedEvent = UIElement.MouseWheelEvent,
+                        Source = s
+                    };
+                    contentScrollViewer.RaiseEvent(eventArg);
+                }
+            };
+        }
+        if (sliderSoundVolume != null && contentScrollViewer != null)
+        {
+            sliderSoundVolume.PreviewMouseWheel += (s, e) =>
+            {
+                if (!sliderSoundVolume.IsFocused)
                 {
                     e.Handled = true;
                     var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
@@ -342,6 +381,8 @@ public partial class MainWindow : Window
             && root.FindName("cbLightMode") is System.Windows.Controls.CheckBox
             && root.FindName("cbRunAsAdmin") is System.Windows.Controls.CheckBox
             && root.FindName("cbSoundFeedback") is System.Windows.Controls.CheckBox
+            && root.FindName("sliderSoundVolume") is Slider
+            && root.FindName("txtSoundVolume") is System.Windows.Controls.TextBox
             && root.FindName("tbStoragePath") is TextBlock
             && root.FindName("borderWarning") is Border
             && root.FindName("tbWarningMessage") is TextBlock
@@ -413,9 +454,25 @@ public partial class MainWindow : Window
             if (screen == null) return;
 
             DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
             double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+            double workLeft = screen.WorkingArea.Left / scaleX;
             double workTop = screen.WorkingArea.Top / scaleY;
+            double workWidth = screen.WorkingArea.Width / scaleX;
             double workHeight = screen.WorkingArea.Height / scaleY;
+
+            if (!_hasInitialCentered && this.ActualHeight > 0)
+            {
+                _hasInitialCentered = true;
+                var centered = UiBehavior.CalculateCenteredWindowBounds(
+                    new DipRect(workLeft, workTop, workWidth, workHeight),
+                    this.ActualWidth > 0 ? this.ActualWidth : _preferredWidth,
+                    this.ActualHeight,
+                    UiBehavior.DefaultAdaptiveVerticalMargin);
+                this.Left = centered.Left;
+                this.Top = centered.Top;
+                return;
+            }
 
             double halfMargin = UiBehavior.DefaultAdaptiveVerticalMargin / 2.0;
             double maxTop = workTop + workHeight - this.ActualHeight - halfMargin;
@@ -477,7 +534,12 @@ public partial class MainWindow : Window
             cbStartup.IsChecked = appSettings.RunOnStartup;
             cbStartMinimized.IsChecked = appSettings.StartMinimized;
             cbEnableOsd.IsChecked = appSettings.EnableOsd;
-            sliderOsdDuration.Value = appSettings.OsdDuration;
+            if (sliderOsdDuration != null)
+            {
+                sliderOsdDuration.Minimum = UiBehavior.MinimumOsdDuration;
+                sliderOsdDuration.Maximum = UiBehavior.MaximumOsdDuration;
+                sliderOsdDuration.Value = appSettings.OsdDuration;
+            }
             txtOsdDuration.Text = UiBehavior.FormatOsdDuration(appSettings.OsdDuration, CultureInfo.CurrentCulture);
             cbLightMode.IsChecked = appSettings.LightMode;
             if (cbRunAsAdmin != null)
@@ -488,6 +550,18 @@ public partial class MainWindow : Window
             {
                 cbSoundFeedback.IsChecked = appSettings.PlaySoundFeedback;
             }
+            if (sliderSoundVolume != null)
+            {
+                sliderSoundVolume.Minimum = UiBehavior.MinimumSoundVolume;
+                sliderSoundVolume.Maximum = UiBehavior.MaximumSoundVolume;
+                sliderSoundVolume.Value = appSettings.SoundVolume;
+            }
+            if (txtSoundVolume != null)
+            {
+                txtSoundVolume.Text = UiBehavior.FormatSoundVolume(appSettings.SoundVolume);
+            }
+            UpdateSoundVolumeUiState(appSettings.PlaySoundFeedback);
+            AudioFeedback.SetVolume(appSettings.SoundVolume);
             SetLightMode(appSettings.LightMode);
             DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
             tbStoragePath.Text = SettingsManager.GetDataFolderPath();
@@ -555,13 +629,17 @@ public partial class MainWindow : Window
         double currentWidth = _preferredWidth;
         if (isInitialPlacement)
         {
-            Measure(new System.Windows.Size(Math.Min(currentWidth, workArea.Width), maxAllowedHeight));
-            double desiredHeight = DesiredSize.Height > 0 ? DesiredSize.Height : maxAllowedHeight;
+            var contentElement = Content as UIElement;
+            contentElement?.Measure(new System.Windows.Size(Math.Min(currentWidth, workArea.Width), maxAllowedHeight));
+            double desiredHeight = contentElement != null && contentElement.DesiredSize.Height > 0
+                ? contentElement.DesiredSize.Height
+                : (ActualHeight > 0 ? ActualHeight : maxAllowedHeight);
             var centered = UiBehavior.CalculateCenteredWindowBounds(
                 workArea, currentWidth, Math.Min(desiredHeight, maxAllowedHeight), UiBehavior.DefaultAdaptiveVerticalMargin);
             Width = centered.Width;
             Left = centered.Left;
             Top = centered.Top;
+            _hasInitialCentered = ActualHeight > 0;
         }
         else
         {
@@ -781,11 +859,6 @@ public partial class MainWindow : Window
         btnRecordHotkey.Content = "Cancel";
         tbHotkey.Text = "Press keys...";
         tbHotkey.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
-        if (tbHeroHotkey != null)
-        {
-            tbHeroHotkey.Text = "Press keys...";
-            tbHeroHotkey.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
-        }
         PreviewKeyDown += MainWindow_PreviewKeyDown;
     }
 
@@ -850,7 +923,6 @@ public partial class MainWindow : Window
         {
             string modifierText = FormatHotkeyText(Key.None, modifiers);
             tbHotkey.Text = modifierText;
-            if (tbHeroHotkey != null) tbHeroHotkey.Text = modifierText;
         }
         else if (key == Key.Tab || key == Key.Enter || key == Key.Space || key == Key.Back || key == Key.Capital)
         {
@@ -883,11 +955,6 @@ public partial class MainWindow : Window
         {
             tbHotkey.Text = hotkeyText;
             tbHotkey.SetResourceReference(TextBlock.ForegroundProperty, "KeycapTextBrush");
-        }
-        if (tbHeroHotkey != null)
-        {
-            tbHeroHotkey.Text = hotkeyText;
-            tbHeroHotkey.SetResourceReference(TextBlock.ForegroundProperty, "KeycapTextBrush");
         }
     }
 
@@ -1076,12 +1143,23 @@ public partial class MainWindow : Window
     {
         if (!_isInitialized || _isReloadingSettings) return;
         SettingsManager.Save(SettingsManager.Load() with { PlaySoundFeedback = true });
+        UpdateSoundVolumeUiState(true);
     }
 
     private void CbSoundFeedback_Unchecked(object sender, RoutedEventArgs e)
     {
         if (!_isInitialized || _isReloadingSettings) return;
         SettingsManager.Save(SettingsManager.Load() with { PlaySoundFeedback = false });
+        UpdateSoundVolumeUiState(false);
+    }
+
+    private void UpdateSoundVolumeUiState(bool soundFeedbackEnabled)
+    {
+        if (panelSoundVolume != null)
+        {
+            panelSoundVolume.IsEnabled = soundFeedbackEnabled;
+            panelSoundVolume.Opacity = soundFeedbackEnabled ? 1.0 : 0.45;
+        }
     }
 
     public void BtnTitleTheme_Click(object sender, RoutedEventArgs e)
@@ -1367,25 +1445,43 @@ public partial class MainWindow : Window
         {
             btnStateToggle.Focus();
         }
+        else if (e.Key == Key.Escape)
+        {
+            double restoreVal = _osdDurationBeforeEdit ?? SettingsManager.Load().OsdDuration;
+            SettingsManager.Save(SettingsManager.Load() with { OsdDuration = restoreVal });
+            _isUpdatingOsdTextFromSlider = true;
+            sliderOsdDuration.Value = restoreVal;
+            txtOsdDuration.Text = UiBehavior.FormatOsdDuration(restoreVal, CultureInfo.CurrentCulture);
+            _isUpdatingOsdTextFromSlider = false;
+            _osdDurationBeforeEdit = null;
+            btnStateToggle.Focus();
+        }
     }
 
     private void TxtOsdDuration_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_isInitialized && !_isReloadingSettings && !_isUpdatingOsdTextFromSlider
-            && UiBehavior.TryParseOsdDuration(txtOsdDuration.Text, CultureInfo.CurrentCulture, out var result))
+        if (_isInitialized && !_isReloadingSettings && !_isUpdatingOsdTextFromSlider)
         {
-            SettingsManager.Save(SettingsManager.Load() with
+            if (_osdDurationBeforeEdit == null)
             {
-                OsdDuration = result
-            });
-            _isUpdatingOsdTextFromSlider = true;
-            sliderOsdDuration.Value = result;
-            _isUpdatingOsdTextFromSlider = false;
+                _osdDurationBeforeEdit = SettingsManager.Load().OsdDuration;
+            }
+            if (UiBehavior.TryParseOsdDuration(txtOsdDuration.Text, CultureInfo.CurrentCulture, out var result))
+            {
+                SettingsManager.Save(SettingsManager.Load() with
+                {
+                    OsdDuration = result
+                });
+                _isUpdatingOsdTextFromSlider = true;
+                sliderOsdDuration.Value = result;
+                _isUpdatingOsdTextFromSlider = false;
+            }
         }
     }
 
     private void CommitOsdDurationText()
     {
+        _osdDurationBeforeEdit = null;
         if (UiBehavior.TryParseOsdDuration(txtOsdDuration.Text, CultureInfo.CurrentCulture, out var result))
         {
             SettingsManager.Save(SettingsManager.Load() with
@@ -1401,6 +1497,94 @@ public partial class MainWindow : Window
         {
             AppSettings appSettings = SettingsManager.Load();
             txtOsdDuration.Text = UiBehavior.FormatOsdDuration(appSettings.OsdDuration, CultureInfo.CurrentCulture);
+        }
+    }
+
+    private void SliderSoundVolume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isInitialized && !_isReloadingSettings && !_isUpdatingSoundVolumeTextFromSlider)
+        {
+            int volume = (int)Math.Round(e.NewValue);
+            if (txtSoundVolume != null && !txtSoundVolume.IsFocused)
+            {
+                _isUpdatingSoundVolumeTextFromSlider = true;
+                txtSoundVolume.Text = UiBehavior.FormatSoundVolume(volume);
+                _isUpdatingSoundVolumeTextFromSlider = false;
+            }
+            SettingsManager.Save(SettingsManager.Load() with
+            {
+                SoundVolume = volume
+            });
+            AudioFeedback.SetVolume(volume);
+        }
+    }
+
+    private void TxtSoundVolume_LostFocus(object sender, RoutedEventArgs e)
+    {
+        CommitSoundVolumeText();
+    }
+
+    private void TxtSoundVolume_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            btnStateToggle.Focus();
+        }
+        else if (e.Key == Key.Escape)
+        {
+            int restoreVal = _soundVolumeBeforeEdit ?? SettingsManager.Load().SoundVolume;
+            SettingsManager.Save(SettingsManager.Load() with { SoundVolume = restoreVal });
+            AudioFeedback.SetVolume(restoreVal);
+            _isUpdatingSoundVolumeTextFromSlider = true;
+            sliderSoundVolume.Value = restoreVal;
+            txtSoundVolume.Text = UiBehavior.FormatSoundVolume(restoreVal);
+            _isUpdatingSoundVolumeTextFromSlider = false;
+            _soundVolumeBeforeEdit = null;
+            btnStateToggle.Focus();
+        }
+    }
+
+    private void TxtSoundVolume_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isInitialized && !_isReloadingSettings && !_isUpdatingSoundVolumeTextFromSlider)
+        {
+            if (_soundVolumeBeforeEdit == null)
+            {
+                _soundVolumeBeforeEdit = SettingsManager.Load().SoundVolume;
+            }
+            if (UiBehavior.TryParseSoundVolume(txtSoundVolume.Text, out var result))
+            {
+                SettingsManager.Save(SettingsManager.Load() with
+                {
+                    SoundVolume = result
+                });
+                AudioFeedback.SetVolume(result);
+                _isUpdatingSoundVolumeTextFromSlider = true;
+                sliderSoundVolume.Value = result;
+                _isUpdatingSoundVolumeTextFromSlider = false;
+            }
+        }
+    }
+
+    private void CommitSoundVolumeText()
+    {
+        _soundVolumeBeforeEdit = null;
+        if (UiBehavior.TryParseSoundVolume(txtSoundVolume.Text, out var result))
+        {
+            SettingsManager.Save(SettingsManager.Load() with
+            {
+                SoundVolume = result
+            });
+            AudioFeedback.SetVolume(result);
+            _isUpdatingSoundVolumeTextFromSlider = true;
+            sliderSoundVolume.Value = result;
+            txtSoundVolume.Text = UiBehavior.FormatSoundVolume(result);
+            _isUpdatingSoundVolumeTextFromSlider = false;
+        }
+        else
+        {
+            AppSettings appSettings = SettingsManager.Load();
+            txtSoundVolume.Text = UiBehavior.FormatSoundVolume(appSettings.SoundVolume);
         }
     }
 

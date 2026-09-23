@@ -10,6 +10,10 @@ if(!$SkipTests){
     & (Join-Path $PSScriptRoot 'test.ps1') -DotnetPath $DotnetPath -NoRestore:$NoRestore
     if($LASTEXITCODE -ne 0){throw 'Regression tests failed; package was not updated.'}
 }
+$objDir = Join-Path $projectRoot 'obj'
+if (Test-Path -LiteralPath $objDir) {
+    Remove-Item -LiteralPath $objDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $stage=Join-Path $projectRoot ".artifacts/publish-$stamp"
 $arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true','-p:EnableCompressionInSingleFile=true','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
@@ -49,4 +53,19 @@ if(Test-Path -LiteralPath $zipPath){Copy-Item -LiteralPath $zipPath -Destination
 Copy-Item -LiteralPath $stageZip -Destination $zipPath -Force
 $publishUpdated=Copy-Release (Join-Path $projectRoot 'publish')
 $rootUpdated=if($UpdateRoot){Copy-Release $projectRoot}else{$false}
+
+# Prune older publish directories and ZIP backups to prevent disk bloat (keep latest 2)
+$artifactsDir = Join-Path $projectRoot '.artifacts'
+if (Test-Path -LiteralPath $artifactsDir) {
+    Get-ChildItem -LiteralPath $artifactsDir -Directory -Filter 'publish-*' |
+        Sort-Object CreationTime -Descending |
+        Select-Object -Skip 2 |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+    Get-ChildItem -LiteralPath $artifactsDir -File -Filter 'MicMute-*.zip' |
+        Sort-Object CreationTime -Descending |
+        Select-Object -Skip 4 |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+}
+
 [pscustomobject]@{Package=$zipPath;PackageSHA256=(Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash;StagingDirectory=$stage;PublishUpdated=$publishUpdated;RootUpdated=$rootUpdated}

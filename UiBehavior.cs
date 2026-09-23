@@ -32,6 +32,19 @@ public static class UiBehavior
 
         const NumberStyles styles = NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite;
         string candidate = text.Trim();
+        if (candidate.EndsWith("seconds", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate.Substring(0, candidate.Length - 7).Trim();
+        }
+        else if (candidate.EndsWith("sec", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate.Substring(0, candidate.Length - 3).Trim();
+        }
+        else if (candidate.EndsWith("s", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate.Substring(0, candidate.Length - 1).Trim();
+        }
+
         if (!double.TryParse(candidate, styles, culture, out duration)
             && !double.TryParse(candidate, styles, CultureInfo.InvariantCulture, out duration))
         {
@@ -47,6 +60,29 @@ public static class UiBehavior
             ? Math.Clamp(duration, MinimumOsdDuration, MaximumOsdDuration)
             : MinimumOsdDuration;
         return safeDuration.ToString("F1", culture);
+    }
+
+    public const int MinimumSoundVolume = 0;
+    public const int MaximumSoundVolume = 100;
+    public const int DefaultSoundVolume = 100;
+
+    public static bool TryParseSoundVolume(string? text, out int volume)
+    {
+        volume = 0;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        string candidate = text.Trim().TrimEnd('%').Trim();
+        if (!int.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out volume) &&
+            !int.TryParse(candidate, NumberStyles.Integer, CultureInfo.CurrentCulture, out volume))
+        {
+            return false;
+        }
+        return volume >= MinimumSoundVolume && volume <= MaximumSoundVolume;
+    }
+
+    public static string FormatSoundVolume(int volume)
+    {
+        int safeVolume = Math.Clamp(volume, MinimumSoundVolume, MaximumSoundVolume);
+        return safeVolume.ToString(CultureInfo.InvariantCulture);
     }
 
     public static string LimitTooltip(string? tooltip)

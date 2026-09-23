@@ -193,7 +193,7 @@
         <!-- ========================================== -->
         <Style x:Key="ToggleSwitchStyle" TargetType="CheckBox">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Cursor" Value="Hand" />
+
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
@@ -237,7 +237,8 @@
                                     BorderBrush="{DynamicResource ToggleKnobBorderBrush}"
                                     BorderThickness="0.8"
                                     HorizontalAlignment="Left"
-                                    Margin="3,3,0,3">
+                                    Margin="3,3,0,3"
+                                    Cursor="Hand">
                                 <Border.RenderTransform>
                                     <TransformGroup>
                                         <TranslateTransform x:Name="knobTrans" X="0" />
@@ -311,8 +312,8 @@
                             </Trigger>
 
                             <!-- Hover Bounce Interaction matching OSD Slider -->
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Cursor" Value="Hand" />
+                            <Trigger SourceName="knob" Property="IsMouseOver" Value="True">
+
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
@@ -1204,7 +1205,7 @@
                                 <Slider x:Name="sliderOsdDuration"
                                         Grid.Column="1"
                                         Style="{StaticResource ModernSliderStyle}"
-                                         Minimum="0.1" Maximum="30.0"
+                                        Minimum="0.1" Maximum="30.0"
                                         TickFrequency="0.1"
                                         IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
@@ -1286,6 +1287,61 @@
                                           VerticalAlignment="Center"
                                           Checked="CbSoundFeedback_Checked"
                                           Unchecked="CbSoundFeedback_Unchecked" />
+                            </Grid>
+
+                            <!-- High-Contrast Sound Volume / Loudness Slider -->
+                            <Grid x:Name="panelSoundVolume" Margin="37,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Volume" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Slider x:Name="sliderSoundVolume"
+                                        Grid.Column="1"
+                                        Style="{StaticResource ModernSliderStyle}"
+                                        Minimum="0" Maximum="100"
+                                        TickFrequency="1"
+                                        IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center"
+                                        ValueChanged="SliderSoundVolume_ValueChanged" />
+                                <Border Grid.Column="2"
+                                        Width="54" Height="24"
+                                        Background="{DynamicResource KeycapBgBrush}"
+                                        BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center">
+                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="txtSoundVolume"
+                                                 Grid.Column="0"
+                                                 Width="28"
+                                                 Text="100"
+                                                 Background="Transparent"
+                                                 Foreground="{DynamicResource TextWhiteBrush}"
+                                                 BorderThickness="0"
+                                                 FontSize="10.5"
+                                                 FontWeight="Bold"
+                                                 TextAlignment="Right"
+                                                 VerticalAlignment="Center"
+                                                 Padding="0"
+                                                 LostFocus="TxtSoundVolume_LostFocus"
+                                                 KeyDown="TxtSoundVolume_KeyDown"
+                                                 TextChanged="TxtSoundVolume_TextChanged" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text=" %"
+                                                   Foreground="{DynamicResource TextGrayBrush}"
+                                                   FontSize="10"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Margin="1,0,0,0" />
+                                    </Grid>
+                                </Border>
                             </Grid>
 
                             <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />

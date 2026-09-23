@@ -9,9 +9,14 @@ public static class AudioFeedback
 {
     private static SoundPlayer? _mutePlayer;
     private static SoundPlayer? _unmutePlayer;
+    private static byte[]? _rawMuteWavBytes;
+    private static byte[]? _rawUnmuteWavBytes;
+    private static int _volumePercent = 100;
     private static bool _isInitialized;
     private static readonly object _initLock = new object();
     private static readonly object _playLock = new object();
+
+    public static int CurrentVolume => _volumePercent;
 
     public static void Initialize()
     {
@@ -21,10 +26,9 @@ public static class AudioFeedback
             if (_isInitialized) return;
             try
             {
-                _mutePlayer = LoadSoundPlayer("MicMute.sounds.mute.wav", isMuted: true);
-                _unmutePlayer = LoadSoundPlayer("MicMute.sounds.unmute.wav", isMuted: false);
-                _mutePlayer.Load();
-                _unmutePlayer.Load();
+                _rawMuteWavBytes = LoadRawWavBytes("MicMute.sounds.mute.wav", isMuted: true);
+                _rawUnmuteWavBytes = LoadRawWavBytes("MicMute.sounds.unmute.wav", isMuted: false);
+                ApplyVolumeLocked(_volumePercent);
                 _isInitialized = true;
             }
             catch (Exception ex)
@@ -34,13 +38,44 @@ public static class AudioFeedback
         }
     }
 
+    public static void SetVolume(int volumePercent)
+    {
+        int clamped = Math.Clamp(volumePercent, 0, 100);
+        lock (_initLock)
+        {
+            if (_isInitialized && _volumePercent == clamped) return;
+            _volumePercent = clamped;
+            if (_isInitialized)
+            {
+                ApplyVolumeLocked(clamped);
+            }
+        }
+    }
+
+    private static void ApplyVolumeLocked(int volumePercent)
+    {
+        float factor = volumePercent / 100.0f;
+        byte[] muteBytes = ScaleWavVolume(_rawMuteWavBytes, factor);
+        byte[] unmuteBytes = ScaleWavVolume(_rawUnmuteWavBytes, factor);
+
+        lock (_playLock)
+        {
+            _mutePlayer = new SoundPlayer(new MemoryStream(muteBytes));
+            _unmutePlayer = new SoundPlayer(new MemoryStream(unmuteBytes));
+            try { _mutePlayer.Load(); } catch { }
+            try { _unmutePlayer.Load(); } catch { }
+        }
+    }
+
     public static void Play(bool isMuted)
     {
+        if (_volumePercent <= 0) return;
         Task.Run(() =>
         {
             try
             {
                 if (!_isInitialized) Initialize();
+                if (_volumePercent <= 0) return;
                 lock (_playLock)
                 {
                     if (isMuted)
@@ -60,7 +95,7 @@ public static class AudioFeedback
         });
     }
 
-    private static SoundPlayer LoadSoundPlayer(string resourceName, bool isMuted)
+    private static byte[] LoadRawWavBytes(string resourceName, bool isMuted)
     {
         // 1. Try loading from embedded assembly manifest resource
         try
@@ -68,15 +103,12 @@ public static class AudioFeedback
             using Stream? stream = typeof(AudioFeedback).Assembly.GetManifestResourceStream(resourceName);
             if (stream != null)
             {
-                MemoryStream ms = new MemoryStream();
+                using MemoryStream ms = new MemoryStream();
                 stream.CopyTo(ms);
-                ms.Position = 0;
-                return new SoundPlayer(ms);
+                return ms.ToArray();
             }
         }
-        catch
-        {
-        }
+        catch { }
 
         // 2. Try loading from disk relative to application directory
         try
@@ -85,28 +117,75 @@ public static class AudioFeedback
             string diskPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sounds", fileName);
             if (File.Exists(diskPath))
             {
-                byte[] bytes = File.ReadAllBytes(diskPath);
-                return new SoundPlayer(new MemoryStream(bytes));
+                return File.ReadAllBytes(diskPath);
             }
         }
-        catch
-        {
-        }
+        catch { }
 
         // 3. Fallback: Synthesize a smooth, acoustic Discord-like two-tone chime
-        return CreateDiscordChimePlayer(isMuted);
+        return SynthesizeDiscordChimeBytes(isMuted, 1.0);
+    }
+
+    public static byte[] ScaleWavVolume(byte[]? wavBytes, float volume)
+    {
+        if (wavBytes == null || wavBytes.Length < 44) return wavBytes ?? Array.Empty<byte>();
+        float safeVolume = Math.Clamp(volume, 0.0f, 1.0f);
+        if (safeVolume >= 0.999f) return (byte[])wavBytes.Clone();
+
+        byte[] scaled = (byte[])wavBytes.Clone();
+        int dIdx = FindDataChunkIndex(scaled);
+        if (dIdx >= 0 && dIdx + 8 <= scaled.Length)
+        {
+            int dataSize = BitConverter.ToInt32(scaled, dIdx + 4);
+            int start = dIdx + 8;
+            int end = Math.Min(start + dataSize, scaled.Length);
+            if (safeVolume <= 0.001f)
+            {
+                Array.Clear(scaled, start, end - start);
+            }
+            else
+            {
+                for (int i = start; i + 1 < end; i += 2)
+                {
+                    short sample = BitConverter.ToInt16(scaled, i);
+                    short newSample = (short)Math.Clamp((int)Math.Round(sample * safeVolume), short.MinValue, short.MaxValue);
+                    scaled[i] = (byte)(newSample & 0xFF);
+                    scaled[i + 1] = (byte)((newSample >> 8) & 0xFF);
+                }
+            }
+        }
+        return scaled;
+    }
+
+    private static int FindDataChunkIndex(byte[] bytes)
+    {
+        for (int i = 12; i <= bytes.Length - 8; i++)
+        {
+            if (bytes[i] == 0x64 && bytes[i + 1] == 0x61 && bytes[i + 2] == 0x74 && bytes[i + 3] == 0x61)
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// <summary>
     /// Fallback acoustic chime generator: Synthesizes a soft, harmonic two-tone chime
     /// inspired by Discord's smooth marimba earcon (two-tone descending for mute, ascending for unmute).
     /// </summary>
-    public static SoundPlayer CreateDiscordChimePlayer(bool isMuted)
+    public static SoundPlayer CreateDiscordChimePlayer(bool isMuted, double volume = 1.0)
+    {
+        byte[] wavBytes = SynthesizeDiscordChimeBytes(isMuted, volume);
+        return new SoundPlayer(new MemoryStream(wavBytes));
+    }
+
+    public static byte[] SynthesizeDiscordChimeBytes(bool isMuted, double volume = 1.0)
     {
         const int sampleRate = 44100;
         const int totalDurationMs = 240;
         int numSamples = (sampleRate * totalDurationMs) / 1000;
         short[] samples = new short[numSamples];
+        double safeVol = Math.Clamp(volume, 0.0, 1.0);
 
         // Mute: Descending melody (E5 ~659Hz -> A4 440Hz)
         // Unmute: Ascending melody (A4 440Hz -> E5 ~659Hz)
@@ -144,12 +223,11 @@ public static class AudioFeedback
                 sampleVal += noteSample * attack * decay;
             }
 
-            double clamped = Math.Clamp(sampleVal * 12000.0, -32767.0, 32767.0);
+            double clamped = Math.Clamp(sampleVal * 12000.0 * safeVol, -32767.0, 32767.0);
             samples[i] = (short)clamped;
         }
 
-        byte[] wavBytes = CreateWavBytes(samples, sampleRate);
-        return new SoundPlayer(new MemoryStream(wavBytes));
+        return CreateWavBytes(samples, sampleRate);
     }
 
     private static byte[] CreateWavBytes(short[] samples, int sampleRate)

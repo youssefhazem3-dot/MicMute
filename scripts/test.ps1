@@ -62,7 +62,9 @@ $resources = @(
     @{ Path = (Join-Path $projectRoot 'App.xaml'); Name = 'MicMute.App.xaml' },
     @{ Path = (Join-Path $projectRoot 'MainWindow.xaml'); Name = 'MicMute.MainWindow.xaml' },
     @{ Path = (Join-Path $projectRoot 'OsdWindow.xaml'); Name = 'MicMute.OsdWindow.xaml' },
-    @{ Path = (Join-Path $projectRoot 'app.ico'); Name = 'MicMute.app.ico' }
+    @{ Path = (Join-Path $projectRoot 'app.ico'); Name = 'MicMute.app.ico' },
+    @{ Path = (Join-Path $projectRoot 'sounds/mute.wav'); Name = 'MicMute.sounds.mute.wav' },
+    @{ Path = (Join-Path $projectRoot 'sounds/unmute.wav'); Name = 'MicMute.sounds.unmute.wav' }
 )
 foreach ($res in $resources) {
     if (Test-Path -LiteralPath $res.Path) {

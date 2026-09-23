@@ -22,7 +22,9 @@ public partial class OsdWindow : Window
     private const uint SWP_NOSIZE = 0x0001;
     private const uint SWP_NOMOVE = 0x0002;
     private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_FRAMECHANGED = 0x0020;
     private const uint SWP_SHOWWINDOW = 0x0040;
+    private const uint SWP_NOOWNERZORDER = 0x0200;
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOPMOST = 0x00000008;
@@ -53,6 +55,9 @@ public partial class OsdWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
@@ -149,6 +154,7 @@ public partial class OsdWindow : Window
         long exStyle = GetWindowLong(handle, GWL_EXSTYLE).ToInt64();
         exStyle |= WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT;
         SetWindowLong(handle, GWL_EXSTYLE, new IntPtr(exStyle));
+        SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
 
     public static void WarmUp()
@@ -201,7 +207,33 @@ public partial class OsdWindow : Window
     {
         try
         {
-            var screen = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position) ?? System.Windows.Forms.Screen.PrimaryScreen;
+            System.Windows.Forms.Screen? screen = null;
+            IntPtr fg = GetForegroundWindow();
+            if (fg != IntPtr.Zero && fg != handle)
+            {
+                try
+                {
+                    screen = System.Windows.Forms.Screen.FromHandle(fg);
+                }
+                catch
+                {
+                    screen = null;
+                }
+            }
+
+            if (screen == null)
+            {
+                try
+                {
+                    screen = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
+                }
+                catch
+                {
+                    screen = null;
+                }
+            }
+
+            screen ??= System.Windows.Forms.Screen.PrimaryScreen;
             if (screen == null) return;
             var bounds = screen.Bounds;
             DpiScale dpi = VisualTreeHelper.GetDpi(this);
@@ -221,11 +253,15 @@ public partial class OsdWindow : Window
             }
             var size = new PixelSize(width, height);
             PixelRect target = UiBehavior.CenterInPixels(new PixelRect(bounds.Left, bounds.Top, bounds.Width, bounds.Height), size);
-            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+
+            this.Left = target.Left / scaleX;
+            this.Top = target.Top / scaleY;
+
+            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
         catch
         {
-            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
     }
 
@@ -240,7 +276,7 @@ public partial class OsdWindow : Window
     private static readonly SolidColorBrush BrushDarkBackground = CreateFrozenBrush(Color.FromArgb(0xE5, 0x0F, 0x14, 0x1C));
     private static readonly SolidColorBrush BrushLightBackground = CreateFrozenBrush(Color.FromArgb(0xF2, 0xF8, 0xF9, 0xFA));
     private static readonly SolidColorBrush BrushLightActive = CreateFrozenBrush(Color.FromRgb(55, 65, 81));
-    private static readonly SolidColorBrush BrushLightMuted = CreateFrozenBrush(Color.FromRgb(155, 44, 44));
+    private static readonly SolidColorBrush BrushLightMuted = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26)); // Clean standard balanced UI red (#DC2626)
 
     private static SolidColorBrush CreateFrozenBrush(Color color)
     {
@@ -293,13 +329,21 @@ public partial class OsdWindow : Window
         try
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
-            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 
             double startOpacity = Math.Clamp(this.Opacity, 0.0, 0.95);
             DoubleAnimation fadeIn = new DoubleAnimation(startOpacity, 0.95, TimeSpan.FromSeconds(0.08));
             BeginAnimation(OpacityProperty, fadeIn);
 
-            await Task.Delay(TimeSpan.FromSeconds(durationSeconds), token);
+            DateTime endTime = DateTime.UtcNow.AddSeconds(durationSeconds);
+            while (DateTime.UtcNow < endTime)
+            {
+                SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+                TimeSpan remaining = endTime - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero) break;
+                TimeSpan chunk = remaining < TimeSpan.FromMilliseconds(80) ? remaining : TimeSpan.FromMilliseconds(80);
+                await Task.Delay(chunk, token);
+            }
 
             DoubleAnimation fadeOut = new DoubleAnimation(0.95, 0.0, TimeSpan.FromSeconds(0.20));
             fadeOut.Completed += delegate

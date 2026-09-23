@@ -25,6 +25,7 @@ public static class SettingsCases
         test("JSON string text is not rewritten by legacy NaN migration", NamedFloatInStringIsPreserved);
         test("background persistence eventually writes the latest cached value", BackgroundPersistence);
         test("pending saves cannot overwrite migrated or reset settings", PendingSavesRespectTransitions);
+        test("sound volume serializes, deserializes, and normalizes within bounds", SoundVolumeSettingsCodecSerializationAndClamping);
     }
 
     private static void LoadsCompactEscapedJson()
@@ -240,6 +241,30 @@ public static class SettingsCases
         scope.Store.Flush();
         using var reopened = new SettingsStore(scope.DefaultDirectory, scope.AppDirectory);
         Check.Equal("retain-this-value", reopened.Load().SelectedDeviceId);
+    }
+
+    private static void SoundVolumeSettingsCodecSerializationAndClamping()
+    {
+        // Default is 100
+        AppSettings defaults = new();
+        Check.Equal(100, defaults.SoundVolume);
+
+        // Deserialize with volume
+        AppSettings deserialized = SettingsCodec.Deserialize("{\"SoundVolume\":65}");
+        Check.Equal(65, deserialized.SoundVolume);
+
+        // Normalize clamps out of range
+        AppSettings clampedLow = SettingsCodec.Normalize(new AppSettings { SoundVolume = -20 });
+        Check.Equal(0, clampedLow.SoundVolume);
+
+        AppSettings clampedHigh = SettingsCodec.Normalize(new AppSettings { SoundVolume = 150 });
+        Check.Equal(100, clampedHigh.SoundVolume);
+
+        // Roundtrip serialization
+        AppSettings custom = new AppSettings { SoundVolume = 42 };
+        string json = SettingsCodec.Serialize(custom);
+        AppSettings roundtrip = SettingsCodec.Deserialize(json);
+        Check.Equal(42, roundtrip.SoundVolume);
     }
 
     private sealed class SettingsScope : IDisposable

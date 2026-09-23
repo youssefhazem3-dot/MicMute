@@ -27,4 +27,5 @@ public sealed record AppSettings
     public bool RunAsAdmin { get; init; }
 
     public bool PlaySoundFeedback { get; init; }
+    public int SoundVolume { get; init; } = 100;
 }
