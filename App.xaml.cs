@@ -151,7 +151,7 @@ public partial class App : System.Windows.Application
                 if (textSize.Width > maxWidth) maxWidth = textSize.Width;
                 totalHeight += 30;
             }
-            int width = maxWidth + 36 + 16;
+            int width = maxWidth + 31 + 9;
             return new System.Drawing.Size(width, totalHeight);
         }
     }
@@ -199,11 +199,11 @@ public partial class App : System.Windows.Application
             int fontHeight = font?.Height ?? 17;
 
             // Render vector outline icon
-            int iconX = 12 - e.Item.Bounds.X;
+            int iconX = 9 - e.Item.Bounds.X;
             int iconY = (e.Item.Height - 16) / 2;
             RenderMenuIcon(e.Graphics, e.Item.Text, iconX, iconY, textColor);
 
-            int leftOnMenu = 36;
+            int leftOnMenu = 31;
             int x = leftOnMenu - e.Item.Bounds.X;
             int y = (e.Item.Height - fontHeight) / 2;
 

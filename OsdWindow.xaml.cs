@@ -243,8 +243,8 @@ public partial class OsdWindow : Window
             DpiScale dpi = VisualTreeHelper.GetDpi(this);
             double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
             double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
-            int width = (int)Math.Round((this.Width > 0 ? this.Width : 140.0) * scaleX);
-            int height = (int)Math.Round((this.Height > 0 ? this.Height : 140.0) * scaleY);
+            int width = (int)Math.Round((this.Width > 0 ? this.Width : 180.0) * scaleX);
+            int height = (int)Math.Round((this.Height > 0 ? this.Height : 180.0) * scaleY);
             if (GetWindowRect(handle, out RECT nativeRect))
             {
                 int curW = nativeRect.Right - nativeRect.Left;
@@ -271,18 +271,27 @@ public partial class OsdWindow : Window
         }
     }
 
-    private static readonly Color ColorMutedText = Color.FromRgb(0xF8, 0x71, 0x71); // Clean standard balanced red (#F87171)
-    private static readonly Color ColorMutedBorder = Color.FromRgb(0xDC, 0x26, 0x26); // Tailwind Red 600 (#DC2626)
+    private static readonly Color ColorMutedText = Color.FromRgb(0xF8, 0x71, 0x71); // Clean standard balanced coral red (#F87171)
+    private static readonly Color ColorMutedBorder = Color.FromRgb(0xF8, 0x71, 0x71); // Matching glowing ring
+    private static readonly Color ColorMutedGlow = Color.FromRgb(0xEF, 0x44, 0x44);
     private static readonly SolidColorBrush BrushMutedText = CreateFrozenBrush(ColorMutedText);
     private static readonly SolidColorBrush BrushMutedBorder = CreateFrozenBrush(ColorMutedBorder);
+    private static readonly SolidColorBrush BrushDarkMutedBackground = CreateFrozenBrush(Color.FromArgb(0x8A, 0x28, 0x16, 0x16));
 
-    private static readonly Color ColorActive = Color.FromRgb(0x94, 0xA3, 0xB8);
-    private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
+    private static readonly Color ColorActive = Color.FromRgb(0xD0, 0xE4, 0xF5); // Ice blue ring from photo
+    private static readonly Color ColorActiveGlow = Color.FromRgb(0xA8, 0xD0, 0xEE); // Soft ice blue glow
+    private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Colors.White); // Pure white matching photo
     private static readonly SolidColorBrush BrushActiveBorder = CreateFrozenBrush(ColorActive);
-    private static readonly SolidColorBrush BrushDarkBackground = CreateFrozenBrush(Color.FromArgb(0xE5, 0x0F, 0x14, 0x1C));
-    private static readonly SolidColorBrush BrushLightBackground = CreateFrozenBrush(Color.FromArgb(0xF2, 0xF8, 0xF9, 0xFA));
-    private static readonly SolidColorBrush BrushLightActive = CreateFrozenBrush(Color.FromRgb(55, 65, 81));
-    private static readonly SolidColorBrush BrushLightMuted = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26)); // Clean standard balanced UI red (#DC2626)
+    private static readonly SolidColorBrush BrushDarkActiveBackground = CreateFrozenBrush(Color.FromArgb(0x8A, 0x16, 0x22, 0x30));
+
+    private static readonly SolidColorBrush BrushLightActiveBackground = CreateFrozenBrush(Color.FromArgb(0xC8, 0xED, 0xF5, 0xFB));
+    private static readonly SolidColorBrush BrushLightActiveBorder = CreateFrozenBrush(Color.FromRgb(0x4A, 0x7A, 0x96));
+    private static readonly SolidColorBrush BrushLightActiveText = CreateFrozenBrush(Color.FromRgb(0x1E, 0x29, 0x3B));
+
+    private static readonly SolidColorBrush BrushLightMutedBackground = CreateFrozenBrush(Color.FromArgb(0xC8, 0xFE, 0xEC, 0xEB));
+    private static readonly SolidColorBrush BrushLightMutedBorder = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26));
+    private static readonly SolidColorBrush BrushLightMutedText = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26));
+    private static readonly SolidColorBrush BrushLightMuted = BrushLightMutedText;
 
     private static SolidColorBrush CreateFrozenBrush(Color color)
     {
@@ -299,11 +308,9 @@ public partial class OsdWindow : Window
     internal void ApplyTheme(bool isLight)
     {
         _lightMode = isLight;
-        borderPanel.Background = isLight ? BrushLightBackground : BrushDarkBackground;
-        activeGlyph.Fill = isLight ? BrushLightActive : BrushActiveText;
-        mutedGlyph.Fill = isLight ? BrushLightMuted : BrushMutedText;
-        muteSlash.Stroke = isLight ? BrushLightMuted : BrushMutedText;
-        if (osdShadow != null) osdShadow.Opacity = isLight ? 0.25 : 0.45;
+        activeGlyph.Fill = isLight ? BrushLightActiveText : BrushActiveText;
+        mutedGlyph.Fill = isLight ? BrushLightMutedText : BrushMutedText;
+        muteSlash.Stroke = isLight ? BrushLightMutedText : BrushMutedText;
         UpdateState(_isMuted);
     }
 
@@ -315,18 +322,28 @@ public partial class OsdWindow : Window
             pathMuted.Visibility = Visibility.Visible;
             pathActive.Visibility = Visibility.Collapsed;
             tbStatus.Text = "MUTED";
-            tbStatus.Foreground = _lightMode ? BrushLightMuted : BrushMutedText;
-            borderPanel.BorderBrush = _lightMode ? BrushLightMuted : BrushMutedBorder;
-            if (osdShadow != null) osdShadow.Color = _lightMode ? BrushLightMuted.Color : ColorMutedBorder;
+            tbStatus.Foreground = _lightMode ? BrushLightMutedText : BrushMutedText;
+            borderPanel.BorderBrush = _lightMode ? BrushLightMutedBorder : BrushMutedBorder;
+            borderPanel.Background = _lightMode ? BrushLightMutedBackground : BrushDarkMutedBackground;
+            if (osdShadow != null)
+            {
+                osdShadow.Color = _lightMode ? BrushLightMutedBorder.Color : ColorMutedGlow;
+                osdShadow.Opacity = _lightMode ? 0.35 : 0.65;
+            }
         }
         else
         {
             pathActive.Visibility = Visibility.Visible;
             pathMuted.Visibility = Visibility.Collapsed;
             tbStatus.Text = "ACTIVE";
-            tbStatus.Foreground = _lightMode ? BrushLightActive : BrushActiveText;
-            borderPanel.BorderBrush = _lightMode ? BrushLightActive : BrushActiveBorder;
-            if (osdShadow != null) osdShadow.Color = _lightMode ? BrushLightActive.Color : ColorActive;
+            tbStatus.Foreground = _lightMode ? BrushLightActiveText : BrushActiveText;
+            borderPanel.BorderBrush = _lightMode ? BrushLightActiveBorder : BrushActiveBorder;
+            borderPanel.Background = _lightMode ? BrushLightActiveBackground : BrushDarkActiveBackground;
+            if (osdShadow != null)
+            {
+                osdShadow.Color = _lightMode ? BrushLightActiveBorder.Color : ColorActiveGlow;
+                osdShadow.Opacity = _lightMode ? 0.35 : 0.65;
+            }
         }
     }
 

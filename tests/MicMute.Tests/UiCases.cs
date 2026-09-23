@@ -57,6 +57,7 @@ static class UiCases
         test(nameof(AppExitAndTeardownHandlesFailuresGracefullyWithoutHanging), AppExitAndTeardownHandlesFailuresGracefullyWithoutHanging);
         test(nameof(OsdWindowCornersHaveNoClippedDropShadowArtifacts), OsdWindowCornersHaveNoClippedDropShadowArtifacts);
         test(nameof(OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction), OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction);
+        test(nameof(OsdWindowMatchesCircularGlowReferenceDesign), OsdWindowMatchesCircularGlowReferenceDesign);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -628,8 +629,8 @@ static class UiCases
         Check.Equal("Open App", menu.Items[1].Text);
         Check.Equal("Quit", menu.Items[2].Text);
         var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
-        // Compact width: should comfortably fit the items without excessive empty gap on the right (between 115 and 135)
-        Check.True(preferredSize.Width >= 115 && preferredSize.Width <= 135, $"Menu preferred width {preferredSize.Width} must be compact and gap-free");
+        // Compact width: should comfortably fit the items without excessive empty gap on the right (between 105 and 125)
+        Check.True(preferredSize.Width >= 105 && preferredSize.Width <= 125, $"Menu preferred width {preferredSize.Width} must be compact and gap-free");
         // Compact height: 3 items (30px each) + padding should be between 85px and 105px (previously bloated to >135px)
         Check.True(preferredSize.Height >= 85 && preferredSize.Height <= 105, $"Menu preferred height {preferredSize.Height} must be compact and under 105px");
 
@@ -680,7 +681,7 @@ static class UiCases
         var mutedBorderField = typeof(OsdWindow).GetField("BrushMutedBorder", flags);
         Check.True(mutedBorderField != null, "BrushMutedBorder field must exist on OsdWindow");
         var mutedBorder = (System.Windows.Media.SolidColorBrush)mutedBorderField!.GetValue(null)!;
-        Check.Equal(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26), mutedBorder.Color, "BrushMutedBorder must be #DC2626");
+        Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedBorder.Color, "BrushMutedBorder must be #F87171");
 
         var mutedTextField = typeof(OsdWindow).GetField("BrushMutedText", flags);
         Check.True(mutedTextField != null, "BrushMutedText field must exist on OsdWindow");
@@ -1241,15 +1242,19 @@ static class UiCases
         using var reader = new System.IO.StreamReader(stream!);
         string rawXaml = reader.ReadToEnd();
 
-        // The circular OSD border must not have a DropShadowEffect which causes sharp rectangular clipping artifacts in the corners
-        Check.True(!rawXaml.Contains("<DropShadowEffect"), "OsdWindow.xaml must not contain DropShadowEffect");
-        Check.True(!rawXaml.Contains("<Border.Effect>"), "OsdWindow.xaml must not contain <Border.Effect>");
+        // The circular OSD border has DropShadowEffect for glowing ring, but must have generous transparent window margin to prevent corner clipping
+        Check.True(rawXaml.Contains("<DropShadowEffect"), "OsdWindow.xaml must contain DropShadowEffect for glowing ring");
+        Check.True(rawXaml.Contains("<Border.Effect>"), "OsdWindow.xaml must contain <Border.Effect>");
 
-        // Verify runtime instance has null effect
+        // Verify runtime instance has shadow effect with radius safely inside window transparent margins
         var window = new OsdWindow();
         try
         {
-            Check.True(window.borderPanel.Effect == null, "OsdWindow borderPanel must have null effect to prevent corner clipping");
+            Check.True(window.borderPanel.Effect is System.Windows.Media.Effects.DropShadowEffect, "OsdWindow borderPanel must have DropShadowEffect for glowing ring");
+            double margin = (window.Width - window.borderPanel.Width) / 2.0;
+            Check.True(margin >= 15.0, $"Window must provide at least 15px transparent margin around borderPanel (actual: {margin}px)");
+            var dropShadow = (System.Windows.Media.Effects.DropShadowEffect)window.borderPanel.Effect;
+            Check.True(dropShadow.BlurRadius <= margin, "DropShadowEffect blur radius must not exceed window transparent margin to prevent clipping");
         }
         finally
         {
@@ -1323,6 +1328,71 @@ static class UiCases
             Check.Equal("0", window.txtSoundVolume.Text);
             Check.Equal(0.0, window.sliderSoundVolume.Value);
             Check.Equal(0, SettingsManager.Load().SoundVolume);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void OsdWindowMatchesCircularGlowReferenceDesign()
+    {
+        var window = new OsdWindow();
+        try
+        {
+            // Geometry matches circular disc in transparent window
+            Check.Equal(180.0, window.Width);
+            Check.Equal(180.0, window.Height);
+            Check.Equal(140.0, window.borderPanel.Width);
+            Check.Equal(140.0, window.borderPanel.Height);
+            Check.Equal(70.0, window.borderPanel.CornerRadius.TopLeft);
+            Check.Equal(1.8, window.borderPanel.BorderThickness.Left);
+
+            // Glowing ring drop shadow
+            Check.True(window.borderPanel.Effect is System.Windows.Media.Effects.DropShadowEffect, "borderPanel must have DropShadowEffect for glowing ring");
+            var shadow = (System.Windows.Media.Effects.DropShadowEffect)window.borderPanel.Effect;
+            Check.Equal(14.0, shadow.BlurRadius);
+            Check.Equal(0.0, shadow.ShadowDepth);
+
+            // Test Active State (Live)
+            var updateMethod = typeof(OsdWindow).GetMethod("UpdateState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Check.True(updateMethod != null, "UpdateState must exist");
+            var applyThemeMethod = typeof(OsdWindow).GetMethod("ApplyTheme", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Check.True(applyThemeMethod != null, "ApplyTheme must exist");
+
+            applyThemeMethod!.Invoke(window, new object[] { false }); // Dark mode
+            updateMethod!.Invoke(window, new object[] { false }); // Active (Live)
+
+            Check.Equal("ACTIVE", window.tbStatus.Text);
+            Check.Equal(13.5, window.tbStatus.FontSize);
+            Check.Equal(System.Windows.FontWeights.Bold, window.tbStatus.FontWeight);
+            var activeTextBrush = (System.Windows.Media.SolidColorBrush)window.tbStatus.Foreground;
+            Check.Equal(System.Windows.Media.Colors.White, activeTextBrush.Color, "Active text must be pure white");
+            var activeBorderBrush = (System.Windows.Media.SolidColorBrush)window.borderPanel.BorderBrush;
+            Check.Equal(System.Windows.Media.Color.FromRgb(0xD0, 0xE4, 0xF5), activeBorderBrush.Color, "Active border must be ice-blue #D0E4F5");
+            Check.Equal(System.Windows.Media.Color.FromRgb(0xA8, 0xD0, 0xEE), shadow.Color, "Active glow must be soft ice-blue #A8D0EE");
+            var activeGlyphBrush = (System.Windows.Media.SolidColorBrush)window.activeGlyph.Fill;
+            Check.Equal(System.Windows.Media.Colors.White, activeGlyphBrush.Color, "Active glyph must be pure white");
+            var activeBg = (System.Windows.Media.SolidColorBrush)window.borderPanel.Background;
+            Check.True(activeBg.Color.A < 200, "Active background disc must be translucent frosted glass");
+
+            // Test Muted State
+            updateMethod.Invoke(window, new object[] { true }); // Muted
+
+            Check.Equal("MUTED", window.tbStatus.Text);
+            Check.Equal(13.5, window.tbStatus.FontSize);
+            Check.Equal(System.Windows.FontWeights.Bold, window.tbStatus.FontWeight);
+            var mutedTextBrush = (System.Windows.Media.SolidColorBrush)window.tbStatus.Foreground;
+            Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedTextBrush.Color, "Muted text must be coral red #F87171");
+            var mutedBorderBrush = (System.Windows.Media.SolidColorBrush)window.borderPanel.BorderBrush;
+            Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedBorderBrush.Color, "Muted border must be coral red #F87171");
+            Check.Equal(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44), shadow.Color, "Muted glow must be coral red #EF4444");
+            var mutedGlyphBrush = (System.Windows.Media.SolidColorBrush)window.mutedGlyph.Fill;
+            Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedGlyphBrush.Color, "Muted glyph must be coral red #F87171");
+            var mutedSlashBrush = (System.Windows.Media.SolidColorBrush)window.muteSlash.Stroke;
+            Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedSlashBrush.Color, "Muted slash must be coral red #F87171");
+            var mutedBg = (System.Windows.Media.SolidColorBrush)window.borderPanel.Background;
+            Check.True(mutedBg.Color.A < 200, "Muted background disc must be translucent frosted glass");
         }
         finally
         {
