@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     internal System.Windows.Controls.ComboBox cbDevices = null!;
     internal Border borderHotkey = null!;
     internal TextBlock tbHotkey = null!;
+    internal TextBlock? tbHeroHotkey;
     internal System.Windows.Controls.Button btnRecordHotkey = null!;
     internal System.Windows.Controls.CheckBox cbEnableOsd = null!;
     internal Slider sliderOsdDuration = null!;
@@ -176,6 +177,7 @@ public partial class MainWindow : Window
             cbDevices = (System.Windows.Controls.ComboBox)root.FindName("cbDevices");
             borderHotkey = (Border)root.FindName("borderHotkey");
             tbHotkey = (TextBlock)root.FindName("tbHotkey");
+            tbHeroHotkey = root.FindName("tbHeroHotkey") as TextBlock;
             btnRecordHotkey = (System.Windows.Controls.Button)root.FindName("btnRecordHotkey");
             cbEnableOsd = (System.Windows.Controls.CheckBox)root.FindName("cbEnableOsd");
             sliderOsdDuration = (Slider)root.FindName("sliderOsdDuration");
@@ -573,13 +575,13 @@ public partial class MainWindow : Window
 
         if (AdminManager.IsRunningAsAdmin())
         {
-            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute (Administrator - Elevated Mode Active)";
-            tbStatusText.ToolTip = "Administrator Mode Active: In-game hotkeys enabled over games and elevated windows";
+            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute (Administrator Mode)";
+            tbStatusText.ToolTip = "Administrator Mode Active: Hotkeys enabled over anti-cheat and elevated windows";
         }
         else
         {
-            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute (Standard User)";
-            tbStatusText.ToolTip = "Tip: Enable 'Run as Administrator' below to use hotkeys inside games and elevated windows";
+            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute";
+            tbStatusText.ToolTip = "Mic Mute Active: In-game hotkeys and OSD ready";
         }
 
     }
@@ -587,7 +589,7 @@ public partial class MainWindow : Window
     private void ApplySettingsToRuntime(AppSettings settings)
     {
         _audioController.SetTargetDevice(settings.SelectedDeviceId);
-        StartupManager.SetStartup(settings.RunOnStartup);
+        StartupManager.SetStartup(settings.RunOnStartup, settings.RunAsAdmin);
         AdminManager.SetRunAsAdmin(settings.RunAsAdmin);
         _hotkeyManager?.Unregister();
         if (!RegisterGlobalHotkey(settings.Hotkey, settings.HotkeyModifiers))
@@ -852,13 +854,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private void StartRecordingHotkey()
+    internal void StartRecordingHotkey()
     {
         _hotkeyManager?.Unregister();
         _isRecordingHotkey = true;
         btnRecordHotkey.Content = "Cancel";
         tbHotkey.Text = "Press keys...";
         tbHotkey.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        if (tbHeroHotkey != null) tbHeroHotkey.Text = "...";
         PreviewKeyDown += MainWindow_PreviewKeyDown;
     }
 
@@ -923,6 +926,7 @@ public partial class MainWindow : Window
         {
             string modifierText = FormatHotkeyText(Key.None, modifiers);
             tbHotkey.Text = modifierText;
+            if (tbHeroHotkey != null) tbHeroHotkey.Text = modifierText;
         }
         else if (key == Key.Tab || key == Key.Enter || key == Key.Space || key == Key.Back || key == Key.Capital)
         {
@@ -948,13 +952,17 @@ public partial class MainWindow : Window
         return _hotkeyManager.Register(key, modifiers);
     }
 
-    private void DisplayHotkey(Key key, ModifierKeys modifiers)
+    internal void DisplayHotkey(Key key, ModifierKeys modifiers)
     {
         string hotkeyText = FormatHotkeyText(key, modifiers);
         if (tbHotkey != null)
         {
             tbHotkey.Text = hotkeyText;
             tbHotkey.SetResourceReference(TextBlock.ForegroundProperty, "KeycapTextBrush");
+        }
+        if (tbHeroHotkey != null)
+        {
+            tbHeroHotkey.Text = hotkeyText;
         }
     }
 
@@ -1026,7 +1034,8 @@ public partial class MainWindow : Window
     {
         if (_isInitialized && !_isReloadingSettings)
         {
-            StartupManager.SetStartup(runOnStartup: true);
+            bool runAsAdmin = cbRunAsAdmin?.IsChecked == true || SettingsManager.Load().RunAsAdmin;
+            StartupManager.SetStartup(runOnStartup: true, runAsAdmin: runAsAdmin);
             SettingsManager.Save(SettingsManager.Load() with
             {
                 RunOnStartup = true
@@ -1115,7 +1124,9 @@ public partial class MainWindow : Window
     {
         if (!_isInitialized || _isReloadingSettings) return;
         AdminManager.SetRunAsAdmin(true);
-        SettingsManager.Save(SettingsManager.Load() with { RunAsAdmin = true });
+        var currentSettings = SettingsManager.Load();
+        SettingsManager.Save(currentSettings with { RunAsAdmin = true });
+        StartupManager.SetStartup(currentSettings.RunOnStartup, runAsAdmin: true);
 
         if (!AdminManager.IsRunningAsAdmin())
         {
@@ -1136,7 +1147,9 @@ public partial class MainWindow : Window
     {
         if (!_isInitialized || _isReloadingSettings) return;
         AdminManager.SetRunAsAdmin(false);
-        SettingsManager.Save(SettingsManager.Load() with { RunAsAdmin = false });
+        var currentSettings = SettingsManager.Load();
+        SettingsManager.Save(currentSettings with { RunAsAdmin = false });
+        StartupManager.SetStartup(currentSettings.RunOnStartup, runAsAdmin: false);
     }
 
     private void CbSoundFeedback_Checked(object sender, RoutedEventArgs e)

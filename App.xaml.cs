@@ -66,6 +66,9 @@ public partial class App : System.Windows.Application
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
 
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr hObject);
+
         [DllImport("user32.dll")]
         private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
 
@@ -124,7 +127,13 @@ public partial class App : System.Windows.Application
                     try
                     {
                         IntPtr hRgn = CreateRoundRectRgn(0, 0, Width + 1, Height + 1, 16, 16);
-                        SetWindowRgn(Handle, hRgn, true);
+                        if (hRgn != IntPtr.Zero)
+                        {
+                            if (SetWindowRgn(Handle, hRgn, true) == 0)
+                            {
+                                DeleteObject(hRgn);
+                            }
+                        }
                     }
                     catch { }
                 }
@@ -278,13 +287,12 @@ public partial class App : System.Windows.Application
                 bool lightMode = SettingsManager.Load().LightMode;
                 Color hoverColor = lightMode ? Color.FromArgb(232, 232, 237) : Color.FromArgb(25, 255, 255, 255);
                 using SolidBrush brush = new SolidBrush(hoverColor);
-                
-                int x1 = 4 - e.Item.Bounds.X;
-                int x2 = e.ToolStrip.ClientRectangle.Width - 4 - e.Item.Bounds.X;
-                int width = x2 - x1;
+
+                const int marginX = 3;
+                int width = e.Item.Width - (marginX * 2);
                 if (width > 0 && e.Item.Height > 2)
                 {
-                    Rectangle rect = new Rectangle(x1, 1, width, e.Item.Height - 2);
+                    Rectangle rect = new Rectangle(marginX, 1, width, e.Item.Height - 2);
                     using GraphicsPath path = CreateRoundedRectanglePath(rect, 5f);
                     e.Graphics.FillPath(brush, path);
                 }
@@ -298,8 +306,9 @@ public partial class App : System.Windows.Application
             Color sepColor = lightMode ? Color.FromArgb(228, 228, 231) : Color.FromArgb(39, 39, 45);
             int y = e.Item.Height / 2;
             using Pen pen = new Pen(sepColor, 1f);
-            int x1 = 8 - e.Item.Bounds.X;
-            int x2 = e.ToolStrip.ClientRectangle.Width - 8 - e.Item.Bounds.X;
+            const int marginX = 5;
+            int x1 = marginX;
+            int x2 = e.Item.Width - marginX;
             if (x2 > x1)
             {
                 e.Graphics.DrawLine(pen, x1, y, x2, y);
@@ -376,6 +385,19 @@ public partial class App : System.Windows.Application
                 }
             }
             return null;
+        };
+
+        System.Windows.Forms.Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        System.Windows.Forms.Application.ThreadException += (s, ev) =>
+        {
+            DiagnosticLogger.LogError("WinForms ThreadException", ev.Exception);
+            try
+            {
+                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MicMute");
+                Directory.CreateDirectory(p);
+                File.WriteAllText(Path.Combine(p, "winforms_error.txt"), ev.Exception?.ToString() ?? "Unknown WinForms exception");
+            }
+            catch { }
         };
 
         AppDomain.CurrentDomain.UnhandledException += (s, ev) =>
@@ -480,7 +502,7 @@ public partial class App : System.Windows.Application
         OsdWindow.WarmUp();
 
         AppSettings appSettings = SettingsManager.Load();
-        StartupManager.SetStartup(appSettings.RunOnStartup);
+        StartupManager.SetStartup(appSettings.RunOnStartup, appSettings.RunAsAdmin);
         _audioController = new AudioController();
         _audioController.SetTargetDeviceAsync(appSettings.SelectedDeviceId).GetAwaiter().GetResult();
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
@@ -499,6 +521,12 @@ public partial class App : System.Windows.Application
             _mainWindow.WindowState = WindowState.Normal;
             _mainWindow.Activate();
             _mainWindow.Focus();
+            var handle = new WindowInteropHelper(_mainWindow).Handle;
+            if (handle != IntPtr.Zero)
+            {
+                ShowWindow(handle, 9); // SW_RESTORE
+                SetForegroundWindow(handle);
+            }
         }
         else
         {
@@ -743,50 +771,104 @@ public partial class App : System.Windows.Application
 
     private void ExitApp()
     {
-        try { SettingsManager.Flush(); }
-        catch (Exception ex)
+        try
         {
-            System.Windows.MessageBox.Show("Settings could not be saved. MicMute will stay open so you can retry.\n\n" + ex.Message, "Save settings");
-            return;
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.ContextMenuStrip?.Dispose();
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
+            }
         }
-        if (_mainWindow != null)
+        catch { }
+
+        try
         {
-            _mainWindow.Closing -= MainWindow_Closing;
-            try { _mainWindow.Close(); } catch { }
+            if (_currentHIcon != IntPtr.Zero)
+            {
+                DestroyIcon(_currentHIcon);
+                _currentHIcon = IntPtr.Zero;
+            }
         }
-        Shutdown();
+        catch { }
+
+        try { SettingsManager.Flush(); } catch { }
+
+        try
+        {
+            if (_mainWindow != null)
+            {
+                _mainWindow.Closing -= MainWindow_Closing;
+                _mainWindow.Close();
+                _mainWindow = null;
+            }
+        }
+        catch { }
+
+        try
+        {
+            _audioController?.Dispose();
+            _audioController = null;
+        }
+        catch { }
+
+        try
+        {
+            _mutex?.Dispose();
+            _mutex = null;
+        }
+        catch { }
+
+        Environment.Exit(0);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         try { SettingsManager.Flush(); }
-        catch (Exception ex)
+        catch { }
+        try
         {
-            System.Diagnostics.Trace.WriteLine("Could not save settings at shutdown: " + ex.Message);
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.ContextMenuStrip?.Dispose();
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
+            }
         }
-        if (_notifyIcon != null)
+        catch { }
+        try
         {
-            _notifyIcon.Visible = false;
-            _notifyIcon.Dispose();
+            if (_currentHIcon != IntPtr.Zero)
+            {
+                DestroyIcon(_currentHIcon);
+                _currentHIcon = IntPtr.Zero;
+            }
         }
-        if (_currentHIcon != IntPtr.Zero)
+        catch { }
+        try
         {
-            DestroyIcon(_currentHIcon);
-            _currentHIcon = IntPtr.Zero;
+            if (_mainWindow != null)
+            {
+                _mainWindow.Closing -= MainWindow_Closing;
+                _mainWindow.Close();
+                _mainWindow = null;
+            }
         }
-        if (_mainWindow != null)
+        catch { }
+        try
         {
-            _mainWindow.Closing -= MainWindow_Closing;
-            try { _mainWindow.Close(); } catch { }
+            _audioController?.Dispose();
+            _audioController = null;
         }
-        _audioController?.Dispose();
+        catch { }
         try
         {
             _mutex?.Dispose();
+            _mutex = null;
         }
-        catch
-        {
-        }
+        catch { }
         base.OnExit(e);
     }
 }

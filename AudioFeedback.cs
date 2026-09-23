@@ -60,10 +60,16 @@ public static class AudioFeedback
 
         lock (_playLock)
         {
+            var oldMute = _mutePlayer;
+            var oldUnmute = _unmutePlayer;
+
             _mutePlayer = new SoundPlayer(new MemoryStream(muteBytes));
             _unmutePlayer = new SoundPlayer(new MemoryStream(unmuteBytes));
             try { _mutePlayer.Load(); } catch { }
             try { _unmutePlayer.Load(); } catch { }
+
+            oldMute?.Dispose();
+            oldUnmute?.Dispose();
         }
     }
 

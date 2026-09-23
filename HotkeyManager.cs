@@ -51,6 +51,11 @@ public class HotkeyManager : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint GetRawInputData(IntPtr hRawInput, uint uiCommand, IntPtr pData, ref uint pcbSize, uint cbSizeHeader);
 
+    private const uint MSGFLT_ALLOW = 1;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint msg, uint action, IntPtr pChangeFilterStruct);
+
     [DllImport("user32.dll")]
     private static extern int GetMessageTime();
 
@@ -81,6 +86,11 @@ public class HotkeyManager : IDisposable
         _hookModifiers.Reset(IsKeyDown);
         _rawModifiers.Reset(IsKeyDown);
         _hwndSource.AddHook(HwndHook);
+        try
+        {
+            ChangeWindowMessageFilterEx(hWnd, WM_INPUT, MSGFLT_ALLOW, IntPtr.Zero);
+        }
+        catch { }
         RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_INPUTSINK, hwndTarget = hWnd } },
             1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
         InstallHook();
@@ -200,7 +210,7 @@ public class HotkeyManager : IDisposable
         _disposed = true;
         Unregister();
         _pollWake.Set();
-        _pollingThread.Join();
+        _pollingThread.Join(1000);
         _pollWake.Dispose();
         if (_hookId != IntPtr.Zero)
         {

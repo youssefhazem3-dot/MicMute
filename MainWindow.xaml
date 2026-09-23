@@ -112,6 +112,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bg" Background="{TemplateBinding Background}">
                             <Path x:Name="minLine"
+                                  Width="10" Height="10"
                                   Data="M 0,5 L 10,5"
                                   Stroke="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Foreground}"
                                   StrokeThickness="1.2"
@@ -143,6 +144,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="0,20,0,0">
                             <Path x:Name="cross"
+                                  Width="10" Height="10"
                                   Data="M 1,1 L 9,9 M 9,1 L 1,9"
                                   Stroke="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Foreground}"
                                   StrokeThickness="1.2"
@@ -167,20 +169,24 @@
 
         <!-- Title Bar Theme Toggle Button Style -->
         <Style x:Key="TitleThemeButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="30" />
-            <Setter Property="Height" Value="28" />
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="32" />
             <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6" Padding="4">
+                        <Border x:Name="border" Background="{TemplateBinding Background}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#25FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -694,6 +700,8 @@
                                 <ControlTemplate TargetType="ComboBoxItem">
                                     <Border x:Name="itemBorder"
                                             Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            BorderThickness="1"
                                             CornerRadius="7"
                                             Margin="3,1.5"
                                             Padding="10,6">
@@ -726,7 +734,6 @@
                                         <Trigger Property="IsSelected" Value="True">
                                             <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
                                             <Setter TargetName="itemBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-                                            <Setter TargetName="itemBorder" Property="BorderThickness" Value="1" />
                                             <Setter TargetName="checkIcon" Property="Visibility" Value="Visible" />
                                         </Trigger>
                                     </ControlTemplate.Triggers>
@@ -763,16 +770,53 @@
                                                                   ContentTemplate="{Binding Path=SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   TextBlock.Foreground="{DynamicResource TextWhiteBrush}"
                                                                   VerticalAlignment="Center" />
-                                                <Path Grid.Column="1"
+                                                <Path x:Name="arrow"
+                                                      Grid.Column="1"
                                                       Data="M 0 0 L 4 4 L 8 0 Z"
                                                       Fill="{DynamicResource TextGrayBrush}"
                                                       HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center" />
+                                                      VerticalAlignment="Center"
+                                                      RenderTransformOrigin="0.5,0.5">
+                                                    <Path.RenderTransform>
+                                                        <RotateTransform x:Name="arrowRot" Angle="0" />
+                                                    </Path.RenderTransform>
+                                                </Path>
                                             </Grid>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="arrowRot"
+                                                                             Storyboard.TargetProperty="Angle"
+                                                                             To="180"
+                                                                             Duration="0:0:0.18">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="arrowRot"
+                                                                             Storyboard.TargetProperty="Angle"
+                                                                             To="0"
+                                                                             Duration="0:0:0.18">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -783,7 +827,7 @@
                                    AllowsTransparency="True"
                                    Focusable="False"
                                    Placement="Bottom"
-                                   PopupAnimation="Slide">
+                                   PopupAnimation="Fade">
                                 <Border x:Name="dropDownBorder"
                                         MinWidth="{Binding ActualWidth, ElementName=toggle}"
                                         MaxHeight="220"
@@ -792,7 +836,43 @@
                                         BorderThickness="1"
                                         CornerRadius="10"
                                         Padding="4"
-                                        Margin="0,4,0,8">
+                                        Margin="0,4,0,8"
+                                        RenderTransformOrigin="0.5,0">
+                                    <Border.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                                            <TranslateTransform Y="0" />
+                                        </TransformGroup>
+                                    </Border.RenderTransform>
+                                    <Border.Triggers>
+                                        <EventTrigger RoutedEvent="Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="0.0" To="1.0"
+                                                                     Duration="0:0:0.18">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseOut" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)"
+                                                                     From="-6" To="0"
+                                                                     Duration="0:0:0.18">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseOut" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)"
+                                                                     From="0.96" To="1.0"
+                                                                     Duration="0:0:0.18">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseOut" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Border.Triggers>
                                     <Border.Effect>
                                         <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.55" Color="Black" />
                                     </Border.Effect>
@@ -1452,7 +1532,7 @@
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
                                     <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Enables hotkeys over games and elevated windows"
+                                    <TextBlock Text="Enables hotkeys over anti-cheat and elevated windows"
                                                Foreground="{DynamicResource TextGrayBrush}"
                                                FontSize="9.5"
                                                TextWrapping="Wrap" />

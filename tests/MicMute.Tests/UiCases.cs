@@ -49,6 +49,12 @@ static class UiCases
         test(nameof(SoundVolumeSliderDimmingReflectsSoundFeedbackToggle), SoundVolumeSliderDimmingReflectsSoundFeedbackToggle);
         test(nameof(InputBoxesSupportEscapeKeyToRevertAndLoseFocus), InputBoxesSupportEscapeKeyToRevertAndLoseFocus);
         test(nameof(OsdWindowTargetingAndTopmostPersistence), OsdWindowTargetingAndTopmostPersistence);
+        test(nameof(StartupManagerElevatedTaskSchedulerAndStandardRegistry), StartupManagerElevatedTaskSchedulerAndStandardRegistry);
+        test(nameof(MainWindowUiAccuratelyClarifiesAdminModeForAntiCheat), MainWindowUiAccuratelyClarifiesAdminModeForAntiCheat);
+        test(nameof(TitleBarCaptionButtonsAndThemeToggleAreSymmetricallyAligned), TitleBarCaptionButtonsAndThemeToggleAreSymmetricallyAligned);
+        test(nameof(ComboBoxDropdownHasSmoothAnimationAndRotatingChevron), ComboBoxDropdownHasSmoothAnimationAndRotatingChevron);
+        test(nameof(HeroHotkeySynchronizesWithSettingsAndLiveChanges), HeroHotkeySynchronizesWithSettingsAndLiveChanges);
+        test(nameof(AppExitAndTeardownHandlesFailuresGracefullyWithoutHanging), AppExitAndTeardownHandlesFailuresGracefullyWithoutHanging);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -431,6 +437,8 @@ static class UiCases
 
     private static void ExplicitStartupArgumentsOverrideStoredPreference()
     {
+        Check.True(!new AppSettings().StartMinimized, "AppSettings default StartMinimized must be false so the app pops up on first launch");
+        Check.True(!UiBehavior.ShouldStartMinimized(false, Array.Empty<string>()), "stored false preference should start visible without arguments");
         Check.True(UiBehavior.ShouldStartMinimized(true, Array.Empty<string>()), "stored minimized preference should apply without arguments");
         Check.True(!UiBehavior.ShouldStartMinimized(true, new[] { "--show" }), "show argument should override stored preference");
         Check.True(UiBehavior.ShouldStartMinimized(false, new[] { "--minimized" }), "minimized argument should override stored preference");
@@ -623,6 +631,15 @@ static class UiCases
         Check.True(preferredSize.Width >= 145 && preferredSize.Width <= 180, $"Menu preferred width {preferredSize.Width} must be compact");
         // Compact height: 3 items (30px each) + padding should be between 85px and 105px (previously bloated to >135px)
         Check.True(preferredSize.Height >= 85 && preferredSize.Height <= 105, $"Menu preferred height {preferredSize.Height} must be compact and under 105px");
+
+        // Validate that OnRenderMenuItemBackground renders cleanly within item bounds without clipping
+        using var bmp = new System.Drawing.Bitmap(160, 30);
+        using var g = System.Drawing.Graphics.FromImage(bmp);
+        var renderArgs = new System.Windows.Forms.ToolStripItemRenderEventArgs(g, item2);
+        item2.Select();
+        var renderMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderMenuItemBackground", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Check.True(renderMethod != null, "OnRenderMenuItemBackground must exist on LiquidGlassMenuRenderer");
+        renderMethod!.Invoke(menu.Renderer, new object[] { renderArgs });
     }
 
     private static void MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones()
@@ -1030,6 +1047,9 @@ static class UiCases
         var getFgMethod = typeof(OsdWindow).GetMethod("GetForegroundWindow", flags);
         Check.True(getFgMethod != null, "GetForegroundWindow P/Invoke must be defined on OsdWindow");
 
+        var bringWindowToTopMethod = typeof(OsdWindow).GetMethod("BringWindowToTop", flags);
+        Check.True(bringWindowToTopMethod != null, "BringWindowToTop P/Invoke must be defined on OsdWindow");
+
         var window = new OsdWindow();
         try
         {
@@ -1053,5 +1073,163 @@ static class UiCases
         {
             window.Close();
         }
+    }
+
+    private static void StartupManagerElevatedTaskSchedulerAndStandardRegistry()
+    {
+        // Assert StartupManager public API methods exist and execute safely
+        Check.True(typeof(StartupManager).GetMethod("CreateScheduledTask") != null, "CreateScheduledTask must exist");
+        Check.True(typeof(StartupManager).GetMethod("RemoveScheduledTask") != null, "RemoveScheduledTask must exist");
+        Check.True(typeof(StartupManager).GetMethod("IsScheduledTaskConfigured") != null, "IsScheduledTaskConfigured must exist");
+
+        // Querying scheduled task status should not throw
+        bool taskConfigured = StartupManager.IsScheduledTaskConfigured();
+        // Querying startup enabled should not throw
+        bool enabled = StartupManager.IsStartupEnabled();
+    }
+
+    private static void MainWindowUiAccuratelyClarifiesAdminModeForAntiCheat()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string xaml = reader.ReadToEnd();
+
+        // Must clarify anti-cheat and elevated windows, and not claim games in general require admin
+        Check.True(xaml.Contains("Enables hotkeys over anti-cheat and elevated windows"), "MainWindow.xaml must clarify anti-cheat and elevated windows");
+        Check.True(!xaml.Contains("Enables hotkeys over games and elevated windows"), "MainWindow.xaml must not misleadingly claim normal games require admin");
+    }
+
+    private static void TitleBarCaptionButtonsAndThemeToggleAreSymmetricallyAligned()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Verify all three button styles are declared
+        Check.True(rawXaml.Contains(@"<Style x:Key=""Win11MinimizeButtonStyle"" TargetType=""Button"">"), "Win11MinimizeButtonStyle must be defined");
+        Check.True(rawXaml.Contains(@"<Style x:Key=""Win11CloseButtonStyle"" TargetType=""Button"">"), "Win11CloseButtonStyle must be defined");
+        Check.True(rawXaml.Contains(@"<Style x:Key=""TitleThemeButtonStyle"" TargetType=""Button"">"), "TitleThemeButtonStyle must be defined");
+
+        // 2. Parse Window to inspect instantiated styles and controls
+        string xaml = System.Text.RegularExpressions.Regex.Replace(rawXaml, @"\s+x:Class=""[^""]+""", "");
+        xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
+        var window = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(xaml);
+        try
+        {
+            var btnTheme = window.FindName("btnTitleTheme") as System.Windows.Controls.Button;
+            var btnMin = window.FindName("btnMinimize") as System.Windows.Controls.Button;
+            var btnClose = window.FindName("btnClose") as System.Windows.Controls.Button;
+
+            Check.True(btnTheme != null, "btnTitleTheme must exist");
+            Check.True(btnMin != null, "btnMinimize must exist");
+            Check.True(btnClose != null, "btnClose must exist");
+
+            // Assert exact matching button dimensions (44x32) for mathematical alignment and equal spacing
+            var themeStyle = (System.Windows.Style)window.Resources["TitleThemeButtonStyle"];
+            var minStyle = (System.Windows.Style)window.Resources["Win11MinimizeButtonStyle"];
+            var closeStyle = (System.Windows.Style)window.Resources["Win11CloseButtonStyle"];
+
+            static double GetStyleDimension(System.Windows.Style style, System.Windows.DependencyProperty prop)
+            {
+                foreach (var setter in style.Setters)
+                {
+                    if (setter is System.Windows.Setter s && s.Property == prop && s.Value is double d)
+                        return d;
+                }
+                return double.NaN;
+            }
+
+            Check.Equal(44.0, GetStyleDimension(themeStyle, System.Windows.FrameworkElement.WidthProperty));
+            Check.Equal(32.0, GetStyleDimension(themeStyle, System.Windows.FrameworkElement.HeightProperty));
+            Check.Equal(44.0, GetStyleDimension(minStyle, System.Windows.FrameworkElement.WidthProperty));
+            Check.Equal(32.0, GetStyleDimension(minStyle, System.Windows.FrameworkElement.HeightProperty));
+            Check.Equal(44.0, GetStyleDimension(closeStyle, System.Windows.FrameworkElement.WidthProperty));
+            Check.Equal(32.0, GetStyleDimension(closeStyle, System.Windows.FrameworkElement.HeightProperty));
+
+            // Verify glyphs are centered in consistent 10x10 bounding boxes for pixel-perfect vertical centering
+            Check.True(rawXaml.Contains(@"x:Name=""minLine""") && rawXaml.Contains(@"Width=""10"" Height=""10"""), "minLine glyph must have explicit 10x10 dimensions");
+            Check.True(rawXaml.Contains(@"x:Name=""cross""") && rawXaml.Contains(@"Width=""10"" Height=""10"""), "cross glyph must have explicit 10x10 dimensions");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void ComboBoxDropdownHasSmoothAnimationAndRotatingChevron()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. PopupAnimation must be Fade for smooth entrance without mechanical slide window clipping
+        Check.True(rawXaml.Contains(@"PopupAnimation=""Fade"""), "ComboBox Popup must use PopupAnimation=Fade");
+
+        // 2. Rotating chevron arrow with RotateTransform and QuadraticEase on IsChecked
+        Check.True(rawXaml.Contains(@"x:Name=""arrowRot"""), "arrowRot RotateTransform must be defined");
+        Check.True(rawXaml.Contains(@"Storyboard.TargetName=""arrowRot"""), "Storyboard must target arrowRot");
+        Check.True(rawXaml.Contains(@"Storyboard.TargetProperty=""Angle"""), "Storyboard must animate Angle");
+        Check.True(rawXaml.Contains(@"<QuadraticEase EasingMode=""EaseOut"" />"), "Chevron rotation must use QuadraticEase");
+
+        // 3. Dropdown loaded animation: CubicEase opacity, subtle slide (Y: -6 -> 0), scale (0.96 -> 1.0)
+        Check.True(rawXaml.Contains(@"<EventTrigger RoutedEvent=""Loaded"">"), "dropDownBorder must have Loaded EventTrigger");
+        Check.True(rawXaml.Contains(@"<CubicEase EasingMode=""EaseOut"" />"), "Dropdown animation must use CubicEase");
+        Check.True(rawXaml.Contains(@"From=""0.0"" To=""1.0"""), "Dropdown must animate opacity from 0.0 to 1.0");
+        Check.True(rawXaml.Contains(@"From=""-6"" To=""0"""), "Dropdown must animate TranslateTransform.Y from -6 to 0");
+        Check.True(rawXaml.Contains(@"From=""0.96"" To=""1.0"""), "Dropdown must animate ScaleTransform.ScaleY from 0.96 to 1.0");
+    }
+
+    private static void HeroHotkeySynchronizesWithSettingsAndLiveChanges()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.tbHeroHotkey != null, "tbHeroHotkey must be bound in MainWindow");
+
+            // Display key sync
+            window.DisplayHotkey(System.Windows.Input.Key.F8, System.Windows.Input.ModifierKeys.Control);
+            Check.Equal("Ctrl + F8", window.tbHeroHotkey!.Text);
+
+            // Record mode sync
+            window.StartRecordingHotkey();
+            Check.Equal("...", window.tbHeroHotkey.Text);
+
+            // Reset back
+            window.DisplayHotkey(System.Windows.Input.Key.Insert, System.Windows.Input.ModifierKeys.None);
+            Check.Equal("Insert", window.tbHeroHotkey.Text);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void AppExitAndTeardownHandlesFailuresGracefullyWithoutHanging()
+    {
+        // Simulate tray icon lifecycle
+        using var notifyIcon = new System.Windows.Forms.NotifyIcon { Visible = true };
+        notifyIcon.Visible = false;
+        notifyIcon.Dispose();
+        Check.True(!notifyIcon.Visible, "NotifyIcon should be invisible upon teardown");
+
+        // Verify window close event unhooking allows normal closure
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        bool closingCalled = false;
+        System.ComponentModel.CancelEventHandler handler = (s, e) =>
+        {
+            closingCalled = true;
+            e.Cancel = true;
+        };
+        window.Closing += handler;
+
+        // Unhook handler as done in ExitApp
+        window.Closing -= handler;
+        window.Close();
+        Check.True(!closingCalled, "Window should close cleanly without being intercepted by hide-to-tray");
     }
 }

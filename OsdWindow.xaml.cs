@@ -57,6 +57,10 @@ public partial class OsdWindow : Window
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
     [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -257,10 +261,12 @@ public partial class OsdWindow : Window
             this.Left = target.Left / scaleX;
             this.Top = target.Top / scaleY;
 
+            BringWindowToTop(handle);
             SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
         catch
         {
+            BringWindowToTop(handle);
             SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
     }
@@ -329,6 +335,7 @@ public partial class OsdWindow : Window
         try
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
+            BringWindowToTop(handle);
             SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 
             double startOpacity = Math.Clamp(this.Opacity, 0.0, 0.95);
@@ -338,6 +345,7 @@ public partial class OsdWindow : Window
             DateTime endTime = DateTime.UtcNow.AddSeconds(durationSeconds);
             while (DateTime.UtcNow < endTime)
             {
+                BringWindowToTop(handle);
                 SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
                 TimeSpan remaining = endTime - DateTime.UtcNow;
                 if (remaining <= TimeSpan.Zero) break;

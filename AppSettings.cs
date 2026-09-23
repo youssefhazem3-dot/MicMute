@@ -12,7 +12,7 @@ public sealed record AppSettings
 
     public bool RunOnStartup { get; init; }
 
-    public bool StartMinimized { get; init; } = true;
+    public bool StartMinimized { get; init; } = false;
 
     public bool EnableOsd { get; init; } = true;
 
