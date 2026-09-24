@@ -107,6 +107,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ClickMode" Value="Press" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -139,6 +140,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ClickMode" Value="Press" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -175,6 +177,7 @@
             <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="ClickMode" Value="Press" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -477,13 +480,15 @@
         <Style x:Key="MicToggleButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="96" />
             <Setter Property="Height" Value="96" />
+            <Setter Property="Background" Value="Transparent" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="ClickMode" Value="Press" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid x:Name="rootGrid" RenderTransformOrigin="0.5,0.5">
+                        <Grid x:Name="rootGrid" Background="Transparent" RenderTransformOrigin="0.5,0.5">
                             <Grid.RenderTransform>
                                 <ScaleTransform x:Name="gridScale" ScaleX="1.0" ScaleY="1.0" />
                             </Grid.RenderTransform>
@@ -641,10 +646,10 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="0.89" Duration="0:0:0.07">
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="0.94" Duration="0:0:0.07">
                                                 <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="0.89" Duration="0:0:0.07">
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="0.94" Duration="0:0:0.07">
                                                 <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>

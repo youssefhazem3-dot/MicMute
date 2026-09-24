@@ -58,6 +58,7 @@ static class UiCases
         test(nameof(OsdWindowCornersHaveNoClippedDropShadowArtifacts), OsdWindowCornersHaveNoClippedDropShadowArtifacts);
         test(nameof(OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction), OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction);
         test(nameof(OsdWindowMatchesCircularGlowReferenceDesign), OsdWindowMatchesCircularGlowReferenceDesign);
+        test(nameof(ButtonsReliablyRegisterClicksWithPressModeAndTitleBarGuards), ButtonsReliablyRegisterClicksWithPressModeAndTitleBarGuards);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -1392,6 +1393,53 @@ static class UiCases
             Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedSlashBrush.Color, "Muted slash must be coral red #F87171");
             var mutedBg = (System.Windows.Media.SolidColorBrush)window.borderPanel.Background;
             Check.True(mutedBg.Color.R < 40, "Muted background disc must be dark surface");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void ButtonsReliablyRegisterClicksWithPressModeAndTitleBarGuards()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Verify in raw XAML that ClickMode="Press" is applied to caption buttons, theme toggle, and hero mute button
+        Check.True(rawXaml.Contains(@"<Style x:Key=""Win11MinimizeButtonStyle"" TargetType=""Button"">")
+            && rawXaml.Contains(@"<Setter Property=""ClickMode"" Value=""Press"" />"), "Win11MinimizeButtonStyle must have ClickMode=Press");
+        Check.True(rawXaml.Contains(@"<Style x:Key=""Win11CloseButtonStyle"" TargetType=""Button"">"), "Win11CloseButtonStyle must be defined");
+        Check.True(rawXaml.Contains(@"<Style x:Key=""TitleThemeButtonStyle"" TargetType=""Button"">"), "TitleThemeButtonStyle must be defined");
+        Check.True(rawXaml.Contains(@"<Style x:Key=""MicToggleButtonStyle"" TargetType=""Button"">"), "MicToggleButtonStyle must be defined");
+        Check.True(rawXaml.Contains(@"<Grid x:Name=""rootGrid"" Background=""Transparent"""), "rootGrid must have Background=Transparent to ensure reliable hit-testing");
+
+        // 2. Parse Window and verify style ClickMode values
+        string xaml = System.Text.RegularExpressions.Regex.Replace(rawXaml, @"\s+x:Class=""[^""]+""", "");
+        xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
+        var window = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(xaml);
+        try
+        {
+            static System.Windows.Controls.ClickMode GetClickMode(System.Windows.Style style)
+            {
+                foreach (var setter in style.Setters)
+                {
+                    if (setter is System.Windows.Setter s && s.Property == System.Windows.Controls.Primitives.ButtonBase.ClickModeProperty)
+                        return (System.Windows.Controls.ClickMode)s.Value;
+                }
+                return System.Windows.Controls.ClickMode.Release;
+            }
+
+            var minStyle = (System.Windows.Style)window.Resources["Win11MinimizeButtonStyle"];
+            var closeStyle = (System.Windows.Style)window.Resources["Win11CloseButtonStyle"];
+            var themeStyle = (System.Windows.Style)window.Resources["TitleThemeButtonStyle"];
+            var heroStyle = (System.Windows.Style)window.Resources["MicToggleButtonStyle"];
+
+            Check.Equal(System.Windows.Controls.ClickMode.Press, GetClickMode(minStyle), "Minimize button style must use ClickMode.Press");
+            Check.Equal(System.Windows.Controls.ClickMode.Press, GetClickMode(closeStyle), "Close button style must use ClickMode.Press");
+            Check.Equal(System.Windows.Controls.ClickMode.Press, GetClickMode(themeStyle), "Theme toggle button style must use ClickMode.Press");
+            Check.Equal(System.Windows.Controls.ClickMode.Press, GetClickMode(heroStyle), "Hero mute toggle button style must use ClickMode.Press");
         }
         finally
         {

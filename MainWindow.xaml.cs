@@ -215,10 +215,22 @@ public partial class MainWindow : Window
             var titleBar = (Border)root.FindName("borderTitleBar");
             if (titleBar != null) titleBar.MouseLeftButtonDown += TitleBar_MouseLeftButtonDown;
             btnMin = (System.Windows.Controls.Button)root.FindName("btnMinimize");
-            if (btnMin != null) btnMin.Click += MinimizeButton_Click;
+            if (btnMin != null)
+            {
+                btnMin.Click += MinimizeButton_Click;
+                btnMin.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
+            }
             btnCls = (System.Windows.Controls.Button)root.FindName("btnClose");
-            if (btnCls != null) btnCls.Click += CloseButton_Click;
-            if (btnTitleTheme != null) btnTitleTheme.Click += BtnTitleTheme_Click;
+            if (btnCls != null)
+            {
+                btnCls.Click += CloseButton_Click;
+                btnCls.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
+            }
+            if (btnTitleTheme != null)
+            {
+                btnTitleTheme.Click += BtnTitleTheme_Click;
+                btnTitleTheme.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
+            }
             var btnOpenFolder = (System.Windows.Controls.Button)root.FindName("btnOpenFolder");
             if (btnOpenFolder != null) btnOpenFolder.Click += BtnOpenDataFolder_Click;
             var btnChangeFolder = (System.Windows.Controls.Button)root.FindName("btnChangeFolder");
@@ -251,7 +263,11 @@ public partial class MainWindow : Window
             this.Content = content;
         }
 
-        if (btnStateToggle != null) btnStateToggle.Click += BtnStateToggle_Click;
+        if (btnStateToggle != null)
+        {
+            btnStateToggle.Click += BtnStateToggle_Click;
+            btnStateToggle.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
+        }
         if (cbDevices != null) cbDevices.SelectionChanged += CbDevices_SelectionChanged;
         if (btnRecordHotkey != null) btnRecordHotkey.Click += BtnRecordHotkey_Click;
         if (cbEnableOsd != null)
@@ -393,6 +409,13 @@ public partial class MainWindow : Window
             };
         }
         this.SizeChanged += MainWindow_SizeChanged;
+        this.PreviewMouseLeftButtonDown += (s, e) =>
+        {
+            if (!this.IsActive)
+            {
+                this.Activate();
+            }
+        };
     }
 
     internal static Window LoadWindowRoot(string localFile)
@@ -866,8 +889,26 @@ public partial class MainWindow : Window
         _audioController.ToggleMute();
     }
 
+    private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+    {
+        while (child != null)
+        {
+            if (child is T parent) return parent;
+            if (child is Visual || child is System.Windows.Media.Media3D.Visual3D)
+                child = VisualTreeHelper.GetParent(child);
+            else
+                child = LogicalTreeHelper.GetParent(child);
+        }
+        return null;
+    }
+
     public void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.OriginalSource is DependencyObject dep && FindVisualParent<System.Windows.Controls.Primitives.ButtonBase>(dep) != null)
+        {
+            return;
+        }
+
         if (e.LeftButton == MouseButtonState.Pressed)
         {
             ReleaseCapture();
