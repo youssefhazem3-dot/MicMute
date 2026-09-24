@@ -17,6 +17,36 @@ public partial class OsdWindow : Window
 {
     private static OsdWindow? _instance;
     private static CancellationTokenSource? _cts;
+    private static Window? _blurWindow;
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateEllipticRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowCompositionAttributeData
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AccentPolicy
+    {
+        public int AccentState;
+        public int AccentFlags;
+        public uint GradientColor;
+        public int AnimationId;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
 
     private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
     private const uint SWP_NOSIZE = 0x0001;
@@ -185,10 +215,49 @@ public partial class OsdWindow : Window
         _cts = new CancellationTokenSource();
         previousCts?.Cancel();
         previousCts?.Dispose();
+
+        if (_blurWindow == null)
+        {
+            _blurWindow = new Window
+            {
+                WindowStyle = WindowStyle.None,
+                AllowsTransparency = false,
+                ShowInTaskbar = false,
+                Topmost = true,
+                Width = 140,
+                Height = 140,
+                Background = Brushes.Black,
+                ResizeMode = ResizeMode.NoResize,
+                ShowActivated = false
+            };
+
+            _blurWindow.Loaded += (s, e) =>
+            {
+                IntPtr hwnd = new WindowInteropHelper(_blurWindow).EnsureHandle();
+                IntPtr hRgn = CreateEllipticRgn(0, 0, 140, 140);
+                SetWindowRgn(hwnd, hRgn, true);
+                DeleteObject(hRgn);
+
+                var accent = new AccentPolicy { AccentState = 3, GradientColor = 0x01000000 };
+                int size = Marshal.SizeOf(accent);
+                IntPtr ptr = Marshal.AllocHGlobal(size);
+                Marshal.StructureToPtr(accent, ptr, false);
+                var data = new WindowCompositionAttributeData { Attribute = 19, SizeOfData = size, Data = ptr };
+                SetWindowCompositionAttribute(hwnd, ref data);
+                Marshal.FreeHGlobal(ptr);
+
+                long exStyle = GetWindowLong(hwnd, GWL_EXSTYLE).ToInt64();
+                SetWindowLong(hwnd, GWL_EXSTYLE, new IntPtr(exStyle | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST));
+            };
+        }
+
         if (_instance == null)
         {
             _instance = new OsdWindow();
+            _instance.Owner = _blurWindow;
+            System.Windows.Data.BindingOperations.SetBinding(_blurWindow, Window.OpacityProperty, new System.Windows.Data.Binding("Opacity") { Source = _instance });
         }
+
         _instance.ApplyTheme(SettingsManager.Load().LightMode);
         _instance.UpdateState(isMuted);
 
@@ -196,6 +265,13 @@ public partial class OsdWindow : Window
 
         _instance.PositionOnActiveScreen(handle);
 
+        _blurWindow.Left = _instance.Left + 20;
+        _blurWindow.Top = _instance.Top + 20;
+
+        if (!_blurWindow.IsVisible)
+        {
+            _blurWindow.Show();
+        }
         if (!_instance.IsVisible)
         {
             _instance.Show();
@@ -376,6 +452,7 @@ public partial class OsdWindow : Window
                 if (!token.IsCancellationRequested)
                 {
                     Hide();
+                    _blurWindow?.Hide();
                 }
             };
             BeginAnimation(OpacityProperty, fadeOut);

@@ -103,12 +103,6 @@ public partial class App : System.Windows.Application
         {
             base.OnLayout(e);
             ApplyWindowRounding();
-            int contentWidth = ClientRectangle.Width - Padding.Horizontal;
-            foreach (ToolStripItem item in Items)
-            {
-                if (!item.Available) continue;
-                item.Size = new System.Drawing.Size(contentWidth, 30);
-            }
         }
 
         private void ApplyWindowRounding()
@@ -138,21 +132,6 @@ public partial class App : System.Windows.Application
                     catch { }
                 }
             }
-        }
-
-        public override System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
-        {
-            int maxWidth = 0;
-            int totalHeight = Padding.Vertical;
-            foreach (ToolStripItem item in Items)
-            {
-                if (!item.Available) continue;
-                System.Drawing.Size textSize = TextRenderer.MeasureText(item.Text, Font, System.Drawing.Size.Empty, TextFormatFlags.NoPadding);
-                if (textSize.Width > maxWidth) maxWidth = textSize.Width;
-                totalHeight += 30;
-            }
-            int width = maxWidth + 31 + 9;
-            return new System.Drawing.Size(width, totalHeight);
         }
     }
 
@@ -199,11 +178,11 @@ public partial class App : System.Windows.Application
             int fontHeight = font?.Height ?? 17;
 
             // Render vector outline icon
-            int iconX = 9 - e.Item.Bounds.X;
+            int iconX = 14 - e.Item.Bounds.X;
             int iconY = (e.Item.Height - 16) / 2;
             RenderMenuIcon(e.Graphics, e.Item.Text, iconX, iconY, textColor);
 
-            int leftOnMenu = 31;
+            int leftOnMenu = 40;
             int x = leftOnMenu - e.Item.Bounds.X;
             int y = (e.Item.Height - fontHeight) / 2;
 
@@ -288,7 +267,7 @@ public partial class App : System.Windows.Application
                 Color hoverColor = lightMode ? Color.FromArgb(232, 232, 237) : Color.FromArgb(25, 255, 255, 255);
                 using SolidBrush brush = new SolidBrush(hoverColor);
 
-                const int marginX = 3;
+                const int marginX = 4;
                 int width = e.Item.Width - (marginX * 2);
                 if (width > 0 && e.Item.Height > 2)
                 {
@@ -560,17 +539,20 @@ public partial class App : System.Windows.Application
         ToolStripMenuItem value = new ToolStripMenuItem("Toggle Mute", null, delegate
         {
             _audioController?.ToggleMute();
-        }) { AutoSize = false, Height = 30, Margin = new Padding(0), Padding = new Padding(0) };
+        })
+        { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 10, 48, 10) };
 
         ToolStripMenuItem value2 = new ToolStripMenuItem("Open App", null, delegate
         {
             ShowWindow();
-        }) { AutoSize = false, Height = 30, Margin = new Padding(0), Padding = new Padding(0) };
+        })
+        { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 10, 48, 10) };
 
         ToolStripMenuItem value3 = new ToolStripMenuItem("Quit", null, delegate
         {
             ExitApp();
-        }) { AutoSize = false, Height = 30, Margin = new Padding(0), Padding = new Padding(0) };
+        })
+        { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 10, 48, 10) };
 
         contextMenuStrip.Items.Add(value);
         contextMenuStrip.Items.Add(value2);

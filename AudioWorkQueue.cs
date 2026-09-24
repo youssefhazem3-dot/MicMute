@@ -20,7 +20,8 @@ internal sealed class AudioWorkQueue : IDisposable
             _dispatcher = Dispatcher.CurrentDispatcher;
             _ready.Set();
             Dispatcher.Run();
-        }) { IsBackground = true, Name = "MicMute_Audio" };
+        })
+        { IsBackground = true, Name = "MicMute_Audio" };
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
         _ready.Wait();

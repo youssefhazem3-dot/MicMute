@@ -2,18 +2,18 @@ namespace MicMute;
 
 public class AudioDevice
 {
-	public string Id { get; }
+    public string Id { get; }
 
-	public string Name { get; }
+    public string Name { get; }
 
-	public AudioDevice(string id, string name)
-	{
-		Id = id;
-		Name = name;
-	}
+    public AudioDevice(string id, string name)
+    {
+        Id = id;
+        Name = name;
+    }
 
-	public override string ToString()
-	{
-		return Name;
-	}
+    public override string ToString()
+    {
+        return Name;
+    }
 }

@@ -613,9 +613,9 @@ static class UiCases
             menu.Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
         }
 
-        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = false, Height = 30, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0) };
-        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = false, Height = 30, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0) };
-        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = false, Height = 30, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0) };
+        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 10, 48, 10) };
+        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 10, 48, 10) };
+        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 10, 48, 10) };
 
         menu.Items.Add(item1);
         menu.Items.Add(item2);
@@ -629,10 +629,9 @@ static class UiCases
         Check.Equal("Open App", menu.Items[1].Text);
         Check.Equal("Quit", menu.Items[2].Text);
         var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
-        // Compact width: should comfortably fit the items without excessive empty gap on the right (between 105 and 125)
-        Check.True(preferredSize.Width >= 105 && preferredSize.Width <= 125, $"Menu preferred width {preferredSize.Width} must be compact and gap-free");
-        // Compact height: 3 items (30px each) + padding should be between 85px and 105px (previously bloated to >135px)
-        Check.True(preferredSize.Height >= 85 && preferredSize.Height <= 105, $"Menu preferred height {preferredSize.Height} must be compact and under 105px");
+        
+        Check.True(preferredSize.Width >= 120 && preferredSize.Width <= 140, $"Menu preferred width {preferredSize.Width} must be comfortably sized");
+        Check.True(preferredSize.Height >= 110 && preferredSize.Height <= 130, $"Menu preferred height {preferredSize.Height} must be comfortably sized");
 
         // Validate that OnRenderMenuItemBackground renders cleanly within item bounds without clipping
         using var bmp = new System.Drawing.Bitmap(160, 30);
