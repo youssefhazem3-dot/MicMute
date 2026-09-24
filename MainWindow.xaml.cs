@@ -833,11 +833,6 @@ public partial class MainWindow : Window
                 {
                     OsdWindow.ShowOsd(e.IsMuted, appSettings.OsdDuration);
                 }
-                else if (e.ShowOsd && System.Windows.Application.Current is App app)
-                {
-                    string text = e.IsMuted ? "Muted" : "Active";
-                    app.ShowToastNotification("Microphone is now " + text + ".");
-                }
             }
         });
     }

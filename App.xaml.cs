@@ -722,10 +722,7 @@ public partial class App : System.Windows.Application
 
     public void ShowToastNotification(string message)
     {
-        if (_notifyIcon != null)
-        {
-            _notifyIcon.ShowBalloonTip(1500, "Mic Mute", message, ToolTipIcon.Info);
-        }
+        // Notification popups disabled per user request
     }
 
     private void ShowWindow()

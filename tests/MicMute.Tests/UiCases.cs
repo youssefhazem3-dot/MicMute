@@ -1368,12 +1368,12 @@ static class UiCases
             var activeTextBrush = (System.Windows.Media.SolidColorBrush)window.tbStatus.Foreground;
             Check.Equal(System.Windows.Media.Colors.White, activeTextBrush.Color, "Active text must be pure white");
             var activeBorderBrush = (System.Windows.Media.SolidColorBrush)window.borderPanel.BorderBrush;
-            Check.Equal(System.Windows.Media.Color.FromRgb(0xD0, 0xE4, 0xF5), activeBorderBrush.Color, "Active border must be ice-blue #D0E4F5");
-            Check.Equal(System.Windows.Media.Color.FromRgb(0xA8, 0xD0, 0xEE), shadow.Color, "Active glow must be soft ice-blue #A8D0EE");
+            Check.Equal(System.Windows.Media.Colors.White, activeBorderBrush.Color, "Active border must be pure white #FFFFFF");
+            Check.Equal(System.Windows.Media.Color.FromRgb(0x00, 0x00, 0x00), shadow.Color, "Active shadow must be clean black #000000");
             var activeGlyphBrush = (System.Windows.Media.SolidColorBrush)window.activeGlyph.Fill;
             Check.Equal(System.Windows.Media.Colors.White, activeGlyphBrush.Color, "Active glyph must be pure white");
             var activeBg = (System.Windows.Media.SolidColorBrush)window.borderPanel.Background;
-            Check.True(activeBg.Color.A < 200, "Active background disc must be translucent frosted glass");
+            Check.True(activeBg.Color.R < 40, "Active background disc must be dark surface");
 
             // Test Muted State
             updateMethod.Invoke(window, new object[] { true }); // Muted
@@ -1391,7 +1391,7 @@ static class UiCases
             var mutedSlashBrush = (System.Windows.Media.SolidColorBrush)window.muteSlash.Stroke;
             Check.Equal(System.Windows.Media.Color.FromRgb(0xF8, 0x71, 0x71), mutedSlashBrush.Color, "Muted slash must be coral red #F87171");
             var mutedBg = (System.Windows.Media.SolidColorBrush)window.borderPanel.Background;
-            Check.True(mutedBg.Color.A < 200, "Muted background disc must be translucent frosted glass");
+            Check.True(mutedBg.Color.R < 40, "Muted background disc must be dark surface");
         }
         finally
         {

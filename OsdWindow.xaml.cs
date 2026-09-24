@@ -17,36 +17,6 @@ public partial class OsdWindow : Window
 {
     private static OsdWindow? _instance;
     private static CancellationTokenSource? _cts;
-    private static Window? _blurWindow;
-
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateEllipticRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect);
-
-    [DllImport("user32.dll")]
-    private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
-
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteObject(IntPtr hObject);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct WindowCompositionAttributeData
-    {
-        public int Attribute;
-        public IntPtr Data;
-        public int SizeOfData;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct AccentPolicy
-    {
-        public int AccentState;
-        public int AccentFlags;
-        public uint GradientColor;
-        public int AnimationId;
-    }
-
-    [DllImport("user32.dll")]
-    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
 
     private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
     private const uint SWP_NOSIZE = 0x0001;
@@ -216,46 +186,9 @@ public partial class OsdWindow : Window
         previousCts?.Cancel();
         previousCts?.Dispose();
 
-        if (_blurWindow == null)
-        {
-            _blurWindow = new Window
-            {
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = false,
-                ShowInTaskbar = false,
-                Topmost = true,
-                Width = 140,
-                Height = 140,
-                Background = Brushes.Black,
-                ResizeMode = ResizeMode.NoResize,
-                ShowActivated = false
-            };
-
-            _blurWindow.Loaded += (s, e) =>
-            {
-                IntPtr hwnd = new WindowInteropHelper(_blurWindow).EnsureHandle();
-                IntPtr hRgn = CreateEllipticRgn(0, 0, 140, 140);
-                SetWindowRgn(hwnd, hRgn, true);
-                DeleteObject(hRgn);
-
-                var accent = new AccentPolicy { AccentState = 3, GradientColor = 0x01000000 };
-                int size = Marshal.SizeOf(accent);
-                IntPtr ptr = Marshal.AllocHGlobal(size);
-                Marshal.StructureToPtr(accent, ptr, false);
-                var data = new WindowCompositionAttributeData { Attribute = 19, SizeOfData = size, Data = ptr };
-                SetWindowCompositionAttribute(hwnd, ref data);
-                Marshal.FreeHGlobal(ptr);
-
-                long exStyle = GetWindowLong(hwnd, GWL_EXSTYLE).ToInt64();
-                SetWindowLong(hwnd, GWL_EXSTYLE, new IntPtr(exStyle | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST));
-            };
-        }
-
         if (_instance == null)
         {
             _instance = new OsdWindow();
-            _instance.Owner = _blurWindow;
-            System.Windows.Data.BindingOperations.SetBinding(_blurWindow, Window.OpacityProperty, new System.Windows.Data.Binding("Opacity") { Source = _instance });
         }
 
         _instance.ApplyTheme(SettingsManager.Load().LightMode);
@@ -265,13 +198,6 @@ public partial class OsdWindow : Window
 
         _instance.PositionOnActiveScreen(handle);
 
-        _blurWindow.Left = _instance.Left + 20;
-        _blurWindow.Top = _instance.Top + 20;
-
-        if (!_blurWindow.IsVisible)
-        {
-            _blurWindow.Show();
-        }
         if (!_instance.IsVisible)
         {
             _instance.Show();
@@ -347,24 +273,24 @@ public partial class OsdWindow : Window
         }
     }
 
-    private static readonly Color ColorMutedText = Color.FromRgb(0xF8, 0x71, 0x71); // Clean standard balanced coral red (#F87171)
-    private static readonly Color ColorMutedBorder = Color.FromRgb(0xF8, 0x71, 0x71); // Matching glowing ring
+    private static readonly Color ColorMutedText = Color.FromRgb(0xF8, 0x71, 0x71); // Clean standard coral red (#F87171)
+    private static readonly Color ColorMutedBorder = Color.FromRgb(0xF8, 0x71, 0x71);
     private static readonly Color ColorMutedGlow = Color.FromRgb(0xEF, 0x44, 0x44);
     private static readonly SolidColorBrush BrushMutedText = CreateFrozenBrush(ColorMutedText);
     private static readonly SolidColorBrush BrushMutedBorder = CreateFrozenBrush(ColorMutedBorder);
-    private static readonly SolidColorBrush BrushDarkMutedBackground = CreateFrozenBrush(Color.FromArgb(0x8A, 0x28, 0x16, 0x16));
+    private static readonly SolidColorBrush BrushDarkMutedBackground = CreateFrozenBrush(Color.FromArgb(0xEE, 0x16, 0x11, 0x12));
 
-    private static readonly Color ColorActive = Color.FromRgb(0xD0, 0xE4, 0xF5); // Ice blue ring from photo
-    private static readonly Color ColorActiveGlow = Color.FromRgb(0xA8, 0xD0, 0xEE); // Soft ice blue glow
-    private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Colors.White); // Pure white matching photo
-    private static readonly SolidColorBrush BrushActiveBorder = CreateFrozenBrush(ColorActive);
-    private static readonly SolidColorBrush BrushDarkActiveBackground = CreateFrozenBrush(Color.FromArgb(0x8A, 0x16, 0x22, 0x30));
+    private static readonly Color ColorActive = Color.FromRgb(0xFF, 0xFF, 0xFF); // Pure white
+    private static readonly Color ColorActiveGlow = Color.FromRgb(0x00, 0x00, 0x00); // Clean subtle shadow
+    private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Colors.White);
+    private static readonly SolidColorBrush BrushActiveBorder = CreateFrozenBrush(Colors.White);
+    private static readonly SolidColorBrush BrushDarkActiveBackground = CreateFrozenBrush(Color.FromArgb(0xEE, 0x12, 0x14, 0x18));
 
-    private static readonly SolidColorBrush BrushLightActiveBackground = CreateFrozenBrush(Color.FromArgb(0xC8, 0xED, 0xF5, 0xFB));
-    private static readonly SolidColorBrush BrushLightActiveBorder = CreateFrozenBrush(Color.FromRgb(0x4A, 0x7A, 0x96));
-    private static readonly SolidColorBrush BrushLightActiveText = CreateFrozenBrush(Color.FromRgb(0x1E, 0x29, 0x3B));
+    private static readonly SolidColorBrush BrushLightActiveBackground = CreateFrozenBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush BrushLightActiveBorder = CreateFrozenBrush(Color.FromRgb(0x12, 0x14, 0x18));
+    private static readonly SolidColorBrush BrushLightActiveText = CreateFrozenBrush(Color.FromRgb(0x12, 0x14, 0x18));
 
-    private static readonly SolidColorBrush BrushLightMutedBackground = CreateFrozenBrush(Color.FromArgb(0xC8, 0xFE, 0xEC, 0xEB));
+    private static readonly SolidColorBrush BrushLightMutedBackground = CreateFrozenBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
     private static readonly SolidColorBrush BrushLightMutedBorder = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26));
     private static readonly SolidColorBrush BrushLightMutedText = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26));
     private static readonly SolidColorBrush BrushLightMuted = BrushLightMutedText;
@@ -404,7 +330,7 @@ public partial class OsdWindow : Window
             if (osdShadow != null)
             {
                 osdShadow.Color = _lightMode ? BrushLightMutedBorder.Color : ColorMutedGlow;
-                osdShadow.Opacity = _lightMode ? 0.35 : 0.65;
+                osdShadow.Opacity = _lightMode ? 0.40 : 0.65;
             }
         }
         else
@@ -417,8 +343,8 @@ public partial class OsdWindow : Window
             borderPanel.Background = _lightMode ? BrushLightActiveBackground : BrushDarkActiveBackground;
             if (osdShadow != null)
             {
-                osdShadow.Color = _lightMode ? BrushLightActiveBorder.Color : ColorActiveGlow;
-                osdShadow.Opacity = _lightMode ? 0.35 : 0.65;
+                osdShadow.Color = Color.FromRgb(0x00, 0x00, 0x00);
+                osdShadow.Opacity = _lightMode ? 0.25 : 0.45;
             }
         }
     }
@@ -452,7 +378,6 @@ public partial class OsdWindow : Window
                 if (!token.IsCancellationRequested)
                 {
                     Hide();
-                    _blurWindow?.Hide();
                 }
             };
             BeginAnimation(OpacityProperty, fadeOut);

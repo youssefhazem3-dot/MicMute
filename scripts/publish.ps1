@@ -20,7 +20,7 @@ $arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release',
 if($NoRestore){$arguments+='--no-restore'}
 & $DotnetPath @arguments
 if($LASTEXITCODE -ne 0){throw 'Publish failed; package was not updated.'}
-$files=@(Get-ChildItem -LiteralPath $stage -File | Where-Object {$_.Extension -in @('.exe','.ico')})
+$files=@(Get-ChildItem -LiteralPath $stage -File | Where-Object {$_.Extension -eq '.exe'})
 foreach($required in @('MicMute.exe')){
     if($required -notin $files.Name){throw "Missing release artifact: $required"}
 }
