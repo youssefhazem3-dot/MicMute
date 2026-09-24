@@ -1294,6 +1294,14 @@ public partial class MainWindow : Window
         {
             btnCls.Foreground = themeGlyphBrush;
         }
+        if (txtOsdDuration != null)
+        {
+            txtOsdDuration.CaretBrush = themeGlyphBrush;
+        }
+        if (txtSoundVolume != null)
+        {
+            txtSoundVolume.CaretBrush = themeGlyphBrush;
+        }
 
         if (isLight)
         {

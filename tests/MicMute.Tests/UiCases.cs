@@ -277,7 +277,7 @@ static class UiCases
             typeof(MainWindow).GetMethod("ShowWarningMessage", flags)!.Invoke(window, new object[] { "No active audio capture devices found.", "" });
             Check.True(window.pathWarningIcon!.Data != null, "pathWarningIcon data must be set on warning");
 
-            // Verify dark mode brushes are monochrome
+            // Verify dark mode brushes are monochrome and input caret is light
             typeof(MainWindow).GetMethod("SetLightMode", flags)!.Invoke(window, new object[] { false });
             var darkBg = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBgBrush"];
             var darkBorder = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBorderBrush"];
@@ -286,8 +286,12 @@ static class UiCases
             Check.True(darkBorder.Color.R == darkBorder.Color.G && darkBorder.Color.G == darkBorder.Color.B, "dark WarningBorderBrush must be neutral monochrome");
             Check.True(darkText.Color.R > 200 && darkText.Color.G > 200 && darkText.Color.B > 200, "dark WarningTextBrush must be white/near-white");
             Check.True(Math.Abs(darkText.Color.R - darkText.Color.B) <= 2, "dark WarningTextBrush must be neutral");
+            var darkOsdCaret = (System.Windows.Media.SolidColorBrush)window.txtOsdDuration.CaretBrush;
+            var darkVolCaret = (System.Windows.Media.SolidColorBrush)window.txtSoundVolume.CaretBrush;
+            Check.True(darkOsdCaret.Color.R > 200 && darkOsdCaret.Color.G > 200 && darkOsdCaret.Color.B > 200, "dark txtOsdDuration CaretBrush must be white/near-white");
+            Check.True(darkVolCaret.Color.R > 200 && darkVolCaret.Color.G > 200 && darkVolCaret.Color.B > 200, "dark txtSoundVolume CaretBrush must be white/near-white");
 
-            // Verify light mode brushes are monochrome
+            // Verify light mode brushes are monochrome and input caret is dark
             typeof(MainWindow).GetMethod("SetLightMode", flags)!.Invoke(window, new object[] { true });
             var lightBg = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBgBrush"];
             var lightBorder = (System.Windows.Media.SolidColorBrush)window.Resources["WarningBorderBrush"];
@@ -296,6 +300,10 @@ static class UiCases
             Check.True(lightBorder.Color.R == lightBorder.Color.G && lightBorder.Color.G == lightBorder.Color.B, "light WarningBorderBrush must be neutral monochrome");
             Check.True(lightText.Color.R < 100 && lightText.Color.G < 100 && lightText.Color.B < 100, "light WarningTextBrush must be dark neutral");
             Check.True(lightText.Color.R != 239 && lightText.Color.R != 220, "light WarningTextBrush must not be red");
+            var lightOsdCaret = (System.Windows.Media.SolidColorBrush)window.txtOsdDuration.CaretBrush;
+            var lightVolCaret = (System.Windows.Media.SolidColorBrush)window.txtSoundVolume.CaretBrush;
+            Check.True(lightOsdCaret.Color.R < 100 && lightOsdCaret.Color.G < 100 && lightOsdCaret.Color.B < 100, "light txtOsdDuration CaretBrush must be dark neutral");
+            Check.True(lightVolCaret.Color.R < 100 && lightVolCaret.Color.G < 100 && lightVolCaret.Color.B < 100, "light txtSoundVolume CaretBrush must be dark neutral");
         }
         finally { window.Close(); }
     }
