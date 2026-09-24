@@ -1,166 +1,102 @@
-<div align="center">
+# MicMute
 
-# 🎙️ MicMute
+MicMute is a Windows desktop utility for toggling a microphone's mute state from the control panel, notification-area icon, or a configurable keyboard shortcut.
 
-**A modern, lightweight Windows 11 utility for instant microphone control with global hotkeys, high-refresh-rate animations, and a sleek On-Screen Display (OSD).**
+[Download the latest build](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip) · [Report an issue](https://github.com/youssefhazem3-dot/MicMute/issues)
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue?style=for-the-badge&logo=windows)](https://github.com/youssefhazem3-dot/MicMute)
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Release](https://img.shields.io/badge/Version-v1.0.0-orange?style=for-the-badge)](https://github.com/youssefhazem3-dot/MicMute/releases)
-[![Download](https://img.shields.io/badge/Download-MicMute.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)
+![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-blue?logo=windows) ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)
 
-<br />
+MicMute changes the mute state of a Windows audio capture device through WASAPI. It does not record or save microphone audio.
 
-[Features](#-key-features) • [Installation](#-installation--downloads) • [Latest Fixes](#-latest-bugs-fixed) • [Building](#-building-from-source) • [Architecture](#-architecture--tech-stack) • [Configuration](#-data-storage--portable-mode)
+## Quick start
 
-</div>
+1. Download and extract `MicMute.zip`.
+2. Run `MicMute.exe`. The release package contains one self-contained `win-x64` executable and does not require a separate .NET Desktop Runtime installation.
+3. Use the large microphone button or press **F1** to toggle mute. The app also adds an icon to the notification area.
 
----
+The control panel opens on launch by default. **Start Minimized** or the `--minimized` argument starts MicMute with the panel hidden in the notification area. The title-bar minimize button minimizes the window; the close button hides it to the notification area. Double-click the tray icon to reopen the panel. Right-click it for **Toggle Mute**, **Open App**, and **Quit**.
 
-## 🌟 Overview
+If MicMute is already running, launching it again brings the existing window forward. Use `--show` to open the panel even when **Start Minimized** is enabled.
 
-**MicMute** is a native Windows desktop application for gamers, streamers, professionals, and remote workers who need responsive microphone control. Built in C# and WPF with Windows audio (WASAPI) integration, MicMute provides global shortcuts and a Fluent Design interface.
+## Interface and appearance
 
----
+The panel is organized around a prominent microphone toggle and status indicator, with grouped controls for the input device, shortcut, OSD, sound effects, launch behavior, and settings location. Dark mode is the default; use the theme button in the title bar to switch to light mode.
 
-## ✨ Key Features
+The optional OSD is a compact circular status overlay. It shows **ACTIVE** or **MUTED** with a microphone icon; the muted state uses a coral-red slash. The overlay follows the selected theme.
 
-| Feature | Description |
-| :--- | :--- |
-| **🎙️ Global Hotkeys** | Observe custom modifier and key combinations while preserving their normal action in the foreground app. Some protected games may restrict input monitoring. |
-| **🖥️ Fluent OSD Popup** | Non-intrusive On-Screen Display with customizable display duration (`0.1s – 30.0s`), preloaded to reduce first-toggle work. |
-| **🎨 Dark & Light Modes** | Fully adaptive modern color schemes with frosted glass accents, subtle glows, and high-contrast accessibility. |
-| **⚡ High Refresh Rate** | WPF animation frame rate configured from the primary display at startup, with native window dragging. |
-| **🎛️ WASAPI Audio Control** | Hardware-level audio endpoint control using NAudio WASAPI with automatic device hotplug detection. |
-| **🪟 Windows 11 Native Controls** | Seamless integration with Windows 11 caption buttons (minimize, close) and rounded corners. |
-| **🚀 System Tray Integration** | Minimize to tray, start on Windows login, and receive unobtrusive notifications. |
-| **📁 Flexible Storage & Portable Mode** | Choose your settings directory or place `portable.flag` next to the executable for a 100% portable flash drive setup. |
+## Using MicMute
 
----
+### Microphone and shortcut
 
-## 🐛 Latest Bugs Fixed
+- Choose an active capture device from **Microphone Input**. The device list refreshes when Windows reports a device change.
+- Press **Record** under **Shortcut Key**, then enter the key combination to use. The default shortcut is **F1** with no modifiers.
+- MicMute observes the shortcut while leaving its normal key action available to the foreground app.
+- You can also toggle mute from the main button or the tray menu.
 
-Here is a concise summary of the latest stability improvements and fixes:
+Some elevated apps and protected games restrict global keyboard input. **Run as Administrator** can help with elevated windows, but anti-cheat software may still block shortcuts.
 
-* **Stuck Hotkeys Fixed:** Resolved an issue where rapid presses or dropped native release events caused shortcuts to become unresponsive or stuck.
-* **Generic Modifier Support:** Full compatibility with generic `Ctrl`, `Shift`, and `Alt` virtual keys across Remote Desktop, virtual machines, and mouse/macro software.
-* **Instant Mute/Unmute Response:** Removed UI thread latency during volume state updates so the tray icon and toggle respond immediately.
-* **Comprehensive Device Fallback:** Added automatic audio capture endpoint fallback across all Windows roles (`Communications`, `Console`, `Multimedia`).
-* **OSD Multi-Monitor & DPI Fix:** Eliminated screen jumping and display flickering on launch; added per-monitor DPI coordinate scaling.
-* **Safer Shortcut Recording:** Pressing `Escape` now cleanly cancels shortcut recording, and core typing/navigation keys (`Tab`, `Enter`, `Space`, `Backspace`, `CapsLock`) are protected from accidental binding.
-* **No UI Freezing on Device Hotplug:** Headset connection/disconnection device enumeration now runs asynchronously in the background.
-* **GPU Spikes & Performance Lag Fixed:** Eliminated high GPU utilization (spiking up to 70%) caused by continuous pixel shader blur operations and infinite animation loops on transparent layered surfaces. Replaced with efficient vector radial gradient rendering and clamped the maximum UI animation rate to 120 FPS.
-* **Single Standalone Executable:** Packaged into a single self-contained `.exe` with zero external runtime requirements (no .NET 8 desktop runtime installation needed).
+### OSD and sound effects
 
----
+- The OSD is enabled by default and stays visible for **1.5 seconds**. Turn it off or set a duration from **0.1 to 30 seconds** in the panel.
+- Sound effects are off by default. Enable them to play a built-in chime when MicMute toggles mute, then set the volume from **0% to 100%**.
 
-## 🚀 Installation & Downloads
+### Launch and appearance settings
 
-### Option 1: Standalone Single-File Executable (Recommended)
+- **Run on Windows Startup** adds or removes MicMute from the current user's startup apps.
+- **Start Minimized** launches MicMute with its window hidden in the notification area.
+- **Run as Administrator** can improve shortcut compatibility with elevated apps and may require a restart to take effect.
+- The title-bar theme button switches between dark and light modes.
 
-[![Download MicMute.zip](https://img.shields.io/badge/Direct%20Download-MicMute.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)
+## Settings and portable mode
 
-1. Download **[`MicMute.zip`](https://github.com/youssefhazem3-dot/MicMute/raw/main/MicMute.zip)** or the standalone **`MicMute.exe`** directly.
-2. Extract or place `MicMute.exe` anywhere on your system.
-3. **No runtime required:** MicMute is 100% self-contained into a single `.exe` file. You do **not** need to install the .NET 8 Desktop Runtime or keep extra DLL/JSON files around!
-4. Double-click `MicMute.exe`. It starts in the tray by default; double-click the tray icon to open the panel, or run `MicMute.exe --show`.
+By default, MicMute stores its settings in `%APPDATA%\MicMute\settings.json`. Use the **Settings Location** controls to open that folder, move settings to a custom folder, or reset settings.
 
-### Option 2: Clone & Build
+To keep settings beside the executable, place an empty `portable.flag` file next to `MicMute.exe` before starting MicMute. A `settings.json` file beside the executable also selects that folder. Portable mode applies to MicMute's settings; Windows startup and administrator integration still use current-user Windows settings.
+
+## Build from source
+
+Building requires the .NET 8 SDK on Windows. From PowerShell:
+
 ```powershell
-# Clone the repository
 git clone https://github.com/youssefhazem3-dot/MicMute.git
-
-# Navigate into the project directory
 cd MicMute
 
-# Requires the .NET 8 SDK on PATH (or in .tools/dotnet/)
 .\scripts\build.ps1
-.\scripts\test.ps1 -NoRestore
-
-# Build the distributable ZIP and refresh the root executable
-.\scripts\publish.ps1 -NoRestore -UpdateRoot
+.\scripts\test.ps1
+.\scripts\publish.ps1 -UpdateRoot
 ```
 
----
+The publish script runs the test suite, creates the self-contained single-file executable and `MicMute.zip`, and updates the `publish` folder. `-UpdateRoot` also refreshes the root-level `MicMute.exe`.
 
-## 🛠️ Architecture & Tech Stack
+## Architecture
 
 ```mermaid
-graph TD
-    UI[WPF Fluent UI / MainWindow & OsdWindow] --> Core[AudioController WASAPI Engine]
-    UI --> Hotkeys[Win32 Global Hotkey Manager]
-    UI --> Storage[SettingsManager & Portable Config]
-    Core --> NAudio[NAudio WASAPI MMDevice API]
-    Hotkeys --> Win32[Passive keyboard hooks / raw input / polling]
-    Storage --> JSON[System.Text.Json / coalesced atomic saves]
+graph LR
+    Keys[Keyboard shortcut] --> Main[MicMute app]
+    Panel[Panel controls] --> Main
+    Main --> Audio[AudioController]
+    Tray[Tray menu] --> Audio
+    Audio --> Endpoint[Windows capture endpoint via WASAPI]
+    Audio --> Status[Tray and panel status]
+    Main --> OSD[OSD on MicMute toggles]
+    Main --> Settings[SettingsStore]
+    Settings --> Json[settings.json]
 ```
 
-* **Language & Framework:** C# 12 / .NET 8 (`net8.0-windows`)
-* **UI Subsystem:** Windows Presentation Foundation (WPF) with pure GUI subsystem (`IMAGE_SUBSYSTEM_WINDOWS_GUI`)
-* **Audio Layer:** NAudio 2.2.1 WASAPI Core Audio Endpoint API
-* **Window Styling & Native Hooks:** Win32 P/Invoke APIs (`RegisterWindowMessage`, `SetForegroundWindow`, keyboard hooks and raw input)
+MicMute uses C# 12, WPF, .NET 8 for Windows, and NAudio 2.2.1. The shortcut listener combines a low-level keyboard hook, raw input, and polling so key presses remain available to the foreground app.
 
----
+## Project files
 
-## 📁 Data Storage & Portable Mode
+| Area | Files |
+| --- | --- |
+| App startup, tray, and single-instance behavior | `App.xaml.cs`, `AppInstanceMutex.cs` |
+| Main control panel and OSD | `MainWindow.xaml`, `MainWindow.xaml.cs`, `OsdWindow.xaml`, `OsdWindow.xaml.cs` |
+| Audio devices and mute state | `AudioController.cs`, `AudioDevice.cs`, `AudioMuteState.cs`, `AudioWorkQueue.cs` |
+| Keyboard shortcuts | `HotkeyManager.cs`, `HotkeyState.cs`, `RawKeyboardPacket.cs` |
+| Settings and persistence | `AppSettings.cs`, `SettingsManager.cs`, `SettingsStore.cs`, `SettingsCodec.cs` |
+| Sound feedback and Windows integration | `AudioFeedback.cs`, `StartupManager.cs`, `AdminManager.cs` |
+| Build, test, and publish scripts | `scripts/` |
 
-MicMute gives you complete control over your application data:
+## Contributing
 
-1. **Standard AppData Mode (Default):** Settings and cache are safely stored under `%APPDATA%\MicMute\settings.json`.
-2. **Custom Location:** Easily change the storage directory directly from the **Data & Storage Location** card in the UI.
-3. **Portable Mode:** Create an empty file named `portable.flag` or place `settings.json` directly in the application folder. MicMute will store settings there. Startup and administrator preferences still use Windows registry entries.
-
----
-
-## 🗂️ Project Structure
-
-```
-e:\MicMute\
-├── App.xaml / App.xaml.cs             # Application lifecycle, mutex & AssemblyResolve hooks
-├── MainWindow.xaml / .cs              # Primary Fluent UI control panel & animations
-├── OsdWindow.xaml / .cs               # Floating On-Screen Display window
-├── AudioController.cs                 # WASAPI audio endpoint enumeration & volume management
-├── HotkeyManager.cs                   # Passive keyboard hooks, raw input & polling
-├── SettingsManager.cs                 # Cached settings backed by SettingsStore/SettingsCodec
-├── StartupManager.cs                  # Windows registry run-on-startup integration
-├── ThemeManager.cs                    # Dynamic Dark/Light theme brush provider
-├── AssemblyInfo.cs                    # Application metadata and version attributes
-├── app.ico                            # High-resolution multi-size application icon
-├── MicMute.csproj                     # .NET project configuration
-└── MicMute.sln                        # Visual Studio Solution
-```
-
----
-
-## ⌨️ Default Controls
-
-| Action | Default Shortcut | Configurable |
-| :--- | :--- | :--- |
-| **Toggle Microphone Mute** | `F1` | ✅ Yes (Click **Record**) |
-| **Dismiss OSD** | Auto-timed (`1.5s` default) | ✅ Yes (`0.1s – 30.0s`) |
-| **Open Control Panel** | Double-click Tray Icon | — |
-| **Restore Running Instance** | Re-run `MicMute.exe` | — |
-
----
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome!
-Feel free to check the [issues page](https://github.com/youssefhazem3-dot/MicMute/issues).
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-<div align="center">
-<sub>Crafted with precision for Windows 11.</sub>
-</div>
+Bug reports and pull requests are welcome. Please include the Windows version and clear steps to reproduce an issue. Run `.\scripts\test.ps1` before submitting code changes.
