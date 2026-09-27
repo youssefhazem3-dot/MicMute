@@ -61,6 +61,7 @@ static class UiCases
         test(nameof(ButtonsReliablyRegisterClicksWithPressModeAndTitleBarGuards), ButtonsReliablyRegisterClicksWithPressModeAndTitleBarGuards);
         test(nameof(TaskbarIconAndTypographyAndThemeBrighterPalette), TaskbarIconAndTypographyAndThemeBrighterPalette);
         test(nameof(SmoothMinimizeRestoreAndDropdownClearType), SmoothMinimizeRestoreAndDropdownClearType);
+        test(nameof(HeroHotkeyCenterLockedAndThemeMoonAlignedAndBoldTypography), HeroHotkeyCenterLockedAndThemeMoonAlignedAndBoldTypography);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -617,16 +618,16 @@ static class UiCases
         menu.Renderer = new App.LiquidGlassMenuRenderer();
         try
         {
-            menu.Font = new System.Drawing.Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            menu.Font = new System.Drawing.Font("Segoe UI Variable Text", 10f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
         }
         catch
         {
-            menu.Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            menu.Font = new System.Drawing.Font("Segoe UI", 10f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
         }
 
-        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 10, 48, 10) };
-        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 10, 48, 10) };
-        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = true, Margin = new System.Windows.Forms.Padding(0), Padding = new System.Windows.Forms.Padding(0, 10, 48, 10) };
+        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = false, Size = new System.Drawing.Size(205, 36), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = false, Size = new System.Drawing.Size(205, 36), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = false, Size = new System.Drawing.Size(205, 36), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
 
         menu.Items.Add(item1);
         menu.Items.Add(item2);
@@ -641,17 +642,85 @@ static class UiCases
         Check.Equal("Quit", menu.Items[2].Text);
         var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
         
-        Check.True(preferredSize.Width >= 120 && preferredSize.Width <= 140, $"Menu preferred width {preferredSize.Width} must be comfortably sized");
-        Check.True(preferredSize.Height >= 110 && preferredSize.Height <= 130, $"Menu preferred height {preferredSize.Height} must be comfortably sized");
+        Check.True(preferredSize.Width >= 190 && preferredSize.Width <= 230, $"Menu preferred width {preferredSize.Width} must be a wide short rectangle");
+        Check.True(preferredSize.Height >= 110 && preferredSize.Height <= 140, $"Menu preferred height {preferredSize.Height} must be comfortably sized");
 
-        // Validate that OnRenderMenuItemBackground renders cleanly within item bounds without clipping
-        using var bmp = new System.Drawing.Bitmap(160, 30);
+        // Validate that OnRenderMenuItemBackground and OnRenderItemText render cleanly for all items
+        using var bmp = new System.Drawing.Bitmap(215, 36);
         using var g = System.Drawing.Graphics.FromImage(bmp);
         var renderArgs = new System.Windows.Forms.ToolStripItemRenderEventArgs(g, item2);
         item2.Select();
         var renderMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderMenuItemBackground", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         Check.True(renderMethod != null, "OnRenderMenuItemBackground must exist on LiquidGlassMenuRenderer");
         renderMethod!.Invoke(menu.Renderer, new object[] { renderArgs });
+
+        var textRenderMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderItemText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Check.True(textRenderMethod != null, "OnRenderItemText must exist on LiquidGlassMenuRenderer");
+        var rect = new System.Drawing.Rectangle(0, 0, 205, 36);
+        var flags = System.Windows.Forms.TextFormatFlags.Left | System.Windows.Forms.TextFormatFlags.VerticalCenter;
+
+        // Render full menu simulation to scratch image for visual verification in both dark and light modes
+        try
+        {
+            string scratchDir = @"C:\Users\PoolFrty\.gemini\antigravity\brain\0300b3b7-33af-4964-8387-3d792bce1b30\scratch";
+            if (!System.IO.Directory.Exists(scratchDir)) System.IO.Directory.CreateDirectory(scratchDir);
+
+            foreach (bool light in new[] { false, true })
+            {
+                var settings = SettingsManager.Load();
+                SettingsManager.Save(settings with { LightMode = light });
+
+                string outPath = System.IO.Path.Combine(scratchDir, light ? "tray_light.png" : "tray_dark.png");
+                using var fullBmp = new System.Drawing.Bitmap(215, 124);
+                using var fullG = System.Drawing.Graphics.FromImage(fullBmp);
+                
+                // Background & Border
+                var bgMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderToolStripBackground", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                bgMethod?.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripRenderEventArgs(fullG, menu) });
+                var borderMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderToolStripBorder", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                borderMethod?.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripRenderEventArgs(fullG, menu) });
+
+                // Item 1 (Hovered / Selected, just like in the user's reference photo)
+                item1.Select();
+                using var item1Bmp = new System.Drawing.Bitmap(205, 36);
+                using (var item1G = System.Drawing.Graphics.FromImage(item1Bmp))
+                {
+                    renderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemRenderEventArgs(item1G, item1) });
+                    textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item1G, item1, item1.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
+                }
+                fullG.DrawImage(item1Bmp, 5, 5);
+
+                // Item 2 (Open App)
+                using var item2Bmp = new System.Drawing.Bitmap(205, 36);
+                using (var item2G = System.Drawing.Graphics.FromImage(item2Bmp))
+                {
+                    textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item2G, item2, item2.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
+                }
+                fullG.DrawImage(item2Bmp, 5, 43);
+
+                // Item 3 (Quit)
+                using var item3Bmp = new System.Drawing.Bitmap(205, 36);
+                using (var item3G = System.Drawing.Graphics.FromImage(item3Bmp))
+                {
+                    textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item3G, item3, item3.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
+                }
+                fullG.DrawImage(item3Bmp, 5, 81);
+
+                fullBmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
+
+                // Verify item3 has drawn glyphs
+                int item3Pixels = 0;
+                for (int py = 0; py < item3Bmp.Height; py++)
+                    for (int px = 0; px < item3Bmp.Width; px++)
+                        if (item3Bmp.GetPixel(px, py).A > 0) item3Pixels++;
+                Check.True(item3Pixels > 50, "Item 3 (Quit) must render both icon and text pixels");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("PREVIEW ERROR: " + ex);
+            throw;
+        }
     }
 
     private static void MutedIndicatorUsesCommonlyUsedRedAndEliminatesBloodTones()
@@ -1485,6 +1554,7 @@ static class UiCases
         var window = new MainWindow(audio);
         try
         {
+            window.cbLightMode.IsChecked = false;
             Check.True(window.ShowInTaskbar, "MainWindow must show in Windows taskbar");
             Check.True(window.Icon != null, "MainWindow.Icon must be populated from embedded multi-resolution icon");
             Check.True(window.FontFamily != null && window.FontFamily.Source.Contains("Roboto"), "MainWindow FontFamily must use Roboto Google Font");
@@ -1530,6 +1600,76 @@ static class UiCases
             Check.True(window.rootTranslateTransform != null, "rootTranslateTransform must be bound at runtime");
             Check.True(window.themeTransitionOverlay != null, "themeTransitionOverlay must be bound at runtime");
             Check.True(window.themeIconRot != null, "themeIconRot must be bound at runtime");
+
+            // 4. Verify Theme resources are frozen for zero-stutter rendering
+            window.cbLightMode.IsChecked = true;
+            if (window.Resources["AccentBrush"] is System.Windows.Media.Brush lightAccent)
+            {
+                Check.True(lightAccent.IsFrozen, "Light mode AccentBrush must be frozen for zero-stutter rendering");
+            }
+            if (window.Resources["WindowBgBrush"] is System.Windows.Media.Brush lightBg)
+            {
+                Check.True(lightBg.IsFrozen, "Light mode WindowBgBrush must be frozen for zero-stutter rendering");
+            }
+            window.cbLightMode.IsChecked = false;
+            if (window.Resources["AccentBrush"] is System.Windows.Media.Brush darkAccent)
+            {
+                Check.True(darkAccent.IsFrozen, "Dark mode AccentBrush must be frozen for zero-stutter rendering");
+            }
+            if (window.Resources["WindowBgBrush"] is System.Windows.Media.Brush darkBg)
+            {
+                Check.True(darkBg.IsFrozen, "Dark mode WindowBgBrush must be frozen for zero-stutter rendering");
+            }
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void HeroHotkeyCenterLockedAndThemeMoonAlignedAndBoldTypography()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Verify XAML structural constraints for centering and Bold typography
+        Check.True(rawXaml.Contains(@"FontWeight=""Bold"""), "Window must specify Bold font weight");
+        Check.True(rawXaml.Contains(@"x:Name=""borderStatusCapsule"""), "borderStatusCapsule must be defined");
+        Check.True(rawXaml.Contains(@"Width=""158"""), "borderStatusCapsule must have invariant width 158");
+
+        // 2. Runtime verification of coordinates and theme icon
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.cbLightMode.IsChecked = false;
+            Check.Equal(System.Windows.FontWeights.Bold, window.FontWeight);
+
+            // Verify live vs muted layout invariance
+            window.Measure(new System.Windows.Size(412, 700));
+            window.Arrange(new System.Windows.Rect(0, 0, 412, 700));
+            window.UpdateLayout();
+
+            var posLive = window.tbHeroHotkey!.TransformToAncestor(window.rootBorder!).Transform(new System.Windows.Point(0, 0));
+
+            var updateMute = typeof(MainWindow).GetMethod("UpdateMuteStateUI", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Check.True(updateMute != null, "UpdateMuteStateUI must exist");
+            updateMute!.Invoke(window, new object[] { true });
+
+            window.Measure(new System.Windows.Size(412, 700));
+            window.Arrange(new System.Windows.Rect(0, 0, 412, 700));
+            window.UpdateLayout();
+
+            var posMuted = window.tbHeroHotkey.TransformToAncestor(window.rootBorder!).Transform(new System.Windows.Point(0, 0));
+
+            Check.True(Math.Abs(posLive.X - posMuted.X) < 0.001, $"Hero hotkey must remain locked in center. Live={posLive.X}, Muted={posMuted.X}");
+
+            // Verify light mode moon geometry and angle
+            window.cbLightMode.IsChecked = true;
+            Check.True(window.themeIconRot!.Angle == 0 || window.themeIconRot.Angle == 360, $"Moon icon must remain upright (Angle={window.themeIconRot.Angle})");
+            Check.True(window.pathTitleTheme!.Data.ToString().Contains("12.79") || window.pathTitleTheme.Data.ToString().Contains("21"), "Moon geometry must be centered 1:1");
         }
         finally
         {

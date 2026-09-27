@@ -66,15 +66,6 @@ public partial class App : System.Windows.Application
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
-
-        [DllImport("gdi32.dll")]
-        private static extern bool DeleteObject(IntPtr hObject);
-
-        [DllImport("user32.dll")]
-        private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
-
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         private const int DWMWCP_ROUND = 2;
 
@@ -84,7 +75,25 @@ public partial class App : System.Windows.Application
             ShowImageMargin = false;
             ShowCheckMargin = false;
             CanOverflow = false;
-            Padding = new Padding(3, 4, 3, 4);
+            Padding = new Padding(5, 5, 5, 5);
+            DropShadowEnabled = true;
+        }
+
+        public override System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
+        {
+            System.Drawing.Size size = base.GetPreferredSize(proposedSize);
+            // Wide short rectangle matching modern Windows 11 system tray menus
+            return new System.Drawing.Size(Math.Max(size.Width, 205), Math.Max(size.Height, 122));
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ClassStyle |= 0x00020000; // CS_DROPSHADOW
+                return cp;
+            }
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -102,12 +111,6 @@ public partial class App : System.Windows.Application
             }
         }
 
-        protected override void OnLayout(LayoutEventArgs e)
-        {
-            base.OnLayout(e);
-            ApplyWindowRounding();
-        }
-
         private void ApplyWindowRounding()
         {
             if (Handle != IntPtr.Zero)
@@ -118,22 +121,6 @@ public partial class App : System.Windows.Application
                     DwmSetWindowAttribute(Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
                 }
                 catch { }
-
-                if (Width > 0 && Height > 0)
-                {
-                    try
-                    {
-                        IntPtr hRgn = CreateRoundRectRgn(0, 0, Width + 1, Height + 1, 16, 16);
-                        if (hRgn != IntPtr.Zero)
-                        {
-                            if (SetWindowRgn(Handle, hRgn, true) == 0)
-                            {
-                                DeleteObject(hRgn);
-                            }
-                        }
-                    }
-                    catch { }
-                }
             }
         }
     }
@@ -148,51 +135,85 @@ public partial class App : System.Windows.Application
 
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
         {
+            if (e.ToolStrip == null) return;
             bool lightMode = SettingsManager.Load().LightMode;
-            Color bgColor = lightMode ? Color.FromArgb(250, 250, 252) : Color.FromArgb(28, 28, 32);
-            using SolidBrush brush = new SolidBrush(bgColor);
+            Color bgColor = lightMode ? Color.FromArgb(248, 248, 250) : Color.FromArgb(40, 42, 52);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            e.Graphics.Clear(bgColor);
+
+            using SolidBrush brush = new SolidBrush(bgColor);
             RectangleF rect = new RectangleF(0.5f, 0.5f, e.ToolStrip.Width - 1f, e.ToolStrip.Height - 1f);
-            using GraphicsPath path = CreateRoundedRectanglePath(rect, 8f);
+            using GraphicsPath path = CreateRoundedRectanglePath(rect, 10f);
             e.Graphics.FillPath(brush, path);
         }
 
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
         {
+            if (e.ToolStrip == null) return;
             bool lightMode = SettingsManager.Load().LightMode;
-            Color borderColor = lightMode ? Color.FromArgb(228, 228, 231) : Color.FromArgb(45, 255, 255, 255);
+            Color borderColor = lightMode ? Color.FromArgb(220, 222, 228) : Color.FromArgb(50, 255, 255, 255);
             using Pen pen = new Pen(borderColor, 1f);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             RectangleF rect = new RectangleF(0.5f, 0.5f, e.ToolStrip.Width - 1f, e.ToolStrip.Height - 1f);
-            using GraphicsPath path = CreateRoundedRectanglePath(rect, 8f);
+            using GraphicsPath path = CreateRoundedRectanglePath(rect, 10f);
             e.Graphics.DrawPath(pen, path);
+        }
+
+        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        {
+            if (e.Item == null) return;
+
+            if (e.Item.Selected && e.Item.Enabled)
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                bool lightMode = SettingsManager.Load().LightMode;
+                Color hoverColor = lightMode ? Color.FromArgb(20, 0, 0, 0) : Color.FromArgb(35, 255, 255, 255);
+                using SolidBrush brush = new SolidBrush(hoverColor);
+
+                // Smooth rounded pill across the full width of the item section
+                const float marginX = 4f;
+                const float marginY = 1.5f;
+                float width = e.Item.Width - (marginX * 2f);
+                float height = e.Item.Height - (marginY * 2f);
+                if (width > 0 && height > 0)
+                {
+                    RectangleF rect = new RectangleF(marginX, marginY, width, height);
+                    using GraphicsPath path = CreateRoundedRectanglePath(rect, 7f);
+                    e.Graphics.FillPath(brush, path);
+                }
+            }
         }
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
-            if (e.Item == null || e.ToolStrip == null) return;
+            if (e.Item == null) return;
             bool lightMode = SettingsManager.Load().LightMode;
-            Color textColor = lightMode ? Color.FromArgb(24, 24, 27) : Color.FromArgb(244, 244, 246);
+            Color textColor = lightMode ? Color.FromArgb(15, 23, 42) : Color.FromArgb(255, 255, 255);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
             Font font = e.TextFont ?? e.Item.Font;
-            int fontHeight = font?.Height ?? 17;
+            int fontHeight = font?.Height ?? 18;
 
-            // Render vector outline icon
-            int iconX = 14 - e.Item.Bounds.X;
-            int iconY = (e.Item.Height - 16) / 2;
+            // Render vector outline icon (bold, crisp, perfectly proportioned)
+            int iconX = 18;
+            int iconY = (e.Item.Height - 18) / 2;
             RenderMenuIcon(e.Graphics, e.Item.Text, iconX, iconY, textColor);
 
-            int leftOnMenu = 40;
-            int x = leftOnMenu - e.Item.Bounds.X;
+            // Render text
+            int leftOnMenu = 46;
+            int x = leftOnMenu;
             int y = (e.Item.Height - fontHeight) / 2;
 
-            Rectangle textRect = new Rectangle(x, y, Math.Max(0, e.ToolStrip.ClientRectangle.Width - leftOnMenu - 4), fontHeight);
+            Rectangle textRect = new Rectangle(x, y, Math.Max(0, e.Item.Width - leftOnMenu - 8), fontHeight);
             if (font != null)
             {
-                TextRenderer.DrawText(e.Graphics, e.Text ?? string.Empty, font, textRect, textColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                TextRenderer.DrawText(e.Graphics, e.Text ?? string.Empty, font, textRect, textColor,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
         }
 
@@ -202,7 +223,7 @@ public partial class App : System.Windows.Application
 
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            using Pen pen = new Pen(color, 1.25f)
+            using Pen pen = new Pen(color, 1.75f)
             {
                 StartCap = LineCap.Round,
                 EndCap = LineCap.Round,
@@ -211,90 +232,57 @@ public partial class App : System.Windows.Application
 
             if (text == "Toggle Mute")
             {
-                // Microphone outline: condenser capsule, cradle, stem, base
-                RectangleF capRect = new RectangleF(iconX + 5.5f, iconY + 1.5f, 5f, 7.5f);
-                using GraphicsPath micCap = CreateRoundedRectanglePath(capRect, 2.5f);
+                // Microphone outline: condenser body, U-cradle, stem, foot
+                RectangleF capRect = new RectangleF(iconX + 6f, iconY + 1.5f, 6f, 10f);
+                using GraphicsPath micCap = CreateRoundedRectanglePath(capRect, 3f);
                 g.DrawPath(pen, micCap);
 
-                RectangleF cradleRect = new RectangleF(iconX + 3f, iconY + 4f, 10f, 6.5f);
+                RectangleF cradleRect = new RectangleF(iconX + 3f, iconY + 5.5f, 12f, 8.5f);
                 g.DrawArc(pen, cradleRect, 0f, 180f);
 
-                g.DrawLine(pen, iconX + 8f, iconY + 10.5f, iconX + 8f, iconY + 13.5f);
-                g.DrawLine(pen, iconX + 5.5f, iconY + 13.5f, iconX + 10.5f, iconY + 13.5f);
+                g.DrawLine(pen, iconX + 9f, iconY + 14f, iconX + 9f, iconY + 16.5f);
+                g.DrawLine(pen, iconX + 6f, iconY + 16.5f, iconX + 12f, iconY + 16.5f);
             }
             else if (text == "Open App")
             {
-                // Window outline with diagonal pop-out arrow
-                RectangleF winRect = new RectangleF(iconX + 1.5f, iconY + 2f, 13f, 11.5f);
-                using GraphicsPath winPath = CreateRoundedRectanglePath(winRect, 1.75f);
+                // App window outline with top titlebar and diagonal pop-out arrow ↗
+                RectangleF winRect = new RectangleF(iconX + 2f, iconY + 2f, 14.5f, 13f);
+                using GraphicsPath winPath = CreateRoundedRectanglePath(winRect, 2f);
                 g.DrawPath(pen, winPath);
 
-                g.DrawLine(pen, iconX + 1.5f, iconY + 5.5f, iconX + 14.5f, iconY + 5.5f);
+                g.DrawLine(pen, iconX + 2f, iconY + 6f, iconX + 16.5f, iconY + 6f);
 
                 // Pop-out arrow ↗
-                g.DrawLine(pen, iconX + 5.5f, iconY + 10.5f, iconX + 10f, iconY + 7.5f);
-                g.DrawLine(pen, iconX + 7.5f, iconY + 7.5f, iconX + 10f, iconY + 7.5f);
-                g.DrawLine(pen, iconX + 10f, iconY + 7.5f, iconX + 10f, iconY + 10f);
+                g.DrawLine(pen, iconX + 6f, iconY + 12f, iconX + 11.5f, iconY + 8f);
+                g.DrawLine(pen, iconX + 8.5f, iconY + 8f, iconX + 11.5f, iconY + 8f);
+                g.DrawLine(pen, iconX + 11.5f, iconY + 8f, iconX + 11.5f, iconY + 11f);
             }
             else if (text == "Quit")
             {
-                // Exit / Door bracket with centered 'x'
+                // Exit doorway bracket on left with centered 'x' cross
                 using GraphicsPath quitPath = new GraphicsPath();
-                quitPath.AddLine(iconX + 9.5f, iconY + 2.5f, iconX + 5.5f, iconY + 2.5f);
-                quitPath.AddArc(iconX + 3f, iconY + 2.5f, 5f, 5f, 270f, -90f);
-                quitPath.AddLine(iconX + 3f, iconY + 5f, iconX + 3f, iconY + 11f);
-                quitPath.AddArc(iconX + 3f, iconY + 8.5f, 5f, 5f, 180f, -90f);
-                quitPath.AddLine(iconX + 5.5f, iconY + 13.5f, iconX + 9.5f, iconY + 13.5f);
+                quitPath.AddLine(iconX + 10f, iconY + 2.5f, iconX + 5.5f, iconY + 2.5f);
+                quitPath.AddArc(iconX + 2.5f, iconY + 2.5f, 5f, 5f, 270f, -90f);
+                quitPath.AddLine(iconX + 2.5f, iconY + 5f, iconX + 2.5f, iconY + 13f);
+                quitPath.AddArc(iconX + 2.5f, iconY + 10.5f, 5f, 5f, 180f, -90f);
+                quitPath.AddLine(iconX + 5.5f, iconY + 15.5f, iconX + 10f, iconY + 15.5f);
                 g.DrawPath(pen, quitPath);
 
-                // 'x' mark centered at (iconX + 10.5f, iconY + 8f)
-                g.DrawLine(pen, iconX + 8.5f, iconY + 6.5f, iconX + 12.5f, iconY + 9.5f);
-                g.DrawLine(pen, iconX + 8.5f, iconY + 9.5f, iconX + 12.5f, iconY + 6.5f);
+                // 'x' cross
+                g.DrawLine(pen, iconX + 8.5f, iconY + 6.5f, iconX + 14.5f, iconY + 12f);
+                g.DrawLine(pen, iconX + 8.5f, iconY + 12f, iconX + 14.5f, iconY + 6.5f);
             }
         }
 
-        protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
-        {
-            bool lightMode = SettingsManager.Load().LightMode;
-            e.ArrowColor = lightMode ? Color.FromArgb(113, 113, 122) : Color.FromArgb(193, 193, 204);
-            base.OnRenderArrow(e);
-        }
 
-        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
         {
-            if (e.Item != null && e.ToolStrip != null && e.Item.Selected && e.Item.Enabled)
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                bool lightMode = SettingsManager.Load().LightMode;
-                Color hoverColor = lightMode ? Color.FromArgb(232, 232, 237) : Color.FromArgb(25, 255, 255, 255);
-                using SolidBrush brush = new SolidBrush(hoverColor);
-
-                const int marginX = 4;
-                int width = e.Item.Width - (marginX * 2);
-                if (width > 0 && e.Item.Height > 2)
-                {
-                    Rectangle rect = new Rectangle(marginX, 1, width, e.Item.Height - 2);
-                    using GraphicsPath path = CreateRoundedRectanglePath(rect, 5f);
-                    e.Graphics.FillPath(brush, path);
-                }
-            }
+            // Suppress default image margin
         }
 
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
         {
-            if (e.Item == null || e.ToolStrip == null) return;
-            bool lightMode = SettingsManager.Load().LightMode;
-            Color sepColor = lightMode ? Color.FromArgb(228, 228, 231) : Color.FromArgb(39, 39, 45);
-            int y = e.Item.Height / 2;
-            using Pen pen = new Pen(sepColor, 1f);
-            const int marginX = 5;
-            int x1 = marginX;
-            int x2 = e.Item.Width - marginX;
-            if (x2 > x1)
-            {
-                e.Graphics.DrawLine(pen, x1, y, x2, y);
-            }
+            // Suppress separator
         }
     }
 
@@ -302,24 +290,20 @@ public partial class App : System.Windows.Application
     {
         private bool IsLight => SettingsManager.Load().LightMode;
 
-        private Color BgWindow => IsLight ? Color.FromArgb(250, 250, 252) : Color.FromArgb(24, 24, 27);
-        private Color BgSelection => IsLight ? Color.FromArgb(232, 232, 237) : Color.FromArgb(44, 44, 50);
-        private Color Border => IsLight ? Color.FromArgb(228, 228, 231) : Color.FromArgb(46, 46, 52);
-        private Color Separator => IsLight ? Color.FromArgb(228, 228, 231) : Color.FromArgb(39, 39, 45);
+        private Color BgWindow => IsLight ? Color.FromArgb(248, 248, 250) : Color.FromArgb(40, 42, 52);
+        private Color Border => IsLight ? Color.FromArgb(220, 222, 228) : Color.FromArgb(50, 255, 255, 255);
 
         public override Color ToolStripDropDownBackground => BgWindow;
         public override Color MenuBorder => Border;
         public override Color MenuItemBorder => Color.Transparent;
-        public override Color MenuItemSelected => BgSelection;
-        public override Color MenuItemSelectedGradientBegin => BgSelection;
-        public override Color MenuItemSelectedGradientEnd => BgSelection;
-        public override Color MenuItemPressedGradientBegin => BgWindow;
-        public override Color MenuItemPressedGradientEnd => BgWindow;
+        public override Color MenuItemSelected => Color.Transparent;
+        public override Color MenuItemSelectedGradientBegin => Color.Transparent;
+        public override Color MenuItemSelectedGradientEnd => Color.Transparent;
+        public override Color MenuItemPressedGradientBegin => Color.Transparent;
+        public override Color MenuItemPressedGradientEnd => Color.Transparent;
         public override Color ImageMarginGradientBegin => BgWindow;
         public override Color ImageMarginGradientEnd => BgWindow;
         public override Color ImageMarginGradientMiddle => BgWindow;
-        public override Color SeparatorDark => Separator;
-        public override Color SeparatorLight => Color.Transparent;
     }
 
     private static AppInstanceMutex? _mutex;
@@ -538,24 +522,17 @@ public partial class App : System.Windows.Application
         contextMenuStrip.Renderer = new LiquidGlassMenuRenderer();
         try
         {
-            contextMenuStrip.Font = new Font("Roboto", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+            contextMenuStrip.Font = new Font("Segoe UI Variable Text", 10f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
         }
         catch
         {
             try
             {
-                contextMenuStrip.Font = new Font("Inter", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+                contextMenuStrip.Font = new Font("Segoe UI", 10f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
             }
             catch
             {
-                try
-                {
-                    contextMenuStrip.Font = new Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
-                }
-                catch
-                {
-                    contextMenuStrip.Font = new Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
-                }
+                contextMenuStrip.Font = new Font("Arial", 10f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
             }
         }
 
@@ -563,19 +540,34 @@ public partial class App : System.Windows.Application
         {
             _audioController?.ToggleMute();
         })
-        { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 10, 48, 10) };
+        {
+            AutoSize = false,
+            Size = new System.Drawing.Size(205, 36),
+            Margin = new Padding(0, 1, 0, 1),
+            Padding = new Padding(0)
+        };
 
         ToolStripMenuItem value2 = new ToolStripMenuItem("Open App", null, delegate
         {
             ShowWindow();
         })
-        { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 10, 48, 10) };
+        {
+            AutoSize = false,
+            Size = new System.Drawing.Size(205, 36),
+            Margin = new Padding(0, 1, 0, 1),
+            Padding = new Padding(0)
+        };
 
         ToolStripMenuItem value3 = new ToolStripMenuItem("Quit", null, delegate
         {
             ExitApp();
         })
-        { AutoSize = true, Margin = new Padding(0), Padding = new Padding(0, 10, 48, 10) };
+        {
+            AutoSize = false,
+            Size = new System.Drawing.Size(205, 36),
+            Margin = new Padding(0, 1, 0, 1),
+            Padding = new Padding(0)
+        };
 
         contextMenuStrip.Items.Add(value);
         contextMenuStrip.Items.Add(value2);
@@ -752,6 +744,7 @@ public partial class App : System.Windows.Application
     {
         if (_mainWindow != null)
         {
+            bool needsRestoreAnimation = !_mainWindow.IsVisible || _mainWindow.WindowState == WindowState.Minimized;
             _mainWindow.Show();
             _mainWindow.WindowState = WindowState.Normal;
             _mainWindow.Activate();
@@ -761,6 +754,10 @@ public partial class App : System.Windows.Application
             {
                 ShowWindow(handle, 9); // SW_RESTORE
                 SetForegroundWindow(handle);
+            }
+            if (needsRestoreAnimation)
+            {
+                _mainWindow.PlayRestoreAnimation();
             }
         }
     }

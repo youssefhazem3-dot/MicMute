@@ -130,6 +130,12 @@ public partial class OsdWindow : Window
                     this.WindowStartupLocation = root.WindowStartupLocation;
                     this.SnapsToDevicePixels = root.SnapsToDevicePixels;
                     this.UseLayoutRounding = root.UseLayoutRounding;
+                    this.FontWeight = root.FontWeight;
+                    TextOptions.SetTextFormattingMode(this, TextOptions.GetTextFormattingMode(root));
+                    TextOptions.SetTextRenderingMode(this, TextOptions.GetTextRenderingMode(root));
+                    TextOptions.SetTextHintingMode(this, TextOptions.GetTextHintingMode(root));
+                    RenderOptions.SetClearTypeHint(this, RenderOptions.GetClearTypeHint(root));
+                    RenderOptions.SetEdgeMode(this, RenderOptions.GetEdgeMode(root));
 
                     borderPanel = (Border)root.FindName("borderPanel");
                     pathActive = (Grid)root.FindName("pathActive");

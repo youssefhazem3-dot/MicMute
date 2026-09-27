@@ -11,10 +11,15 @@
         ShowInTaskbar="True"
         WindowStartupLocation="Manual"
         FontFamily="pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Inter, Poppins, Google Sans, Open Sans, Segoe UI, sans-serif"
-        TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType"
-        SnapsToDevicePixels="True"
-        UseLayoutRounding="True">
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="Auto"
+        TextOptions.TextHintingMode="Auto"
+        RenderOptions.ClearTypeHint="Auto"
+        RenderOptions.EdgeMode="Unspecified"
+        RenderOptions.BitmapScalingMode="HighQuality"
+        SnapsToDevicePixels="False"
+        UseLayoutRounding="True"
+        FontWeight="Bold">
 
     <Window.Resources>
         <!-- ========================================== -->
@@ -121,7 +126,8 @@
                                   Data="M 0,5 L 10,5"
                                   Stroke="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Foreground}"
                                   StrokeThickness="1.2"
-                                  SnapsToDevicePixels="True"
+                                  SnapsToDevicePixels="False"
+                                  RenderOptions.EdgeMode="Unspecified"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center" />
                         </Border>
@@ -148,13 +154,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="0,20,0,0">
+                        <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="0,20,0,0" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
                             <Path x:Name="cross"
                                   Width="10" Height="10"
                                   Data="M 1,1 L 9,9 M 9,1 L 1,9"
                                   Stroke="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Foreground}"
                                   StrokeThickness="1.2"
-                                  SnapsToDevicePixels="True"
+                                  SnapsToDevicePixels="False"
+                                  RenderOptions.EdgeMode="Unspecified"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center" />
                         </Border>
@@ -210,20 +217,22 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
-                        <Grid Width="52" Height="30" SnapsToDevicePixels="True">
+                        <Grid Width="52" Height="30" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
                             <!-- Liquid Glass Track & Recessed Trench -->
                             <Border x:Name="track"
                                     Width="52" Height="30"
                                     Background="{DynamicResource ToggleOffBrush}"
                                     BorderBrush="{DynamicResource ToggleOffBorderBrush}"
                                     BorderThickness="1.2"
-                                    CornerRadius="15">
+                                    CornerRadius="15"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified">
                                 <Border.Effect>
                                     <DropShadowEffect x:Name="glow" BlurRadius="7" ShadowDepth="2" Direction="270" Opacity="0" Color="{DynamicResource AccentColor}" />
                                 </Border.Effect>
                                 <!-- Trench Depth & Refraction Overlay (Physical Overhead Lighting) -->
-                                <Grid>
-                                    <Border Height="8" VerticalAlignment="Top" CornerRadius="14,14,0,0" Opacity="0.30">
+                                <Grid SnapsToDevicePixels="False">
+                                    <Border Height="8" VerticalAlignment="Top" CornerRadius="14,14,0,0" Opacity="0.30" SnapsToDevicePixels="False">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                 <GradientStop Color="#40000000" Offset="0.0" />
@@ -231,7 +240,7 @@
                                             </LinearGradientBrush>
                                         </Border.Background>
                                     </Border>
-                                    <Border Height="4" VerticalAlignment="Bottom" CornerRadius="0,0,14,14" Opacity="0.22">
+                                    <Border Height="4" VerticalAlignment="Bottom" CornerRadius="0,0,14,14" Opacity="0.22" SnapsToDevicePixels="False">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                                                 <GradientStop Color="#30FFFFFF" Offset="0.0" />
@@ -251,6 +260,8 @@
                                     BorderThickness="0.8"
                                     HorizontalAlignment="Left"
                                     Margin="3,3,0,3"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified"
                                     Cursor="Hand">
                                 <Border.RenderTransform>
                                     <TransformGroup>
@@ -398,9 +409,11 @@
                                                         Background="{DynamicResource SliderTrackBrush}"
                                                         BorderBrush="{DynamicResource SliderTrackBorderBrush}"
                                                         BorderThickness="0.8"
-                                                        CornerRadius="4,0,0,4">
+                                                        CornerRadius="4,0,0,4"
+                                                        SnapsToDevicePixels="False"
+                                                        RenderOptions.EdgeMode="Unspecified">
                                                     <!-- Liquid Specular Sheen -->
-                                                    <Border Height="3" Margin="2,1,0,0" VerticalAlignment="Top" CornerRadius="1.5,0,0,0">
+                                                    <Border Height="3" Margin="2,1,0,0" VerticalAlignment="Top" CornerRadius="1.5,0,0,0" SnapsToDevicePixels="False">
                                                         <Border.Background>
                                                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                                 <GradientStop Color="#80FFFFFF" Offset="0.0" />
@@ -421,7 +434,9 @@
                                                         Background="{DynamicResource SliderTrackEmptyBrush}"
                                                         BorderBrush="{DynamicResource SliderTrackBorderBrush}"
                                                         BorderThickness="0.8"
-                                                        CornerRadius="0,4,4,0" />
+                                                        CornerRadius="0,4,4,0"
+                                                        SnapsToDevicePixels="False"
+                                                        RenderOptions.EdgeMode="Unspecified" />
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
@@ -430,7 +445,7 @@
                                     <Thumb Width="22" Height="24">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Grid Background="Transparent">
+                                                <Grid Background="Transparent" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
                                                     <!-- Crystal Bead Thumb with Liquid Specular Rim -->
                                                     <Border x:Name="thumbCircle"
                                                             Width="18" Height="18"
@@ -439,12 +454,14 @@
                                                             BorderBrush="{DynamicResource SliderThumbBorderBrush}"
                                                             BorderThickness="2"
                                                             HorizontalAlignment="Center"
-                                                            VerticalAlignment="Center">
+                                                            VerticalAlignment="Center"
+                                                            SnapsToDevicePixels="False"
+                                                            RenderOptions.EdgeMode="Unspecified">
                                                         <Border.Effect>
                                                             <DropShadowEffect BlurRadius="6" ShadowDepth="1.5" Opacity="0.3" Color="Black" />
                                                         </Border.Effect>
                                                         <!-- Top Specular Crescent Highlight -->
-                                                        <Border Height="4" Margin="3,1,3,0" VerticalAlignment="Top" CornerRadius="2">
+                                                        <Border Height="4" Margin="3,1,3,0" VerticalAlignment="Top" CornerRadius="2" SnapsToDevicePixels="False">
                                                             <Border.Background>
                                                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                                     <GradientStop Color="#E0FFFFFF" Offset="0.0" />
@@ -492,7 +509,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid x:Name="rootGrid" Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                        <Grid x:Name="rootGrid" Background="Transparent" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
                             <Grid.RenderTransform>
                                 <ScaleTransform x:Name="gridScale" ScaleX="1.0" ScaleY="1.0" />
                             </Grid.RenderTransform>
@@ -502,6 +519,8 @@
                                      Width="98" Height="98"
                                      Opacity="0.45"
                                      Margin="0,5,0,0"
+                                     SnapsToDevicePixels="False"
+                                     RenderOptions.EdgeMode="Unspecified"
                                      RenderTransformOrigin="0.5,0.5">
                                 <Ellipse.Fill>
                                     <RadialGradientBrush Center="0.5,0.40" GradientOrigin="0.5,0.30" RadiusX="0.5" RadiusY="0.5">
@@ -518,7 +537,9 @@
                                     CornerRadius="43"
                                     BorderBrush="{DynamicResource JewelRingBorderBrush}"
                                     BorderThickness="1.5"
-                                    Background="{DynamicResource JewelRingBgBrush}">
+                                    Background="{DynamicResource JewelRingBgBrush}"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.38" Color="Black" />
                                 </Border.Effect>
@@ -529,7 +550,9 @@
                                     Width="68" Height="68"
                                     CornerRadius="34"
                                     BorderBrush="#85FFFFFF"
-                                    BorderThickness="1">
+                                    BorderThickness="1"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified">
                                 <Border.Background>
                                     <RadialGradientBrush Center="0.35,0.25" GradientOrigin="0.35,0.25" RadiusX="0.65" RadiusY="0.65">
                                         <GradientStop Color="#FFFFFFFF" Offset="0.0" />
@@ -538,12 +561,14 @@
                                         <GradientStop Color="#FFA1A1AA" Offset="1.0" />
                                     </RadialGradientBrush>
                                 </Border.Background>
-                                <Grid>
+                                <Grid SnapsToDevicePixels="False">
                                     <!-- Overhead Specular Curved Glass Highlight -->
                                     <Ellipse Width="44" Height="18"
                                              HorizontalAlignment="Center"
                                              VerticalAlignment="Top"
-                                             Margin="0,3,0,0">
+                                             Margin="0,3,0,0"
+                                             SnapsToDevicePixels="False"
+                                             RenderOptions.EdgeMode="Unspecified">
                                         <Ellipse.Fill>
                                             <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
                                                 <GradientStop Color="#C8FFFFFF" Offset="0.0" />
@@ -554,11 +579,13 @@
                                     </Ellipse>
 
                                     <!-- Razor-Sharp Vector Microphone Cutout Matching App Logo (app.ico) -->
-                                    <Grid Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Grid Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" SnapsToDevicePixels="False">
                                         <Path x:Name="iconPath"
                                               Fill="{DynamicResource HeroIconActiveBrush}"
                                               Stretch="Uniform"
                                               Width="32" Height="32"
+                                              SnapsToDevicePixels="False"
+                                              RenderOptions.EdgeMode="Unspecified"
                                               Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z">
                                             <Path.Effect>
                                                 <DropShadowEffect BlurRadius="4" ShadowDepth="1.2" Direction="270" Opacity="0.22" Color="Black" />
@@ -571,6 +598,8 @@
                                               StrokeThickness="5.0"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
+                                              SnapsToDevicePixels="False"
+                                              RenderOptions.EdgeMode="Unspecified"
                                               Visibility="Collapsed" />
                                         <Line x:Name="slash"
                                               X1="3" Y1="3" X2="29" Y2="29"
@@ -578,6 +607,8 @@
                                               StrokeThickness="2.5"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
+                                              SnapsToDevicePixels="False"
+                                              RenderOptions.EdgeMode="Unspecified"
                                               Visibility="Collapsed" />
                                     </Grid>
                                 </Grid>
@@ -698,10 +729,11 @@
             <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled" />
-            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
-            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="RenderOptions.ClearTypeHint" Value="Auto" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+            <Setter Property="TextOptions.TextRenderingMode" Value="Auto" />
+            <Setter Property="RenderOptions.EdgeMode" Value="Unspecified" />
+            <Setter Property="SnapsToDevicePixels" Value="False" />
             <Setter Property="UseLayoutRounding" Value="True" />
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
@@ -738,6 +770,8 @@
                                                   Grid.Column="1"
                                                   Data="M 1,5 L 4,8 L 9,2"
                                                   Stroke="{DynamicResource TextWhiteBrush}"
+                                                  SnapsToDevicePixels="False"
+                                                  RenderOptions.EdgeMode="Unspecified"
                                                   StrokeThickness="1.8"
                                                   StrokeStartLineCap="Round"
                                                   StrokeEndLineCap="Round"
@@ -788,11 +822,8 @@
                                                                   Content="{Binding Path=SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   ContentTemplate="{Binding Path=SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   TextBlock.Foreground="{DynamicResource TextWhiteBrush}"
-                                                                  TextOptions.TextFormattingMode="Display"
-                                                                  TextOptions.TextRenderingMode="ClearType"
-                                                                  RenderOptions.ClearTypeHint="Enabled"
-                                                                  SnapsToDevicePixels="True"
-                                                                  UseLayoutRounding="True"
+                                                                  TextOptions.TextFormattingMode="Ideal"
+                                                                  TextOptions.TextRenderingMode="Auto"
                                                                   VerticalAlignment="Center" />
                                                 <Path x:Name="arrow"
                                                       Grid.Column="1"
@@ -800,6 +831,8 @@
                                                       Fill="{DynamicResource TextGrayBrush}"
                                                       HorizontalAlignment="Center"
                                                       VerticalAlignment="Center"
+                                                      SnapsToDevicePixels="False"
+                                                      RenderOptions.EdgeMode="Unspecified"
                                                       RenderTransformOrigin="0.5,0.5">
                                                     <Path.RenderTransform>
                                                         <RotateTransform x:Name="arrowRot" Angle="0" />
@@ -940,7 +973,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -1037,6 +1070,8 @@
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1.5"
             CornerRadius="20"
+            SnapsToDevicePixels="False"
+            RenderOptions.EdgeMode="Unspecified"
             RenderTransformOrigin="0.5,0.5">
         <Border.RenderTransform>
             <TransformGroup x:Name="rootTransformGroup">
@@ -1044,7 +1079,7 @@
                 <TranslateTransform x:Name="rootTranslateTransform" Y="0.0" />
             </TransformGroup>
         </Border.RenderTransform>
-        <Grid x:Name="rootGrid">
+        <Grid x:Name="rootGrid" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
             <Grid.RowDefinitions>
                 <RowDefinition Height="38" />
                 <RowDefinition Height="*" />
@@ -1058,14 +1093,18 @@
                        Visibility="Collapsed"
                        HorizontalAlignment="Stretch"
                        VerticalAlignment="Stretch"
+                       SnapsToDevicePixels="False"
+                       RenderOptions.EdgeMode="Unspecified"
                        RadiusX="20" RadiusY="20" />
 
             <!-- Custom Title Bar with Windows 11 Native Controls & Theme Switcher -->
             <Border x:Name="borderTitleBar" Grid.Row="0"
                     Background="{DynamicResource TitleBarBgBrush}"
                     CornerRadius="20,20,0,0"
+                    SnapsToDevicePixels="False"
+                    RenderOptions.EdgeMode="Unspecified"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid>
+                <Grid SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
                     <!-- Left: App Vector Icon & Title (Icon dynamically follows Theme!) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0">
                         <Path x:Name="titleBarIcon"
@@ -1074,6 +1113,8 @@
                               Stretch="Uniform"
                               Width="14" Height="14"
                               VerticalAlignment="Center"
+                              SnapsToDevicePixels="False"
+                              RenderOptions.EdgeMode="Unspecified"
                               Margin="0,0,7,0" />
                         <TextBlock Text="MicMute"
                                    Foreground="{DynamicResource TitleTextBrush}"
@@ -1098,6 +1139,8 @@
                                   Fill="{DynamicResource TitleTextBrush}"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"
+                                  SnapsToDevicePixels="False"
+                                  RenderOptions.EdgeMode="Unspecified"
                                   RenderTransformOrigin="0.5,0.5"
                                   Data="M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z">
                                 <Path.RenderTransform>
@@ -1123,9 +1166,10 @@
                 <StackPanel Margin="14,0,14,14" MinWidth="380">
                     
                     <!-- HERO SECTION: Liquid Lens Button & Precision Capsule -->
-                    <StackPanel HorizontalAlignment="Center" Margin="0,2,0,12">
+                    <StackPanel HorizontalAlignment="Stretch" Margin="0,2,0,12">
                         <Button x:Name="btnStateToggle"
                                 Style="{StaticResource MicToggleButtonStyle}"
+                                HorizontalAlignment="Center"
                                 Tag="Active"
                                 Click="BtnStateToggle_Click" />
 
@@ -1134,14 +1178,19 @@
                                 Background="{DynamicResource StatusCapsuleBgBrush}"
                                 BorderThickness="0"
                                 CornerRadius="12"
+                                Width="158"
                                 Padding="14,4"
                                 HorizontalAlignment="Center"
+                                SnapsToDevicePixels="False"
+                                RenderOptions.EdgeMode="Unspecified"
                                 Margin="0,6,0,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Ellipse x:Name="dotStatus"
                                          Width="7" Height="7"
                                          Fill="{DynamicResource StatusDotBrush}"
                                          Margin="0,0,6,0"
+                                         SnapsToDevicePixels="False"
+                                         RenderOptions.EdgeMode="Unspecified"
                                          VerticalAlignment="Center">
                                     <Ellipse.Effect>
                                         <DropShadowEffect x:Name="dotGlow" BlurRadius="6" ShadowDepth="0" Color="{DynamicResource AccentColor}" Opacity="0.8" />
@@ -1158,13 +1207,15 @@
 
                         <!-- Display-only Hotkey Pill: "Press [ Insert ] to toggle" -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
-                            <TextBlock Text="Press " Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                            <TextBlock Text="Press " FontWeight="Bold" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
                             <Border Background="{DynamicResource KeycapBgBrush}"
                                     BorderBrush="{DynamicResource KeycapBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="5"
                                     Padding="7,2"
                                     Margin="2,0"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified"
                                     VerticalAlignment="Center">
                                 <TextBlock x:Name="tbHeroHotkey"
                                            Text="Insert"
@@ -1175,7 +1226,7 @@
                                            Margin="0,1,0,0"
                                            VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock Text=" to toggle" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                            <TextBlock Text=" to toggle" FontWeight="Bold" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
                         </StackPanel>
                     </StackPanel>
 
@@ -1185,6 +1236,8 @@
                             BorderThickness="1"
                             CornerRadius="16"
                             Padding="12,10"
+                            SnapsToDevicePixels="False"
+                            RenderOptions.EdgeMode="Unspecified"
                             Margin="0,0,0,10">
                         <StackPanel>
                             <!-- Row 1: Microphone Selection -->
@@ -1202,28 +1255,27 @@
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
                                         Margin="0,0,9,0"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         VerticalAlignment="Center">
                                     <Path Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z"
                                           Fill="{DynamicResource SquircleIconBrush}"
                                           Stretch="Uniform"
                                           Width="14" Height="14"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Microphone Input" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Active capture audio device" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                    <TextBlock Text="Microphone Input" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
+                                    <TextBlock Text="Active capture audio device" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Grid>
 
                             <ComboBox x:Name="cbDevices"
                                       Style="{StaticResource ModernComboBoxStyle}"
-                                      TextOptions.TextFormattingMode="Display"
-                                      TextOptions.TextRenderingMode="ClearType"
-                                      RenderOptions.ClearTypeHint="Enabled"
-                                      SnapsToDevicePixels="True"
-                                      UseLayoutRounding="True"
                                       Margin="0,0,0,8">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
@@ -1231,11 +1283,7 @@
                                                    Foreground="{DynamicResource TextWhiteBrush}"
                                                    VerticalAlignment="Center"
                                                    FontSize="11.5"
-                                                   TextOptions.TextFormattingMode="Display"
-                                                   TextOptions.TextRenderingMode="ClearType"
-                                                   RenderOptions.ClearTypeHint="Enabled"
-                                                   SnapsToDevicePixels="True"
-                                                   UseLayoutRounding="True" />
+                                                   FontWeight="SemiBold" />
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
@@ -1258,18 +1306,22 @@
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
                                         Margin="0,0,9,0"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         VerticalAlignment="Center">
                                     <Path Data="M19,10H5V8H19V10M19,13H5V11H19V13M19,16H5V14H19V16Z"
                                           Fill="{DynamicResource SquircleIconBrush}"
                                           Stretch="Uniform"
                                           Width="13" Height="9"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Shortcut Key" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Global toggle hotkey" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                    <TextBlock Text="Shortcut Key" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
+                                    <TextBlock Text="Global toggle hotkey" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -1281,6 +1333,8 @@
                                             CornerRadius="6"
                                             Padding="10,0"
                                             Margin="0,0,6,0"
+                                            SnapsToDevicePixels="False"
+                                            RenderOptions.EdgeMode="Unspecified"
                                             VerticalAlignment="Center">
                                         <TextBlock x:Name="tbHotkey"
                                                    Text="Insert"
@@ -1309,6 +1363,8 @@
                             BorderThickness="1"
                             CornerRadius="16"
                             Padding="12,10"
+                            SnapsToDevicePixels="False"
+                            RenderOptions.EdgeMode="Unspecified"
                             Margin="0,0,0,10">
                         <StackPanel>
                             <!-- Row 1: On-Screen Display (OSD) -->
@@ -1326,19 +1382,23 @@
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
                                         Margin="0,0,9,0"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         VerticalAlignment="Center">
                                     <Path Data="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
                                           Stroke="{DynamicResource SquircleIconBrush}"
                                           StrokeThickness="1.5"
                                           Stretch="Uniform"
                                           Width="13" Height="13"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="On-Screen Display (OSD)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Visual HUD popup when toggled" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                    <TextBlock Text="On-Screen Display (OSD)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
+                                    <TextBlock Text="Visual HUD popup when toggled" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
 
                                 <!-- Chunky Liquid Toggle Switch -->
@@ -1357,7 +1417,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Duration" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="0" Text="Duration" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                 <Slider x:Name="sliderOsdDuration"
                                         Grid.Column="1"
                                         Style="{StaticResource ModernSliderStyle}"
@@ -1375,6 +1435,8 @@
                                         CornerRadius="6"
                                         Margin="8,0,0,0"
                                         Cursor="IBeam"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         VerticalAlignment="Center">
                                     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <Grid.ColumnDefinitions>
@@ -1422,6 +1484,8 @@
                                 <Border Grid.Column="0"
                                         Width="28" Height="28"
                                         CornerRadius="7"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         Background="{DynamicResource SquircleBgBrush}"
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
@@ -1431,14 +1495,16 @@
                                           Stroke="{DynamicResource SquircleIconBrush}"
                                           StrokeThickness="1.4"
                                           Stretch="Uniform"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           Width="13" Height="13"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Sound Effects (Audio Chime)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Play acoustic sound on mute / unmute" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                    <TextBlock Text="Sound Effects (Audio Chime)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
+                                    <TextBlock Text="Play acoustic sound on mute / unmute" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
 
                                 <CheckBox x:Name="cbSoundFeedback"
@@ -1456,7 +1522,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Volume" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="0" Text="Volume" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                 <Slider x:Name="sliderSoundVolume"
                                         Grid.Column="1"
                                         Style="{StaticResource ModernSliderStyle}"
@@ -1472,6 +1538,8 @@
                                         BorderBrush="{DynamicResource KeycapBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="6"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         Margin="8,0,0,0"
                                         Cursor="IBeam"
                                         VerticalAlignment="Center">
@@ -1521,6 +1589,8 @@
                                 <Border Grid.Column="0"
                                         Width="28" Height="28"
                                         CornerRadius="7"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         Background="{DynamicResource SquircleBgBrush}"
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
@@ -1529,14 +1599,16 @@
                                     <Path Data="M13 10V3L4 14h7v7l9-11h-7z"
                                           Fill="{DynamicResource SquircleIconBrush}"
                                           Stretch="Uniform"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           Width="12" Height="13"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Run on Windows Startup" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Launch automatically with Windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                    <TextBlock Text="Run on Windows Startup" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
+                                    <TextBlock Text="Launch automatically with Windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
 
                                 <CheckBox x:Name="cbStartup"
@@ -1560,6 +1632,8 @@
                                 <Border Grid.Column="0"
                                         Width="28" Height="28"
                                         CornerRadius="7"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         Background="{DynamicResource SquircleBgBrush}"
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
@@ -1569,14 +1643,16 @@
                                           Stroke="{DynamicResource SquircleIconBrush}"
                                           StrokeThickness="1.5"
                                           Stretch="Uniform"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           Width="12" Height="12"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Start Minimized" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Text="Always hide main window to tray" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" />
+                                    <TextBlock Text="Start Minimized" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
+                                    <TextBlock Text="Always hide main window to tray" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
 
                                 <CheckBox x:Name="cbStartMinimized"
@@ -1600,6 +1676,8 @@
                                 <Border Grid.Column="0"
                                         Width="28" Height="28"
                                         CornerRadius="7"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         Background="{DynamicResource SquircleBgBrush}"
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
@@ -1609,16 +1687,19 @@
                                           Stroke="{DynamicResource SquircleIconBrush}"
                                           StrokeThickness="1.4"
                                           Stretch="Uniform"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           Width="13" Height="13"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
-                                    <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
                                     <TextBlock Text="Enables hotkeys over anti-cheat and elevated windows"
                                                Foreground="{DynamicResource TextGrayBrush}"
                                                FontSize="9.5"
+                                               FontWeight="SemiBold"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
 
@@ -1641,6 +1722,8 @@
                             BorderThickness="1"
                             CornerRadius="16"
                             Padding="12,10"
+                            SnapsToDevicePixels="False"
+                            RenderOptions.EdgeMode="Unspecified"
                             Margin="0,0,0,10">
                         <StackPanel>
                             <!-- Row 1: Header with Label and Icon -->
@@ -1654,6 +1737,8 @@
                                 <Border Grid.Column="0"
                                         Width="28" Height="28"
                                         CornerRadius="7"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
                                         Background="{DynamicResource SquircleBgBrush}"
                                         BorderBrush="{DynamicResource SquircleBorderBrush}"
                                         BorderThickness="1"
@@ -1662,6 +1747,8 @@
                                     <Path Data="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"
                                           Fill="{DynamicResource SquircleIconBrush}"
                                           Stretch="Uniform"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified"
                                           Width="13" Height="11"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
@@ -1671,10 +1758,11 @@
                                     <TextBlock Text="Settings Location"
                                                Foreground="{DynamicResource TextWhiteBrush}"
                                                FontSize="12"
-                                               FontWeight="SemiBold" />
+                                               FontWeight="Bold" />
                                     <TextBlock Text="Configuration file and data directory"
                                                Foreground="{DynamicResource TextGrayBrush}"
-                                               FontSize="9.5" />
+                                               FontSize="9.5"
+                                               FontWeight="SemiBold" />
                                 </StackPanel>
                             </Grid>
 
@@ -1709,6 +1797,8 @@
                                     BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="8"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified"
                                     Padding="10,6">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1719,6 +1809,7 @@
                                                Foreground="{DynamicResource TextGrayBrush}"
                                                FontSize="10"
                                                FontFamily="Consolas, SF Mono, Cascadia Mono, Segoe UI Mono, monospace"
+                                               FontWeight="SemiBold"
                                                TextTrimming="CharacterEllipsis"
                                                VerticalAlignment="Center"
                                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
@@ -1734,6 +1825,8 @@
                             BorderBrush="{DynamicResource WarningBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="12"
+                            SnapsToDevicePixels="False"
+                            RenderOptions.EdgeMode="Unspecified"
                             Padding="10,7"
                             Margin="0,4,0,0">
                         <Grid>
@@ -1747,6 +1840,8 @@
                                     Grid.Column="0"
                                     Width="24" Height="24"
                                     CornerRadius="6"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified"
                                     Background="{DynamicResource SquircleBgBrush}"
                                     BorderBrush="{DynamicResource SquircleBorderBrush}"
                                     BorderThickness="1"
@@ -1756,6 +1851,8 @@
                                       Data="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
                                       Fill="{DynamicResource SquircleIconBrush}"
                                       Stretch="Uniform"
+                                      SnapsToDevicePixels="False"
+                                      RenderOptions.EdgeMode="Unspecified"
                                       Width="12" Height="12"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center" />
@@ -1765,7 +1862,7 @@
                                        Grid.Column="1"
                                        Foreground="{DynamicResource WarningTextBrush}"
                                        FontSize="10.5"
-                                       FontWeight="Medium"
+                                       FontWeight="Bold"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
                         </Grid>

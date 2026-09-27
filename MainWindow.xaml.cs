@@ -87,6 +87,7 @@ public partial class MainWindow : Window
     private IntPtr _hIconSmall = IntPtr.Zero;
     private IntPtr _hIconBig = IntPtr.Zero;
     private bool _isMinimizing = false;
+    private bool _isRestoring = false;
 
     private static readonly Geometry IconCheck = Geometry.Parse("M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z");
     private static readonly Geometry IconWarning = Geometry.Parse("M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z");
@@ -96,6 +97,9 @@ public partial class MainWindow : Window
     private const int WM_DPICHANGED = 0x02E0;
     private const int WM_EXITSIZEMOVE = 0x0232;
     private const int WM_DEVICECHANGE = 0x0219;
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_MINIMIZE = 0xF020;
+    private const int SC_RESTORE = 0xF120;
     private const int WM_NCLBUTTONDOWN = 0x00A1;
     private const int HTCAPTION = 0x0002;
     private const int WM_SETICON = 0x0080;
@@ -146,6 +150,15 @@ public partial class MainWindow : Window
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool ChangeWindowMessageFilter(uint msg, uint action);
 
+    private static T Freeze<T>(T freezable) where T : Freezable
+    {
+        if (freezable.CanFreeze)
+        {
+            freezable.Freeze();
+        }
+        return freezable;
+    }
+
     public MainWindow(AudioController audioController)
     {
         InitializeComponent();
@@ -192,6 +205,12 @@ public partial class MainWindow : Window
             this.WindowStartupLocation = root.WindowStartupLocation;
             this.SnapsToDevicePixels = root.SnapsToDevicePixels;
             this.UseLayoutRounding = root.UseLayoutRounding;
+            TextOptions.SetTextFormattingMode(this, TextOptions.GetTextFormattingMode(root));
+            TextOptions.SetTextRenderingMode(this, TextOptions.GetTextRenderingMode(root));
+            TextOptions.SetTextHintingMode(this, TextOptions.GetTextHintingMode(root));
+            RenderOptions.SetClearTypeHint(this, RenderOptions.GetClearTypeHint(root));
+            RenderOptions.SetEdgeMode(this, RenderOptions.GetEdgeMode(root));
+            RenderOptions.SetBitmapScalingMode(this, RenderOptions.GetBitmapScalingMode(root));
 
             try
             {
@@ -306,6 +325,7 @@ public partial class MainWindow : Window
             {
                 this.FontFamily = root.FontFamily;
             }
+            this.FontWeight = root.FontWeight;
 
             // Now safely detach content and attach to this Window
             var content = root.Content;
@@ -666,6 +686,29 @@ public partial class MainWindow : Window
         {
             TriggerDevicesChanged();
         }
+        else if (msg == WM_SYSCOMMAND)
+        {
+            int command = wParam.ToInt32() & 0xFFF0;
+            if (command == SC_MINIMIZE)
+            {
+                if (!_isMinimizing && WindowState != WindowState.Minimized)
+                {
+                    handled = true;
+                    MinimizeWithAnimation();
+                    return IntPtr.Zero;
+                }
+            }
+            else if (command == SC_RESTORE)
+            {
+                if (!_isRestoring && WindowState == WindowState.Minimized)
+                {
+                    handled = true;
+                    this.WindowState = WindowState.Normal;
+                    PlayRestoreAnimation();
+                    return IntPtr.Zero;
+                }
+            }
+        }
         else if (msg == WM_SHOWME)
         {
             this.Show();
@@ -675,6 +718,7 @@ public partial class MainWindow : Window
             this.Focus();
             ShowWindow(hwnd, 9); // SW_RESTORE
             SetForegroundWindow(hwnd);
+            PlayRestoreAnimation();
             handled = true;
         }
         else if (msg == WM_SETTINGCHANGE || msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED || msg == WM_EXITSIZEMOVE)
@@ -1034,23 +1078,46 @@ public partial class MainWindow : Window
 
         if (_isMinimizing) return;
         _isMinimizing = true;
+        _isRestoring = false;
 
-        var duration = new Duration(TimeSpan.FromMilliseconds(160));
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        // Cancel any pending animations
+        rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
 
-        var opacityAnim = new DoubleAnimation(1.0, 0.0, duration) { EasingFunction = ease };
-        var scaleXAnim = new DoubleAnimation(1.0, 0.92, duration) { EasingFunction = ease };
-        var scaleYAnim = new DoubleAnimation(1.0, 0.92, duration) { EasingFunction = ease };
-        var transYAnim = new DoubleAnimation(0.0, 28.0, duration) { EasingFunction = ease };
+        // Dynamic GPU bitmap caching during transition to eliminate re-rasterization micro-stutter
+        rootBorder.CacheMode = new BitmapCache
+        {
+            SnapsToDevicePixels = true,
+            EnableClearType = false,
+            RenderAtScale = 1.0
+        };
+
+        var duration = new Duration(TimeSpan.FromMilliseconds(190));
+        var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
+
+        var opacityAnim = new DoubleAnimation(rootBorder.Opacity, 0.0, duration) { EasingFunction = ease };
+        var scaleXAnim = new DoubleAnimation(rootScaleTransform.ScaleX, 0.93, duration) { EasingFunction = ease };
+        var scaleYAnim = new DoubleAnimation(rootScaleTransform.ScaleY, 0.93, duration) { EasingFunction = ease };
+        var transYAnim = new DoubleAnimation(rootTranslateTransform.Y, 20.0, duration) { EasingFunction = ease };
 
         opacityAnim.Completed += (s, ev) =>
         {
-            WindowState = WindowState.Minimized;
-            _isMinimizing = false;
-            rootBorder.Opacity = 1.0;
-            rootScaleTransform.ScaleX = 1.0;
-            rootScaleTransform.ScaleY = 1.0;
-            rootTranslateTransform.Y = 0.0;
+            try
+            {
+                WindowState = WindowState.Minimized;
+            }
+            finally
+            {
+                _isMinimizing = false;
+                // Keep Opacity at 0.0 while minimized to eliminate the single-frame flash before Windows completes hiding the HWND
+                rootBorder.CacheMode = null;
+                rootBorder.Opacity = 0.0;
+                rootScaleTransform.ScaleX = 0.93;
+                rootScaleTransform.ScaleY = 0.93;
+                rootTranslateTransform.Y = 20.0;
+            }
         };
 
         rootBorder.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
@@ -1066,27 +1133,61 @@ public partial class MainWindow : Window
             _isMinimizing = false;
             PlayRestoreAnimation();
         }
+        else if (WindowState == WindowState.Minimized)
+        {
+            _isRestoring = false;
+        }
     }
 
-    private void PlayRestoreAnimation()
+    public void PlayRestoreAnimation()
     {
         if (!IsLoaded || !IsVisible || ActualWidth <= 0 || rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
         {
+            if (rootBorder != null) rootBorder.Opacity = 1.0;
             return;
         }
 
+        if (_isRestoring) return;
+        _isRestoring = true;
+        _isMinimizing = false;
+
+        // Cancel any pending animations
+        rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+
+        // Dynamic GPU bitmap caching during transition to eliminate re-rasterization micro-stutter
+        rootBorder.CacheMode = new BitmapCache
+        {
+            SnapsToDevicePixels = true,
+            EnableClearType = false,
+            RenderAtScale = 1.0
+        };
+
         rootBorder.Opacity = 0.0;
-        rootScaleTransform.ScaleX = 0.94;
-        rootScaleTransform.ScaleY = 0.94;
+        rootScaleTransform.ScaleX = 0.93;
+        rootScaleTransform.ScaleY = 0.93;
         rootTranslateTransform.Y = 20.0;
 
-        var duration = new Duration(TimeSpan.FromMilliseconds(180));
+        var duration = new Duration(TimeSpan.FromMilliseconds(220));
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
         var opacityAnim = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = ease };
-        var scaleXAnim = new DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease };
-        var scaleYAnim = new DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease };
+        var scaleXAnim = new DoubleAnimation(0.93, 1.0, duration) { EasingFunction = ease };
+        var scaleYAnim = new DoubleAnimation(0.93, 1.0, duration) { EasingFunction = ease };
         var transYAnim = new DoubleAnimation(20.0, 0.0, duration) { EasingFunction = ease };
+
+        opacityAnim.Completed += (s, ev) =>
+        {
+            _isRestoring = false;
+            // Clear CacheMode immediately upon completion so text and vector elements revert to subpixel ClearType rendering
+            rootBorder.CacheMode = null;
+            rootBorder.Opacity = 1.0;
+            rootScaleTransform.ScaleX = 1.0;
+            rootScaleTransform.ScaleY = 1.0;
+            rootTranslateTransform.Y = 0.0;
+        };
 
         rootBorder.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnim);
@@ -1453,9 +1554,12 @@ public partial class MainWindow : Window
                 rtb.Render(rootBorder);
                 rtb.Freeze();
 
-                themeTransitionOverlay!.Fill = new ImageBrush(rtb);
+                var imgBrush = new ImageBrush(rtb);
+                imgBrush.Freeze();
+                themeTransitionOverlay!.Fill = imgBrush;
                 themeTransitionOverlay.Opacity = 1.0;
                 themeTransitionOverlay.Visibility = Visibility.Visible;
+                themeTransitionOverlay.CacheMode = new BitmapCache { SnapsToDevicePixels = true, RenderAtScale = 1.0 };
             }
             catch
             {
@@ -1465,24 +1569,16 @@ public partial class MainWindow : Window
 
         System.Windows.Media.Color accentColor = isLight ? System.Windows.Media.Color.FromRgb(71, 85, 105) : System.Windows.Media.Color.FromRgb(255, 255, 255);
         Resources["AccentColor"] = accentColor;
-        Resources["AccentBrush"] = new SolidColorBrush(accentColor);
-        Resources["AccentHoverBrush"] = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(18, 71, 85, 105) : System.Windows.Media.Color.FromArgb(34, 255, 255, 255));
+        Resources["AccentBrush"] = Freeze(new SolidColorBrush(accentColor));
+        Resources["AccentHoverBrush"] = Freeze(new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(18, 71, 85, 105) : System.Windows.Media.Color.FromArgb(34, 255, 255, 255)));
 
-        var themeGlyphBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(55, 65, 81) : System.Windows.Media.Color.FromRgb(255, 255, 255));
+        var themeGlyphBrush = Freeze(new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(55, 65, 81) : System.Windows.Media.Color.FromRgb(255, 255, 255)));
         if (pathTitleTheme != null)
         {
             pathTitleTheme.Fill = themeGlyphBrush;
             pathTitleTheme.Data = Geometry.Parse(isLight
-                ? "M12.3,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22C16.82,22 20.84,18.6 21.8,14C22.07,12.7 20.93,11.59 19.63,11.83C15.82,12.54 12,9.66 12,5.77C12,4.42 12.92,3.26 14.26,3.03C14.77,2.94 15.08,2.44 14.8,2C14.07,2 13.18,2 12.3,2Z"
+                ? "M21,12.79A9,9 0 1 1 11.21,3 7,7 0 0 0 21,12.79z"
                 : "M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z");
-        }
-        if (themeIconRot != null)
-        {
-            var rotAnim = new DoubleAnimation(themeIconRot.Angle, themeIconRot.Angle + 180, new Duration(TimeSpan.FromMilliseconds(240)))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            themeIconRot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
         }
         if (titleBarIcon != null)
         {
@@ -1507,45 +1603,45 @@ public partial class MainWindow : Window
 
         if (isLight)
         {
-            Resources["WindowBgBrush"] = new LinearGradientBrush(
+            Resources["WindowBgBrush"] = Freeze(new LinearGradientBrush(
                 System.Windows.Media.Color.FromArgb(174, 248, 249, 250),
                 System.Windows.Media.Color.FromArgb(174, 233, 236, 239),
-                new Point(0.0, 0.0), new Point(1.0, 1.0));
-            Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0));
-            Resources["CaptionButtonPressedBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 0, 0, 0));
-            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255));
-            Resources["InputBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245));
-            Resources["TitleBarBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 255, 255, 255));
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            Resources["CaptionButtonHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0)));
+            Resources["CaptionButtonPressedBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 0, 0, 0)));
+            Resources["CardBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255)));
+            Resources["InputBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245)));
+            Resources["TitleBarBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 255, 255, 255)));
             Resources["TitleTextBrush"] = themeGlyphBrush;
             Resources["TextWhiteBrush"] = themeGlyphBrush;
-            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(107, 114, 128));
-            Resources["TextDimBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175));
-            Resources["BorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 0, 0, 0));
-            Resources["DividerBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0));
+            Resources["TextGrayBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(107, 114, 128)));
+            Resources["TextDimBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)));
+            Resources["BorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 0, 0, 0)));
+            Resources["DividerBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0)));
 
             // Liquid Switches (Soft Graphite in Light Mode)
-            Resources["ToggleOnBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105));
-            Resources["ToggleOnBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105));
-            Resources["ToggleOffBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231));
-            Resources["ToggleOffBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
-            Resources["ToggleKnobBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105));
-            Resources["ToggleKnobBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
-            Resources["ToggleKnobActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
-            Resources["ToggleKnobActiveBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231));
+            Resources["ToggleOnBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
+            Resources["ToggleOnBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
+            Resources["ToggleOffBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
+            Resources["ToggleOffBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216)));
+            Resources["ToggleKnobBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
+            Resources["ToggleKnobBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216)));
+            Resources["ToggleKnobActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
+            Resources["ToggleKnobActiveBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
 
             // Liquid OSD Duration Slider (Soft Graphite in Light Mode)
-            Resources["SliderTrackBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105));
-            Resources["SliderTrackEmptyBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231));
-            Resources["SliderTrackBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
-            Resources["SliderThumbBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
-            Resources["SliderThumbBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105));
+            Resources["SliderTrackBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
+            Resources["SliderTrackEmptyBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
+            Resources["SliderTrackBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216)));
+            Resources["SliderThumbBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
+            Resources["SliderThumbBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
 
             // Jewel Ring
-            Resources["JewelRingBgBrush"] = new LinearGradientBrush(
+            Resources["JewelRingBgBrush"] = Freeze(new LinearGradientBrush(
                 System.Windows.Media.Color.FromArgb(180, 255, 255, 255),
                 System.Windows.Media.Color.FromArgb(120, 244, 244, 245),
-                new Point(0.0, 0.0), new Point(1.0, 1.0));
-            Resources["JewelRingBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255));
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            Resources["JewelRingBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255)));
 
             // Hero Mute Button: Liquid Slate-Graphite Lens matching Toggle Switches in Light Mode
             var heroLensLight = new RadialGradientBrush
@@ -1559,7 +1655,7 @@ public partial class MainWindow : Window
             heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(85, 99, 120), 0.35));
             heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(71, 85, 105), 0.70));
             heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(55, 67, 83), 1.0));
-            Resources["HeroLensActiveBrush"] = heroLensLight;
+            Resources["HeroLensActiveBrush"] = Freeze(heroLensLight);
 
             var heroGlowLight = new RadialGradientBrush
             {
@@ -1571,77 +1667,77 @@ public partial class MainWindow : Window
             heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(35, 71, 85, 105), 0.0));
             heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(12, 71, 85, 105), 0.5));
             heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 71, 85, 105), 1.0));
-            Resources["HeroGlowActiveBrush"] = heroGlowLight;
-            Resources["HeroIconActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+            Resources["HeroGlowActiveBrush"] = Freeze(heroGlowLight);
+            Resources["HeroIconActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
 
             // Monochrome Squircle Tiles
-            Resources["SquircleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(14, 0, 0, 0));
-            Resources["SquircleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 0, 0, 0));
+            Resources["SquircleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(14, 0, 0, 0)));
+            Resources["SquircleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 0, 0, 0)));
             Resources["SquircleIconBrush"] = themeGlyphBrush;
 
             // Keycaps
-            Resources["KeycapBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245));
-            Resources["KeycapBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231));
+            Resources["KeycapBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245)));
+            Resources["KeycapBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
             Resources["KeycapTextBrush"] = themeGlyphBrush;
 
             // Status Capsule (Borderless)
-            Resources["StatusCapsuleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 71, 85, 105));
-            Resources["StatusCapsuleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0));
+            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 71, 85, 105)));
+            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0)));
             Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
             Resources["StatusDotBrush"] = themeGlyphBrush;
 
             // Warning / Status Message Box (Monochrome Black & White Theme)
-            Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(12, 0, 0, 0));
-            Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(22, 0, 0, 0));
+            Resources["WarningBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(12, 0, 0, 0)));
+            Resources["WarningBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(22, 0, 0, 0)));
             Resources["WarningTextBrush"] = themeGlyphBrush;
 
             // Scrollbars
-            Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 0, 0, 0));
-            Resources["ScrollBarThumbHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(70, 0, 0, 0));
-            Resources["ScrollBarThumbDragBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 0, 0, 0));
+            Resources["ScrollBarThumbBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 0, 0, 0)));
+            Resources["ScrollBarThumbHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(70, 0, 0, 0)));
+            Resources["ScrollBarThumbDragBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 0, 0, 0)));
         }
         else
         {
             // True Neutral Gray-Black Dark Mode (Zero Blue)
-            Resources["WindowBgBrush"] = new LinearGradientBrush(
+            Resources["WindowBgBrush"] = Freeze(new LinearGradientBrush(
                 System.Windows.Media.Color.FromArgb(242, 24, 24, 27),
                 System.Windows.Media.Color.FromArgb(242, 9, 9, 11),
-                new Point(0.0, 0.0), new Point(1.0, 1.0));
-            Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 255, 255, 255));
-            Resources["CaptionButtonPressedBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, 255, 255, 255));
-            Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
-            Resources["InputBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27));
-            Resources["TitleBarBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0));
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            Resources["CaptionButtonHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 255, 255, 255)));
+            Resources["CaptionButtonPressedBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, 255, 255, 255)));
+            Resources["CardBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
+            Resources["InputBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
+            Resources["TitleBarBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0)));
             Resources["TitleTextBrush"] = themeGlyphBrush;
             Resources["TextWhiteBrush"] = themeGlyphBrush;
-            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204));
-            Resources["TextDimBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(136, 136, 146));
-            Resources["BorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
-            Resources["DividerBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
+            Resources["TextGrayBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204)));
+            Resources["TextDimBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(136, 136, 146)));
+            Resources["BorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255)));
+            Resources["DividerBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
 
             // Liquid Switches (25% Softened White Liquid in Dark Mode)
-            Resources["ToggleOnBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204));
-            Resources["ToggleOnBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204));
-            Resources["ToggleOffBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(28, 28, 31));
-            Resources["ToggleOffBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70));
-            Resources["ToggleKnobBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231));
-            Resources["ToggleKnobBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204));
-            Resources["ToggleKnobActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27));
-            Resources["ToggleKnobActiveBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42));
+            Resources["ToggleOnBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204)));
+            Resources["ToggleOnBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204)));
+            Resources["ToggleOffBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(28, 28, 31)));
+            Resources["ToggleOffBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70)));
+            Resources["ToggleKnobBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
+            Resources["ToggleKnobBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204)));
+            Resources["ToggleKnobActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
+            Resources["ToggleKnobActiveBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42)));
 
             // Liquid OSD Duration Slider
-            Resources["SliderTrackBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204));
-            Resources["SliderTrackEmptyBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42));
-            Resources["SliderTrackBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70));
-            Resources["SliderThumbBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
-            Resources["SliderThumbBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27));
+            Resources["SliderTrackBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204)));
+            Resources["SliderTrackEmptyBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42)));
+            Resources["SliderTrackBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70)));
+            Resources["SliderThumbBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
+            Resources["SliderThumbBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
 
             // Jewel Ring
-            Resources["JewelRingBgBrush"] = new LinearGradientBrush(
+            Resources["JewelRingBgBrush"] = Freeze(new LinearGradientBrush(
                 System.Windows.Media.Color.FromArgb(34, 255, 255, 255),
                 System.Windows.Media.Color.FromArgb(5, 255, 255, 255),
-                new Point(0.0, 0.0), new Point(1.0, 1.0));
-            Resources["JewelRingBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 255, 255));
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            Resources["JewelRingBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 255, 255)));
 
             // Hero Mute Button: Liquid White-Zinc Lens in Dark Mode
             var heroLensDark = new RadialGradientBrush
@@ -1655,7 +1751,7 @@ public partial class MainWindow : Window
             heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(228, 228, 231), 0.45));
             heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(212, 212, 216), 0.85));
             heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(193, 193, 204), 1.0));
-            Resources["HeroLensActiveBrush"] = heroLensDark;
+            Resources["HeroLensActiveBrush"] = Freeze(heroLensDark);
 
             var heroGlowDark = new RadialGradientBrush
             {
@@ -1667,34 +1763,34 @@ public partial class MainWindow : Window
             heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(65, 255, 255, 255), 0.0));
             heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(20, 255, 255, 255), 0.5));
             heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 1.0));
-            Resources["HeroGlowActiveBrush"] = heroGlowDark;
-            Resources["HeroIconActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27));
+            Resources["HeroGlowActiveBrush"] = Freeze(heroGlowDark);
+            Resources["HeroIconActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
 
             // Monochrome Squircle Tiles: Pure White Icon in Dark Mode
-            Resources["SquircleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
-            Resources["SquircleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
+            Resources["SquircleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
+            Resources["SquircleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255)));
             Resources["SquircleIconBrush"] = themeGlyphBrush;
 
             // Keycaps
-            Resources["KeycapBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42));
-            Resources["KeycapBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70));
+            Resources["KeycapBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42)));
+            Resources["KeycapBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70)));
             Resources["KeycapTextBrush"] = themeGlyphBrush;
 
             // Status Capsule (Borderless)
-            Resources["StatusCapsuleBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(26, 255, 255, 255));
-            Resources["StatusCapsuleBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0));
+            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(26, 255, 255, 255)));
+            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0)));
             Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
             Resources["StatusDotBrush"] = themeGlyphBrush;
 
             // Warning / Status Message Box (Monochrome Black & White Theme)
-            Resources["WarningBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
-            Resources["WarningBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
+            Resources["WarningBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
+            Resources["WarningBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255)));
             Resources["WarningTextBrush"] = themeGlyphBrush;
 
             // Scrollbars
-            Resources["ScrollBarThumbBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(36, 255, 255, 255));
-            Resources["ScrollBarThumbHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(65, 255, 255, 255));
-            Resources["ScrollBarThumbDragBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 255, 255, 255));
+            Resources["ScrollBarThumbBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(36, 255, 255, 255)));
+            Resources["ScrollBarThumbHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(65, 255, 255, 255)));
+            Resources["ScrollBarThumbDragBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 255, 255, 255)));
         }
 
         if (_audioController != null)
@@ -1705,17 +1801,37 @@ public partial class MainWindow : Window
 
         if (animateTransition && themeTransitionOverlay != null)
         {
-            var fadeOut = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromMilliseconds(240)))
+            // Decouple overlay animation to DispatcherPriority.Render so the UI thread finishes
+            // invalidating and rendering all updated theme resources BEFORE the fade animation begins.
+            Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            fadeOut.Completed += (s, ev) =>
-            {
-                themeTransitionOverlay.Opacity = 0.0;
-                themeTransitionOverlay.Visibility = Visibility.Collapsed;
-                themeTransitionOverlay.Fill = null;
-            };
-            themeTransitionOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+                if (themeIconRot != null)
+                {
+                    var rotAnim = new DoubleAnimation(0, 360, new Duration(TimeSpan.FromMilliseconds(260)))
+                    {
+                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                    };
+                    themeIconRot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
+                }
+
+                var fadeOut = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromMilliseconds(260)))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                fadeOut.Completed += (s, ev) =>
+                {
+                    themeTransitionOverlay.Opacity = 0.0;
+                    themeTransitionOverlay.Visibility = Visibility.Collapsed;
+                    themeTransitionOverlay.Fill = null;
+                    themeTransitionOverlay.CacheMode = null;
+                };
+                themeTransitionOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            });
+        }
+        else if (themeIconRot != null)
+        {
+            themeIconRot.BeginAnimation(RotateTransform.AngleProperty, null);
+            themeIconRot.Angle = 0;
         }
     }
 
@@ -1977,9 +2093,25 @@ public partial class MainWindow : Window
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         _isMinimizing = false;
-        if (rootBorder != null) rootBorder.Opacity = 1.0;
-        if (rootScaleTransform != null) { rootScaleTransform.ScaleX = 1.0; rootScaleTransform.ScaleY = 1.0; }
-        if (rootTranslateTransform != null) rootTranslateTransform.Y = 0.0;
+        _isRestoring = false;
+        if (rootBorder != null)
+        {
+            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            rootBorder.CacheMode = null;
+            rootBorder.Opacity = 1.0;
+        }
+        if (rootScaleTransform != null)
+        {
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            rootScaleTransform.ScaleX = 1.0;
+            rootScaleTransform.ScaleY = 1.0;
+        }
+        if (rootTranslateTransform != null)
+        {
+            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            rootTranslateTransform.Y = 0.0;
+        }
         base.OnClosing(e);
     }
 
