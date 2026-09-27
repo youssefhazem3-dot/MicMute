@@ -59,6 +59,8 @@ static class UiCases
         test(nameof(OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction), OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction);
         test(nameof(OsdWindowMatchesCircularGlowReferenceDesign), OsdWindowMatchesCircularGlowReferenceDesign);
         test(nameof(ButtonsReliablyRegisterClicksWithPressModeAndTitleBarGuards), ButtonsReliablyRegisterClicksWithPressModeAndTitleBarGuards);
+        test(nameof(TaskbarIconAndTypographyAndThemeBrighterPalette), TaskbarIconAndTypographyAndThemeBrighterPalette);
+        test(nameof(SmoothMinimizeRestoreAndDropdownClearType), SmoothMinimizeRestoreAndDropdownClearType);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -1448,6 +1450,86 @@ static class UiCases
             Check.Equal(System.Windows.Controls.ClickMode.Press, GetClickMode(closeStyle), "Close button style must use ClickMode.Press");
             Check.Equal(System.Windows.Controls.ClickMode.Press, GetClickMode(themeStyle), "Theme toggle button style must use ClickMode.Press");
             Check.Equal(System.Windows.Controls.ClickMode.Press, GetClickMode(heroStyle), "Hero mute toggle button style must use ClickMode.Press");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void TaskbarIconAndTypographyAndThemeBrighterPalette()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Google font family in MainWindow and OsdWindow
+        Check.True(rawXaml.Contains("Roboto") && rawXaml.Contains("Inter"), "MainWindow XAML must specify Google Font family chain");
+
+        using var osdStream = typeof(OsdWindow).Assembly.GetManifestResourceStream("MicMute.OsdWindow.xaml");
+        Check.True(osdStream != null, "OsdWindow.xaml must be embedded");
+        using var osdReader = new System.IO.StreamReader(osdStream!);
+        string osdXaml = osdReader.ReadToEnd();
+        Check.True(osdXaml.Contains("Roboto"), "OsdWindow XAML must specify Google Font family chain");
+
+        // 2. High brightness palette verification in dark mode (+10% white, +20% gray)
+        Check.True(rawXaml.Contains(@"<SolidColorBrush x:Key=""TitleTextBrush"" Color=""#FFFFFF"" />"), "TitleTextBrush must be pure white (#FFFFFF)");
+        Check.True(rawXaml.Contains(@"<SolidColorBrush x:Key=""TextWhiteBrush"" Color=""#FFFFFF"" />"), "TextWhiteBrush must be pure white (#FFFFFF)");
+        Check.True(rawXaml.Contains(@"<SolidColorBrush x:Key=""TextGrayBrush"" Color=""#C1C1CC"" />"), "TextGrayBrush must be 20% brighter gray (#C1C1CC)");
+        Check.True(rawXaml.Contains(@"<SolidColorBrush x:Key=""TextDimBrush"" Color=""#888892"" />"), "TextDimBrush must be 20% brighter (#888892)");
+        Check.True(rawXaml.Contains(@"<SolidColorBrush x:Key=""ToggleKnobBorderBrush"" Color=""#C1C1CC"" />"), "ToggleKnobBorderBrush must be #C1C1CC");
+
+        // 3. Runtime instance verification
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.ShowInTaskbar, "MainWindow must show in Windows taskbar");
+            Check.True(window.Icon != null, "MainWindow.Icon must be populated from embedded multi-resolution icon");
+            Check.True(window.FontFamily != null && window.FontFamily.Source.Contains("Roboto"), "MainWindow FontFamily must use Roboto Google Font");
+
+            var titleBrush = (System.Windows.Media.SolidColorBrush)window.Resources["TitleTextBrush"];
+            Check.Equal(System.Windows.Media.Color.FromRgb(255, 255, 255), titleBrush.Color);
+
+            var grayBrush = (System.Windows.Media.SolidColorBrush)window.Resources["TextGrayBrush"];
+            Check.Equal(System.Windows.Media.Color.FromRgb(193, 193, 204), grayBrush.Color);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void SmoothMinimizeRestoreAndDropdownClearType()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Root transform and transition elements in XAML
+        Check.True(rawXaml.Contains(@"x:Name=""rootBorder"""), "rootBorder must be defined in MainWindow.xaml");
+        Check.True(rawXaml.Contains(@"x:Name=""rootScaleTransform"""), "rootScaleTransform must be defined");
+        Check.True(rawXaml.Contains(@"x:Name=""rootTranslateTransform"""), "rootTranslateTransform must be defined");
+        Check.True(rawXaml.Contains(@"x:Name=""themeTransitionOverlay"""), "themeTransitionOverlay must be defined");
+        Check.True(rawXaml.Contains(@"x:Name=""themeIconRot"""), "themeIconRot must be defined");
+
+        // 2. Dropdown text sharpness and ClearType hints
+        Check.True(rawXaml.Contains(@"TextOptions.TextFormattingMode=""Display"""), "Display formatting mode must be configured");
+        Check.True(rawXaml.Contains(@"TextOptions.TextRenderingMode=""ClearType"""), "ClearType rendering mode must be configured");
+        Check.True(rawXaml.Contains(@"RenderOptions.ClearTypeHint=""Enabled"""), "ClearTypeHint must be enabled for layered dropdown popups");
+
+        // 3. Runtime element bindings
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.rootBorder != null, "rootBorder must be bound at runtime");
+            Check.True(window.rootScaleTransform != null, "rootScaleTransform must be bound at runtime");
+            Check.True(window.rootTranslateTransform != null, "rootTranslateTransform must be bound at runtime");
+            Check.True(window.themeTransitionOverlay != null, "themeTransitionOverlay must be bound at runtime");
+            Check.True(window.themeIconRot != null, "themeIconRot must be bound at runtime");
         }
         finally
         {

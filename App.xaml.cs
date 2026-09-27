@@ -58,6 +58,9 @@ public partial class App : System.Windows.Application
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool DestroyIcon(IntPtr handle);
 
+    [DllImport("shell32.dll", SetLastError = true)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
     internal class LiquidGlassContextMenu : ContextMenuStrip
     {
         [DllImport("dwmapi.dll")]
@@ -253,7 +256,7 @@ public partial class App : System.Windows.Application
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
             bool lightMode = SettingsManager.Load().LightMode;
-            e.ArrowColor = lightMode ? Color.FromArgb(113, 113, 122) : Color.FromArgb(161, 161, 170);
+            e.ArrowColor = lightMode ? Color.FromArgb(113, 113, 122) : Color.FromArgb(193, 193, 204);
             base.OnRenderArrow(e);
         }
 
@@ -474,6 +477,12 @@ public partial class App : System.Windows.Application
         {
         }
 
+        try
+        {
+            SetCurrentProcessExplicitAppUserModelID("MicMute.App");
+        }
+        catch { }
+
         base.OnStartup(e);
         base.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
@@ -529,11 +538,25 @@ public partial class App : System.Windows.Application
         contextMenuStrip.Renderer = new LiquidGlassMenuRenderer();
         try
         {
-            contextMenuStrip.Font = new Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+            contextMenuStrip.Font = new Font("Roboto", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
         }
         catch
         {
-            contextMenuStrip.Font = new Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+            try
+            {
+                contextMenuStrip.Font = new Font("Inter", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+            }
+            catch
+            {
+                try
+                {
+                    contextMenuStrip.Font = new Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+                }
+                catch
+                {
+                    contextMenuStrip.Font = new Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+                }
+            }
         }
 
         ToolStripMenuItem value = new ToolStripMenuItem("Toggle Mute", null, delegate

@@ -13,7 +13,9 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace MicMute;
@@ -74,6 +76,17 @@ public partial class MainWindow : Window
     internal System.Windows.Shapes.Path pathWarningIcon = null!;
     internal System.Windows.Controls.Image imgAppIcon = null!;
     internal ScrollViewer contentScrollViewer = null!;
+    internal Border? rootBorder;
+    internal ScaleTransform? rootScaleTransform;
+    internal TranslateTransform? rootTranslateTransform;
+    internal System.Windows.Shapes.Rectangle? themeTransitionOverlay;
+    internal RotateTransform? themeIconRot;
+
+    private System.Drawing.Icon? _icoSmall;
+    private System.Drawing.Icon? _icoBig;
+    private IntPtr _hIconSmall = IntPtr.Zero;
+    private IntPtr _hIconBig = IntPtr.Zero;
+    private bool _isMinimizing = false;
 
     private static readonly Geometry IconCheck = Geometry.Parse("M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z");
     private static readonly Geometry IconWarning = Geometry.Parse("M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z");
@@ -85,6 +98,30 @@ public partial class MainWindow : Window
     private const int WM_DEVICECHANGE = 0x0219;
     private const int WM_NCLBUTTONDOWN = 0x00A1;
     private const int HTCAPTION = 0x0002;
+    private const int WM_SETICON = 0x0080;
+    private const int WM_GETICON = 0x007F;
+    private const int ICON_SMALL = 0;
+    private const int ICON_BIG = 1;
+    private const int ICON_SMALL2 = 2;
+    private const int GCLP_HICON = -14;
+    private const int GCLP_HICONSM = -34;
+
+    [DllImport("user32.dll", EntryPoint = "DestroyIcon", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+
+    [DllImport("user32.dll", EntryPoint = "SetClassLongPtr", CharSet = CharSet.Auto)]
+    private static extern IntPtr SetClassLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "SetClassLong", CharSet = CharSet.Auto)]
+    private static extern int SetClassLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    private static IntPtr SetClassLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+    {
+        if (IntPtr.Size == 8)
+            return SetClassLongPtr64(hWnd, nIndex, dwNewLong);
+        else
+            return new IntPtr(SetClassLong32(hWnd, nIndex, dwNewLong.ToInt32()));
+    }
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     private static extern int RegisterWindowMessage(string lpString);
@@ -112,6 +149,7 @@ public partial class MainWindow : Window
     public MainWindow(AudioController audioController)
     {
         InitializeComponent();
+        this.StateChanged += MainWindow_StateChanged;
         _preferredWidth = Width > 0 ? Width : 412.0;
         _deviceRefreshDebouncer = new DispatcherDebouncer(Dispatcher);
         _statusDebouncer = new DispatcherDebouncer(Dispatcher);
@@ -210,6 +248,11 @@ public partial class MainWindow : Window
             borderWarningIcon = (Border)root.FindName("borderWarningIcon");
             pathWarningIcon = (System.Windows.Shapes.Path)root.FindName("pathWarningIcon");
             contentScrollViewer = (ScrollViewer)root.FindName("contentScrollViewer");
+            rootBorder = root.FindName("rootBorder") as Border;
+            rootScaleTransform = root.FindName("rootScaleTransform") as ScaleTransform;
+            rootTranslateTransform = root.FindName("rootTranslateTransform") as TranslateTransform;
+            themeTransitionOverlay = root.FindName("themeTransitionOverlay") as System.Windows.Shapes.Rectangle;
+            themeIconRot = root.FindName("themeIconRot") as RotateTransform;
 
             // Event hooks
             var titleBar = (Border)root.FindName("borderTitleBar");
@@ -249,12 +292,19 @@ public partial class MainWindow : Window
                         if (iconStream != null)
                         {
                             var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(iconStream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                            imgIcon.Source = decoder.Frames[0];
-                            this.Icon = decoder.Frames[0];
+                            var bestFrame = decoder.Frames.OrderByDescending(f => f.PixelWidth * f.PixelHeight).FirstOrDefault() ?? decoder.Frames[0];
+                            imgIcon.Source = bestFrame;
+                            this.Icon = bestFrame;
                         }
                     }
                 }
                 catch { }
+            }
+
+            this.ShowInTaskbar = true;
+            if (root.FontFamily != null)
+            {
+                this.FontFamily = root.FontFamily;
             }
 
             // Now safely detach content and attach to this Window
@@ -469,14 +519,48 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         WindowInteropHelper windowInteropHelper = new WindowInteropHelper(this);
+        IntPtr hwnd = windowInteropHelper.Handle;
         try
         {
             ChangeWindowMessageFilter((uint)WM_SHOWME, 1);
-            ChangeWindowMessageFilterEx(windowInteropHelper.Handle, (uint)WM_SHOWME, 1, IntPtr.Zero);
+            ChangeWindowMessageFilterEx(hwnd, (uint)WM_SHOWME, 1, IntPtr.Zero);
         }
         catch { }
-        HwndSource.FromHwnd(windowInteropHelper.Handle)?.AddHook(HwndMessageHook);
-        _hotkeyManager = new HotkeyManager(windowInteropHelper.Handle);
+
+        try
+        {
+            using Stream? iconStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.app.ico");
+            if (iconStream != null)
+            {
+                using var ms = new MemoryStream();
+                iconStream.CopyTo(ms);
+                byte[] iconBytes = ms.ToArray();
+                using (var ms1 = new MemoryStream(iconBytes))
+                {
+                    _icoSmall = new System.Drawing.Icon(ms1, 16, 16);
+                    _hIconSmall = _icoSmall.Handle;
+                }
+                using (var ms2 = new MemoryStream(iconBytes))
+                {
+                    _icoBig = new System.Drawing.Icon(ms2, 32, 32);
+                    _hIconBig = _icoBig.Handle;
+                }
+                if (_hIconSmall != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, _hIconSmall);
+                    try { SetClassLongPtr(hwnd, GCLP_HICONSM, _hIconSmall); } catch { }
+                }
+                if (_hIconBig != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, _hIconBig);
+                    try { SetClassLongPtr(hwnd, GCLP_HICON, _hIconBig); } catch { }
+                }
+            }
+        }
+        catch { }
+
+        HwndSource.FromHwnd(hwnd)?.AddHook(HwndMessageHook);
+        _hotkeyManager = new HotkeyManager(hwnd);
         _hotkeyManager.HotkeyPressed += HotkeyManager_HotkeyPressed;
         AppSettings appSettings = SettingsManager.Load();
         RegisterGlobalHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
@@ -559,7 +643,26 @@ public partial class MainWindow : Window
 
     private IntPtr HwndMessageHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WM_DEVICECHANGE)
+        if (msg == WM_GETICON)
+        {
+            int iconType = wParam.ToInt32();
+            if (iconType == ICON_BIG && _hIconBig != IntPtr.Zero)
+            {
+                handled = true;
+                return _hIconBig;
+            }
+            if ((iconType == ICON_SMALL || iconType == ICON_SMALL2) && _hIconSmall != IntPtr.Zero)
+            {
+                handled = true;
+                return _hIconSmall;
+            }
+            if (_hIconBig != IntPtr.Zero)
+            {
+                handled = true;
+                return _hIconBig;
+            }
+        }
+        else if (msg == WM_DEVICECHANGE)
         {
             TriggerDevicesChanged();
         }
@@ -918,7 +1021,77 @@ public partial class MainWindow : Window
 
     public void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
-        WindowState = WindowState.Minimized;
+        MinimizeWithAnimation();
+    }
+
+    public void MinimizeWithAnimation()
+    {
+        if (!IsLoaded || !IsVisible || ActualWidth <= 0 || rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
+        {
+            WindowState = WindowState.Minimized;
+            return;
+        }
+
+        if (_isMinimizing) return;
+        _isMinimizing = true;
+
+        var duration = new Duration(TimeSpan.FromMilliseconds(160));
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        var opacityAnim = new DoubleAnimation(1.0, 0.0, duration) { EasingFunction = ease };
+        var scaleXAnim = new DoubleAnimation(1.0, 0.92, duration) { EasingFunction = ease };
+        var scaleYAnim = new DoubleAnimation(1.0, 0.92, duration) { EasingFunction = ease };
+        var transYAnim = new DoubleAnimation(0.0, 28.0, duration) { EasingFunction = ease };
+
+        opacityAnim.Completed += (s, ev) =>
+        {
+            WindowState = WindowState.Minimized;
+            _isMinimizing = false;
+            rootBorder.Opacity = 1.0;
+            rootScaleTransform.ScaleX = 1.0;
+            rootScaleTransform.ScaleY = 1.0;
+            rootTranslateTransform.Y = 0.0;
+        };
+
+        rootBorder.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnim);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnim);
+        rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, transYAnim);
+    }
+
+    private void MainWindow_StateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Normal)
+        {
+            _isMinimizing = false;
+            PlayRestoreAnimation();
+        }
+    }
+
+    private void PlayRestoreAnimation()
+    {
+        if (!IsLoaded || !IsVisible || ActualWidth <= 0 || rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
+        {
+            return;
+        }
+
+        rootBorder.Opacity = 0.0;
+        rootScaleTransform.ScaleX = 0.94;
+        rootScaleTransform.ScaleY = 0.94;
+        rootTranslateTransform.Y = 20.0;
+
+        var duration = new Duration(TimeSpan.FromMilliseconds(180));
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        var opacityAnim = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = ease };
+        var scaleXAnim = new DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease };
+        var scaleYAnim = new DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease };
+        var transYAnim = new DoubleAnimation(20.0, 0.0, duration) { EasingFunction = ease };
+
+        rootBorder.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnim);
+        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnim);
+        rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, transYAnim);
     }
 
     public void CloseButton_Click(object sender, RoutedEventArgs e)
@@ -1269,18 +1442,47 @@ public partial class MainWindow : Window
 
     private void SetLightMode(bool isLight)
     {
-        System.Windows.Media.Color accentColor = isLight ? System.Windows.Media.Color.FromRgb(71, 85, 105) : System.Windows.Media.Color.FromRgb(244, 244, 245);
+        bool animateTransition = IsLoaded && IsVisible && ActualWidth > 0 && rootBorder != null && themeTransitionOverlay != null;
+        if (animateTransition)
+        {
+            try
+            {
+                int w = Math.Max(1, (int)rootBorder!.ActualWidth);
+                int h = Math.Max(1, (int)rootBorder!.ActualHeight);
+                var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                rtb.Render(rootBorder);
+                rtb.Freeze();
+
+                themeTransitionOverlay!.Fill = new ImageBrush(rtb);
+                themeTransitionOverlay.Opacity = 1.0;
+                themeTransitionOverlay.Visibility = Visibility.Visible;
+            }
+            catch
+            {
+                // Edge cases / headless fallback
+            }
+        }
+
+        System.Windows.Media.Color accentColor = isLight ? System.Windows.Media.Color.FromRgb(71, 85, 105) : System.Windows.Media.Color.FromRgb(255, 255, 255);
         Resources["AccentColor"] = accentColor;
         Resources["AccentBrush"] = new SolidColorBrush(accentColor);
         Resources["AccentHoverBrush"] = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(18, 71, 85, 105) : System.Windows.Media.Color.FromArgb(34, 255, 255, 255));
 
-        var themeGlyphBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(55, 65, 81) : System.Windows.Media.Color.FromRgb(244, 244, 245));
+        var themeGlyphBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(55, 65, 81) : System.Windows.Media.Color.FromRgb(255, 255, 255));
         if (pathTitleTheme != null)
         {
             pathTitleTheme.Fill = themeGlyphBrush;
             pathTitleTheme.Data = Geometry.Parse(isLight
                 ? "M12.3,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22C16.82,22 20.84,18.6 21.8,14C22.07,12.7 20.93,11.59 19.63,11.83C15.82,12.54 12,9.66 12,5.77C12,4.42 12.92,3.26 14.26,3.03C14.77,2.94 15.08,2.44 14.8,2C14.07,2 13.18,2 12.3,2Z"
                 : "M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z");
+        }
+        if (themeIconRot != null)
+        {
+            var rotAnim = new DoubleAnimation(themeIconRot.Angle, themeIconRot.Angle + 180, new Duration(TimeSpan.FromMilliseconds(240)))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            themeIconRot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
         }
         if (titleBarIcon != null)
         {
@@ -1310,6 +1512,7 @@ public partial class MainWindow : Window
                 System.Windows.Media.Color.FromArgb(174, 233, 236, 239),
                 new Point(0.0, 0.0), new Point(1.0, 1.0));
             Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0));
+            Resources["CaptionButtonPressedBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 0, 0, 0));
             Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255));
             Resources["InputBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245));
             Resources["TitleBarBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 255, 255, 255));
@@ -1405,13 +1608,14 @@ public partial class MainWindow : Window
                 System.Windows.Media.Color.FromArgb(242, 9, 9, 11),
                 new Point(0.0, 0.0), new Point(1.0, 1.0));
             Resources["CaptionButtonHoverBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 255, 255, 255));
+            Resources["CaptionButtonPressedBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, 255, 255, 255));
             Resources["CardBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
             Resources["InputBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27));
             Resources["TitleBarBgBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0));
             Resources["TitleTextBrush"] = themeGlyphBrush;
             Resources["TextWhiteBrush"] = themeGlyphBrush;
-            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(161, 161, 170));
-            Resources["TextDimBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(113, 113, 122));
+            Resources["TextGrayBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204));
+            Resources["TextDimBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(136, 136, 146));
             Resources["BorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
             Resources["DividerBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
 
@@ -1421,7 +1625,7 @@ public partial class MainWindow : Window
             Resources["ToggleOffBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(28, 28, 31));
             Resources["ToggleOffBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70));
             Resources["ToggleKnobBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231));
-            Resources["ToggleKnobBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(161, 161, 170));
+            Resources["ToggleKnobBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204));
             Resources["ToggleKnobActiveBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27));
             Resources["ToggleKnobActiveBorderBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42));
 
@@ -1450,7 +1654,7 @@ public partial class MainWindow : Window
             heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(255, 255, 255), 0.0));
             heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(228, 228, 231), 0.45));
             heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(212, 212, 216), 0.85));
-            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(161, 161, 170), 1.0));
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(193, 193, 204), 1.0));
             Resources["HeroLensActiveBrush"] = heroLensDark;
 
             var heroGlowDark = new RadialGradientBrush
@@ -1498,6 +1702,21 @@ public partial class MainWindow : Window
             UpdateMuteStateUI(_audioController.IsMuted);
         }
         OsdWindow.UpdateVisibleTheme(isLight);
+
+        if (animateTransition && themeTransitionOverlay != null)
+        {
+            var fadeOut = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromMilliseconds(240)))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            fadeOut.Completed += (s, ev) =>
+            {
+                themeTransitionOverlay.Opacity = 0.0;
+                themeTransitionOverlay.Visibility = Visibility.Collapsed;
+                themeTransitionOverlay.Fill = null;
+            };
+            themeTransitionOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+        }
     }
 
     private void CbEnableOsd_Checked(object sender, RoutedEventArgs e)
@@ -1755,6 +1974,15 @@ public partial class MainWindow : Window
         }
     }
 
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        _isMinimizing = false;
+        if (rootBorder != null) rootBorder.Opacity = 1.0;
+        if (rootScaleTransform != null) { rootScaleTransform.ScaleX = 1.0; rootScaleTransform.ScaleY = 1.0; }
+        if (rootTranslateTransform != null) rootTranslateTransform.Y = 0.0;
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _isDisposed = true;
@@ -1767,5 +1995,11 @@ public partial class MainWindow : Window
         _audioController.WarningNotification -= AudioController_WarningNotification;
         base.OnClosed(e);
         _hotkeyManager?.Dispose();
+        try
+        {
+            _icoSmall?.Dispose();
+            _icoBig?.Dispose();
+        }
+        catch { }
     }
 }

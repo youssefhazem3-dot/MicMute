@@ -52,6 +52,12 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
+    <Resource Include="fonts\*.ttf" />
+    <EmbeddedResource Include="fonts\Roboto.ttf" LogicalName="MicMute.fonts.Roboto.ttf" />
+    <Content Include="fonts\*.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

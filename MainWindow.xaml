@@ -8,8 +8,11 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
+        ShowInTaskbar="True"
         WindowStartupLocation="Manual"
-        FontFamily="SF Pro Display, SF Pro Text, SF Pro, -apple-system, BlinkMacSystemFont, Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI, sans-serif"
+        FontFamily="pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Inter, Poppins, Google Sans, Open Sans, Segoe UI, sans-serif"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True">
 
@@ -29,10 +32,10 @@
         <SolidColorBrush x:Key="CardBgBrush" Color="#14FFFFFF" />
         <SolidColorBrush x:Key="InputBgBrush" Color="#18181B" />
         <SolidColorBrush x:Key="TitleBarBgBrush" Color="#00000000" />
-        <SolidColorBrush x:Key="TitleTextBrush" Color="#F4F4F5" />
-        <SolidColorBrush x:Key="TextWhiteBrush" Color="#F4F4F5" />
-        <SolidColorBrush x:Key="TextGrayBrush" Color="#A1A1AA" />
-        <SolidColorBrush x:Key="TextDimBrush" Color="#71717A" />
+        <SolidColorBrush x:Key="TitleTextBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="TextWhiteBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="TextGrayBrush" Color="#C1C1CC" />
+        <SolidColorBrush x:Key="TextDimBrush" Color="#888892" />
         <SolidColorBrush x:Key="BorderBrush" Color="#1FFFFFFF" />
         <SolidColorBrush x:Key="DividerBrush" Color="#14FFFFFF" />
 
@@ -42,7 +45,7 @@
         <SolidColorBrush x:Key="ToggleOffBrush" Color="#1C1C1F" />
         <SolidColorBrush x:Key="ToggleOffBorderBrush" Color="#3F3F46" />
         <SolidColorBrush x:Key="ToggleKnobBrush" Color="#E4E4E7" />
-        <SolidColorBrush x:Key="ToggleKnobBorderBrush" Color="#A1A1AA" />
+        <SolidColorBrush x:Key="ToggleKnobBorderBrush" Color="#C1C1CC" />
         <SolidColorBrush x:Key="ToggleKnobActiveBrush" Color="#18181B" />
         <SolidColorBrush x:Key="ToggleKnobActiveBorderBrush" Color="#27272A" />
 
@@ -76,7 +79,7 @@
         <!-- Monochrome Squircle Icon Tiles -->
         <SolidColorBrush x:Key="SquircleBgBrush" Color="#14FFFFFF" />
         <SolidColorBrush x:Key="SquircleBorderBrush" Color="#24FFFFFF" />
-        <SolidColorBrush x:Key="SquircleIconBrush" Color="#F4F4F5" />
+        <SolidColorBrush x:Key="SquircleIconBrush" Color="#FFFFFF" />
 
         <!-- Status Capsule Brushes -->
         <SolidColorBrush x:Key="StatusCapsuleBgBrush" Color="#1AFFFFFF" />
@@ -87,13 +90,14 @@
         <!-- Keycap Chip Brushes -->
         <SolidColorBrush x:Key="KeycapBgBrush" Color="#27272A" />
         <SolidColorBrush x:Key="KeycapBorderBrush" Color="#3F3F46" />
-        <SolidColorBrush x:Key="KeycapTextBrush" Color="#F4F4F5" />
+        <SolidColorBrush x:Key="KeycapTextBrush" Color="#FFFFFF" />
 
         <!-- Bottom Status / Notification Box Brushes (Monochrome Theme) -->
         <SolidColorBrush x:Key="WarningBgBrush" Color="#14FFFFFF" />
         <SolidColorBrush x:Key="WarningBorderBrush" Color="#20FFFFFF" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="CaptionButtonHoverBrush" Color="#18FFFFFF" />
+        <SolidColorBrush x:Key="CaptionButtonPressedBrush" Color="#30FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#25FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#45FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbDragBrush" Color="#70FFFFFF" />
@@ -126,7 +130,7 @@
                                 <Setter TargetName="bg" Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="#25FFFFFF" />
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource CaptionButtonPressedBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -189,7 +193,7 @@
                                 <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#25FFFFFF" />
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonPressedBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -694,12 +698,22 @@
             <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="UseLayoutRounding" Value="True" />
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
                         <Setter Property="FontSize" Value="11.5" />
                         <Setter Property="Padding" Value="10,7" />
+                        <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled" />
+                        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+                        <Setter Property="SnapsToDevicePixels" Value="True" />
+                        <Setter Property="UseLayoutRounding" Value="True" />
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ComboBoxItem">
@@ -774,6 +788,11 @@
                                                                   Content="{Binding Path=SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   ContentTemplate="{Binding Path=SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   TextBlock.Foreground="{DynamicResource TextWhiteBrush}"
+                                                                  TextOptions.TextFormattingMode="Display"
+                                                                  TextOptions.TextRenderingMode="ClearType"
+                                                                  RenderOptions.ClearTypeHint="Enabled"
+                                                                  SnapsToDevicePixels="True"
+                                                                  UseLayoutRounding="True"
                                                                   VerticalAlignment="Center" />
                                                 <Path x:Name="arrow"
                                                       Grid.Column="1"
@@ -832,7 +851,12 @@
                                    AllowsTransparency="True"
                                    Focusable="False"
                                    Placement="Bottom"
-                                   PopupAnimation="Fade">
+                                   PopupAnimation="Fade"
+                                   TextOptions.TextFormattingMode="Display"
+                                   TextOptions.TextRenderingMode="ClearType"
+                                   RenderOptions.ClearTypeHint="Enabled"
+                                   SnapsToDevicePixels="True"
+                                   UseLayoutRounding="True">
                                 <Border x:Name="dropDownBorder"
                                         MinWidth="{Binding ActualWidth, ElementName=toggle}"
                                         MaxHeight="220"
@@ -842,7 +866,12 @@
                                         CornerRadius="10"
                                         Padding="4"
                                         Margin="0,4,0,8"
-                                        RenderTransformOrigin="0.5,0">
+                                        RenderTransformOrigin="0.5,0"
+                                        TextOptions.TextFormattingMode="Display"
+                                        TextOptions.TextRenderingMode="ClearType"
+                                        RenderOptions.ClearTypeHint="Enabled"
+                                        SnapsToDevicePixels="True"
+                                        UseLayoutRounding="True">
                                     <Border.RenderTransform>
                                         <TransformGroup>
                                             <ScaleTransform ScaleX="1" ScaleY="1" />
@@ -881,8 +910,19 @@
                                     <Border.Effect>
                                         <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.55" Color="Black" />
                                     </Border.Effect>
-                                    <ScrollViewer SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                    <ScrollViewer SnapsToDevicePixels="True"
+                                                  UseLayoutRounding="True"
+                                                  RenderOptions.ClearTypeHint="Enabled"
+                                                  TextOptions.TextFormattingMode="Display"
+                                                  TextOptions.TextRenderingMode="ClearType"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True"
+                                                    KeyboardNavigation.DirectionalNavigation="Cycle"
+                                                    SnapsToDevicePixels="True"
+                                                    UseLayoutRounding="True"
+                                                    RenderOptions.ClearTypeHint="Enabled"
+                                                    TextOptions.TextFormattingMode="Display"
+                                                    TextOptions.TextRenderingMode="ClearType" />
                                     </ScrollViewer>
                                 </Border>
                             </Popup>
@@ -992,15 +1032,33 @@
     </Window.Resources>
 
     <!-- Outer Window Frame (iOS Liquid Glass Shell) -->
-    <Border Background="{DynamicResource WindowBgBrush}"
+    <Border x:Name="rootBorder"
+            Background="{DynamicResource WindowBgBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1.5"
-            CornerRadius="20">
-        <Grid>
+            CornerRadius="20"
+            RenderTransformOrigin="0.5,0.5">
+        <Border.RenderTransform>
+            <TransformGroup x:Name="rootTransformGroup">
+                <ScaleTransform x:Name="rootScaleTransform" ScaleX="1.0" ScaleY="1.0" />
+                <TranslateTransform x:Name="rootTranslateTransform" Y="0.0" />
+            </TransformGroup>
+        </Border.RenderTransform>
+        <Grid x:Name="rootGrid">
             <Grid.RowDefinitions>
                 <RowDefinition Height="38" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
+
+            <!-- Theme Transition Snapshot Crossfade Overlay -->
+            <Rectangle x:Name="themeTransitionOverlay"
+                       Grid.RowSpan="2"
+                       IsHitTestVisible="False"
+                       Opacity="0.0"
+                       Visibility="Collapsed"
+                       HorizontalAlignment="Stretch"
+                       VerticalAlignment="Stretch"
+                       RadiusX="20" RadiusY="20" />
 
             <!-- Custom Title Bar with Windows 11 Native Controls & Theme Switcher -->
             <Border x:Name="borderTitleBar" Grid.Row="0"
@@ -1019,7 +1077,6 @@
                               Margin="0,0,7,0" />
                         <TextBlock Text="MicMute"
                                    Foreground="{DynamicResource TitleTextBrush}"
-                                   FontFamily="Segoe UI Variable Display, Segoe UI"
                                    FontWeight="Bold"
                                    FontSize="12"
                                    VerticalAlignment="Center" />
@@ -1041,7 +1098,12 @@
                                   Fill="{DynamicResource TitleTextBrush}"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"
-                                  Data="M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z" />
+                                  RenderTransformOrigin="0.5,0.5"
+                                  Data="M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z">
+                                <Path.RenderTransform>
+                                    <RotateTransform x:Name="themeIconRot" Angle="0" />
+                                </Path.RenderTransform>
+                            </Path>
                         </Button>
                         <Button x:Name="btnMinimize" Style="{StaticResource Win11MinimizeButtonStyle}" ToolTip="Minimize" Click="MinimizeButton_Click" />
                         <Button x:Name="btnClose" Style="{StaticResource Win11CloseButtonStyle}" ToolTip="Close" Click="CloseButton_Click" />
@@ -1088,7 +1150,6 @@
                                 <TextBlock x:Name="tbStatusText"
                                            Text="MICROPHONE LIVE"
                                            Foreground="{DynamicResource StatusCapsuleTextBrush}"
-                                           FontFamily="Segoe UI Variable Display, Segoe UI"
                                            FontWeight="Bold"
                                            FontSize="10.5"
                                            VerticalAlignment="Center" />
@@ -1108,7 +1169,7 @@
                                 <TextBlock x:Name="tbHeroHotkey"
                                            Text="Insert"
                                            Foreground="{DynamicResource KeycapTextBrush}"
-                                           FontFamily="Consolas, Segoe UI Variable Text, Segoe UI"
+                                           FontFamily="Consolas, pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Segoe UI"
                                            FontWeight="Bold"
                                            FontSize="10"
                                            Margin="0,1,0,0"
@@ -1158,13 +1219,23 @@
 
                             <ComboBox x:Name="cbDevices"
                                       Style="{StaticResource ModernComboBoxStyle}"
+                                      TextOptions.TextFormattingMode="Display"
+                                      TextOptions.TextRenderingMode="ClearType"
+                                      RenderOptions.ClearTypeHint="Enabled"
+                                      SnapsToDevicePixels="True"
+                                      UseLayoutRounding="True"
                                       Margin="0,0,0,8">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Name}"
                                                    Foreground="{DynamicResource TextWhiteBrush}"
                                                    VerticalAlignment="Center"
-                                                   FontSize="11.5" />
+                                                   FontSize="11.5"
+                                                   TextOptions.TextFormattingMode="Display"
+                                                   TextOptions.TextRenderingMode="ClearType"
+                                                   RenderOptions.ClearTypeHint="Enabled"
+                                                   SnapsToDevicePixels="True"
+                                                   UseLayoutRounding="True" />
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
@@ -1214,7 +1285,7 @@
                                         <TextBlock x:Name="tbHotkey"
                                                    Text="Insert"
                                                    Foreground="{DynamicResource KeycapTextBrush}"
-                                                   FontFamily="Consolas, Segoe UI"
+                                                   FontFamily="Consolas, pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Segoe UI"
                                                    FontWeight="Bold"
                                                    FontSize="11"
                                                    Margin="0,1.5,0,0"

@@ -64,7 +64,8 @@ $resources = @(
     @{ Path = (Join-Path $projectRoot 'OsdWindow.xaml'); Name = 'MicMute.OsdWindow.xaml' },
     @{ Path = (Join-Path $projectRoot 'app.ico'); Name = 'MicMute.app.ico' },
     @{ Path = (Join-Path $projectRoot 'sounds/mute.wav'); Name = 'MicMute.sounds.mute.wav' },
-    @{ Path = (Join-Path $projectRoot 'sounds/unmute.wav'); Name = 'MicMute.sounds.unmute.wav' }
+    @{ Path = (Join-Path $projectRoot 'sounds/unmute.wav'); Name = 'MicMute.sounds.unmute.wav' },
+    @{ Path = (Join-Path $projectRoot 'fonts/Roboto.ttf'); Name = 'MicMute.fonts.Roboto.ttf' }
 )
 foreach ($res in $resources) {
     if (Test-Path -LiteralPath $res.Path) {
