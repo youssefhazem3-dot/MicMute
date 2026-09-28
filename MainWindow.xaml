@@ -88,7 +88,7 @@
 
         <!-- Status Capsule Brushes -->
         <SolidColorBrush x:Key="StatusCapsuleBgBrush" Color="#1AFFFFFF" />
-        <SolidColorBrush x:Key="StatusCapsuleBorderBrush" Color="#00000000" />
+        <SolidColorBrush x:Key="StatusCapsuleBorderBrush" Color="#28FFFFFF" />
         <SolidColorBrush x:Key="StatusCapsuleTextBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="StatusDotBrush" Color="#FFFFFF" />
 
@@ -1173,10 +1173,11 @@
                                 Tag="Active"
                                 Click="BtnStateToggle_Click" />
 
-                        <!-- High-Precision Jewel Status Capsule (Borderless Liquid Pill) -->
+                        <!-- High-Precision Jewel Status Capsule (Bordered Liquid Pill) -->
                         <Border x:Name="borderStatusCapsule"
                                 Background="{DynamicResource StatusCapsuleBgBrush}"
-                                BorderThickness="0"
+                                BorderBrush="{DynamicResource StatusCapsuleBorderBrush}"
+                                BorderThickness="1"
                                 CornerRadius="12"
                                 Width="158"
                                 Padding="14,4"

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace MicMute;
@@ -19,7 +20,10 @@ public static class StartupManager
         if (!runOnStartup)
         {
             RemoveRegistryRun();
-            RemoveScheduledTask();
+            if (IsScheduledTaskConfigured())
+            {
+                RemoveScheduledTask();
+            }
             return;
         }
 
@@ -35,14 +39,17 @@ public static class StartupManager
             }
             else
             {
-                // Fallback to registry if schtasks failed
+                // Fallback to registry if task creation failed
                 SetRegistryRun(exePath);
             }
         }
         else
         {
             // Standard non-admin startup uses the standard HKCU Run key
-            RemoveScheduledTask();
+            if (IsScheduledTaskConfigured())
+            {
+                RemoveScheduledTask();
+            }
             SetRegistryRun(exePath);
         }
     }
@@ -71,7 +78,11 @@ public static class StartupManager
             if (registryKey != null)
             {
                 string value = "\"" + exePath + "\"";
-                registryKey.SetValue(AppName, value);
+                string? existing = registryKey.GetValue(AppName) as string;
+                if (!string.Equals(existing, value, StringComparison.OrdinalIgnoreCase))
+                {
+                    registryKey.SetValue(AppName, value);
+                }
             }
         }
         catch { }
@@ -92,6 +103,34 @@ public static class StartupManager
 
     public static bool CreateScheduledTask(string exePath)
     {
+        try
+        {
+            Type? schedulerType = Type.GetTypeFromProgID("Schedule.Service");
+            if (schedulerType != null)
+            {
+                dynamic? scheduler = Activator.CreateInstance(schedulerType);
+                if (scheduler != null)
+                {
+                    scheduler.Connect();
+                    dynamic folder = scheduler.GetFolder("\\");
+                    dynamic taskDef = scheduler.NewTask(0);
+                    taskDef.RegistrationInfo.Description = "MicMute Startup Task";
+                    taskDef.Principal.RunLevel = 1; // TASK_RUNLEVEL_HIGHEST
+                    taskDef.Principal.LogonType = 3; // TASK_LOGON_INTERACTIVE_TOKEN
+                    dynamic trigger = taskDef.Triggers.Create(9); // TASK_TRIGGER_LOGON
+                    trigger.Enabled = true;
+                    dynamic action = taskDef.Actions.Create(0); // TASK_ACTION_EXEC
+                    action.Path = exePath;
+                    folder.RegisterTaskDefinition(TaskName, taskDef, 6, null, null, 3, null); // TASK_CREATE_OR_UPDATE = 6
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+            // Fall back to schtasks if COM registration fails
+        }
+
         string schtasksPath = GetSchtasksPath();
         var psi = new ProcessStartInfo
         {
@@ -117,6 +156,38 @@ public static class StartupManager
 
     public static bool RemoveScheduledTask()
     {
+        try
+        {
+            Type? schedulerType = Type.GetTypeFromProgID("Schedule.Service");
+            if (schedulerType != null)
+            {
+                dynamic? scheduler = Activator.CreateInstance(schedulerType);
+                if (scheduler != null)
+                {
+                    scheduler.Connect();
+                    dynamic folder = scheduler.GetFolder("\\");
+                    try
+                    {
+                        folder.DeleteTask(TaskName, 0);
+                        return true;
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        // Task does not exist, consider removal successful
+                        return true;
+                    }
+                    catch (COMException ex) when ((uint)ex.HResult == 0x80070002) // ERROR_FILE_NOT_FOUND
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fall back if COM is unavailable
+        }
+
         string schtasksPath = GetSchtasksPath();
         var psi = new ProcessStartInfo
         {
@@ -136,20 +207,35 @@ public static class StartupManager
 
     public static bool IsScheduledTaskConfigured()
     {
-        string schtasksPath = GetSchtasksPath();
-        var psi = new ProcessStartInfo
+        try
         {
-            FileName = schtasksPath,
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        psi.ArgumentList.Add("/query");
-        psi.ArgumentList.Add("/tn");
-        psi.ArgumentList.Add(TaskName);
+            Type? schedulerType = Type.GetTypeFromProgID("Schedule.Service");
+            if (schedulerType != null)
+            {
+                dynamic? scheduler = Activator.CreateInstance(schedulerType);
+                if (scheduler != null)
+                {
+                    scheduler.Connect();
+                    dynamic folder = scheduler.GetFolder("\\");
+                    dynamic task = folder.GetTask(TaskName);
+                    return task != null;
+                }
+            }
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (COMException ex) when ((uint)ex.HResult == 0x80070002) // ERROR_FILE_NOT_FOUND
+        {
+            return false;
+        }
+        catch
+        {
+            // Non-COM environment fallback
+        }
 
-        return RunSchtasks(psi);
+        return false;
     }
 
     private static string GetSchtasksPath()

@@ -618,16 +618,16 @@ static class UiCases
         menu.Renderer = new App.LiquidGlassMenuRenderer();
         try
         {
-            menu.Font = new System.Drawing.Font("Segoe UI Variable Text", 10f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
+            menu.Font = new System.Drawing.Font("Segoe UI Variable Text", 9f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
         }
         catch
         {
-            menu.Font = new System.Drawing.Font("Segoe UI", 10f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
+            menu.Font = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
         }
 
-        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = false, Size = new System.Drawing.Size(205, 36), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
-        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = false, Size = new System.Drawing.Size(205, 36), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
-        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = false, Size = new System.Drawing.Size(205, 36), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = false, Size = new System.Drawing.Size(164, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = false, Size = new System.Drawing.Size(164, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = false, Size = new System.Drawing.Size(164, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
 
         menu.Items.Add(item1);
         menu.Items.Add(item2);
@@ -642,11 +642,11 @@ static class UiCases
         Check.Equal("Quit", menu.Items[2].Text);
         var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
         
-        Check.True(preferredSize.Width >= 190 && preferredSize.Width <= 230, $"Menu preferred width {preferredSize.Width} must be a wide short rectangle");
-        Check.True(preferredSize.Height >= 110 && preferredSize.Height <= 140, $"Menu preferred height {preferredSize.Height} must be comfortably sized");
+        Check.True(preferredSize.Width >= 150 && preferredSize.Width <= 180, $"Menu preferred width {preferredSize.Width} must be a compact wide rectangle (20% smaller)");
+        Check.True(preferredSize.Height >= 85 && preferredSize.Height <= 115, $"Menu preferred height {preferredSize.Height} must be comfortably sized");
 
         // Validate that OnRenderMenuItemBackground and OnRenderItemText render cleanly for all items
-        using var bmp = new System.Drawing.Bitmap(215, 36);
+        using var bmp = new System.Drawing.Bitmap(170, 29);
         using var g = System.Drawing.Graphics.FromImage(bmp);
         var renderArgs = new System.Windows.Forms.ToolStripItemRenderEventArgs(g, item2);
         item2.Select();
@@ -656,7 +656,7 @@ static class UiCases
 
         var textRenderMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderItemText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         Check.True(textRenderMethod != null, "OnRenderItemText must exist on LiquidGlassMenuRenderer");
-        var rect = new System.Drawing.Rectangle(0, 0, 205, 36);
+        var rect = new System.Drawing.Rectangle(0, 0, 164, 29);
         var flags = System.Windows.Forms.TextFormatFlags.Left | System.Windows.Forms.TextFormatFlags.VerticalCenter;
 
         // Render full menu simulation to scratch image for visual verification in both dark and light modes
@@ -671,7 +671,7 @@ static class UiCases
                 SettingsManager.Save(settings with { LightMode = light });
 
                 string outPath = System.IO.Path.Combine(scratchDir, light ? "tray_light.png" : "tray_dark.png");
-                using var fullBmp = new System.Drawing.Bitmap(215, 124);
+                using var fullBmp = new System.Drawing.Bitmap(170, 100);
                 using var fullG = System.Drawing.Graphics.FromImage(fullBmp);
                 
                 // Background & Border
@@ -682,29 +682,29 @@ static class UiCases
 
                 // Item 1 (Hovered / Selected, just like in the user's reference photo)
                 item1.Select();
-                using var item1Bmp = new System.Drawing.Bitmap(205, 36);
+                using var item1Bmp = new System.Drawing.Bitmap(164, 29);
                 using (var item1G = System.Drawing.Graphics.FromImage(item1Bmp))
                 {
                     renderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemRenderEventArgs(item1G, item1) });
                     textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item1G, item1, item1.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
                 }
-                fullG.DrawImage(item1Bmp, 5, 5);
+                fullG.DrawImage(item1Bmp, 4, 4);
 
                 // Item 2 (Open App)
-                using var item2Bmp = new System.Drawing.Bitmap(205, 36);
+                using var item2Bmp = new System.Drawing.Bitmap(164, 29);
                 using (var item2G = System.Drawing.Graphics.FromImage(item2Bmp))
                 {
                     textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item2G, item2, item2.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
                 }
-                fullG.DrawImage(item2Bmp, 5, 43);
+                fullG.DrawImage(item2Bmp, 4, 34);
 
                 // Item 3 (Quit)
-                using var item3Bmp = new System.Drawing.Bitmap(205, 36);
+                using var item3Bmp = new System.Drawing.Bitmap(164, 29);
                 using (var item3G = System.Drawing.Graphics.FromImage(item3Bmp))
                 {
                     textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item3G, item3, item3.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
                 }
-                fullG.DrawImage(item3Bmp, 5, 81);
+                fullG.DrawImage(item3Bmp, 4, 64);
 
                 fullBmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
 
@@ -713,7 +713,7 @@ static class UiCases
                 for (int py = 0; py < item3Bmp.Height; py++)
                     for (int px = 0; px < item3Bmp.Width; px++)
                         if (item3Bmp.GetPixel(px, py).A > 0) item3Pixels++;
-                Check.True(item3Pixels > 50, "Item 3 (Quit) must render both icon and text pixels");
+                Check.True(item3Pixels > 30, "Item 3 (Quit) must render both icon and text pixels");
             }
         }
         catch (Exception ex)
@@ -1165,6 +1165,14 @@ static class UiCases
 
         // Querying scheduled task status should not throw
         bool taskConfigured = StartupManager.IsScheduledTaskConfigured();
+        // Removing scheduled task when it does not exist should not throw and return true
+        bool removed = StartupManager.RemoveScheduledTask();
+        Check.True(removed, "RemoveScheduledTask should succeed or safely report non-existence");
+        // Setting standard startup should not spawn external schtasks processes
+        int schtasksBefore = System.Diagnostics.Process.GetProcessesByName("schtasks").Length;
+        StartupManager.SetStartup(true, false);
+        int schtasksAfter = System.Diagnostics.Process.GetProcessesByName("schtasks").Length;
+        Check.True(schtasksAfter == schtasksBefore, "SetStartup must not spawn schtasks subprocesses");
         // Querying startup enabled should not throw
         bool enabled = StartupManager.IsStartupEnabled();
     }
@@ -1611,6 +1619,17 @@ static class UiCases
             {
                 Check.True(lightBg.IsFrozen, "Light mode WindowBgBrush must be frozen for zero-stutter rendering");
             }
+            if (window.Resources["StatusCapsuleBorderBrush"] is System.Windows.Media.SolidColorBrush lightBorder)
+            {
+                Check.True(lightBorder.Color.A > 20, "StatusCapsuleBorderBrush must have visible alpha in Light Mode");
+                Check.True(lightBorder.IsFrozen, "Light mode StatusCapsuleBorderBrush must be frozen");
+            }
+            if (window.borderStatusCapsule != null)
+            {
+                Check.Equal(new System.Windows.Thickness(1), window.borderStatusCapsule.BorderThickness);
+                Check.True(window.borderStatusCapsule.BorderBrush != null, "borderStatusCapsule must have BorderBrush in Light Mode");
+            }
+
             window.cbLightMode.IsChecked = false;
             if (window.Resources["AccentBrush"] is System.Windows.Media.Brush darkAccent)
             {
@@ -1619,6 +1638,16 @@ static class UiCases
             if (window.Resources["WindowBgBrush"] is System.Windows.Media.Brush darkBg)
             {
                 Check.True(darkBg.IsFrozen, "Dark mode WindowBgBrush must be frozen for zero-stutter rendering");
+            }
+            if (window.Resources["StatusCapsuleBorderBrush"] is System.Windows.Media.SolidColorBrush darkBorder)
+            {
+                Check.True(darkBorder.Color.A > 20, "StatusCapsuleBorderBrush must have visible alpha in Dark Mode");
+                Check.True(darkBorder.IsFrozen, "Dark mode StatusCapsuleBorderBrush must be frozen");
+            }
+            if (window.borderStatusCapsule != null)
+            {
+                Check.Equal(new System.Windows.Thickness(1), window.borderStatusCapsule.BorderThickness);
+                Check.True(window.borderStatusCapsule.BorderBrush != null, "borderStatusCapsule must have BorderBrush in Dark Mode");
             }
         }
         finally

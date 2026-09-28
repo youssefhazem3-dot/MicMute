@@ -920,8 +920,10 @@ public partial class MainWindow : Window
             if (borderStatusCapsule != null)
             {
                 borderStatusCapsule.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 100, 116, 139));
-                borderStatusCapsule.BorderThickness = new Thickness(0);
-                borderStatusCapsule.BorderBrush = null;
+                borderStatusCapsule.BorderThickness = new Thickness(1);
+                borderStatusCapsule.BorderBrush = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(35, 100, 116, 139)
+                    : System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
             }
             ShowWarningMessage("No active audio capture devices found.", "");
             borderWarning.Visibility = Visibility.Visible;
@@ -950,8 +952,10 @@ public partial class MainWindow : Window
                 borderStatusCapsule.Background = new SolidColorBrush(
                     isLight ? System.Windows.Media.Color.FromArgb(20, 220, 38, 38)
                             : System.Windows.Media.Color.FromArgb(24, 239, 68, 68));
-                borderStatusCapsule.BorderThickness = new Thickness(0);
-                borderStatusCapsule.BorderBrush = null;
+                borderStatusCapsule.BorderThickness = new Thickness(1);
+                borderStatusCapsule.BorderBrush = new SolidColorBrush(
+                    isLight ? System.Windows.Media.Color.FromArgb(50, 220, 38, 38)
+                            : System.Windows.Media.Color.FromArgb(45, 239, 68, 68));
             }
         }
         else
@@ -968,9 +972,13 @@ public partial class MainWindow : Window
             }
             if (borderStatusCapsule != null)
             {
-                borderStatusCapsule.Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(18, 71, 85, 105) : System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
-                borderStatusCapsule.BorderThickness = new Thickness(0);
-                borderStatusCapsule.BorderBrush = null;
+                borderStatusCapsule.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(24, 71, 85, 105)
+                    : System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
+                borderStatusCapsule.BorderThickness = new Thickness(1);
+                borderStatusCapsule.BorderBrush = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(42, 71, 85, 105)
+                    : System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
             }
         }
     }
@@ -1548,9 +1556,10 @@ public partial class MainWindow : Window
         {
             try
             {
-                int w = Math.Max(1, (int)rootBorder!.ActualWidth);
-                int h = Math.Max(1, (int)rootBorder!.ActualHeight);
-                var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                var dpi = VisualTreeHelper.GetDpi(this);
+                int pixelW = Math.Max(1, (int)Math.Ceiling(rootBorder!.ActualWidth * dpi.DpiScaleX));
+                int pixelH = Math.Max(1, (int)Math.Ceiling(rootBorder!.ActualHeight * dpi.DpiScaleY));
+                var rtb = new RenderTargetBitmap(pixelW, pixelH, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
                 rtb.Render(rootBorder);
                 rtb.Freeze();
 
@@ -1559,7 +1568,6 @@ public partial class MainWindow : Window
                 themeTransitionOverlay!.Fill = imgBrush;
                 themeTransitionOverlay.Opacity = 1.0;
                 themeTransitionOverlay.Visibility = Visibility.Visible;
-                themeTransitionOverlay.CacheMode = new BitmapCache { SnapsToDevicePixels = true, RenderAtScale = 1.0 };
             }
             catch
             {
@@ -1680,9 +1688,9 @@ public partial class MainWindow : Window
             Resources["KeycapBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
             Resources["KeycapTextBrush"] = themeGlyphBrush;
 
-            // Status Capsule (Borderless)
-            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 71, 85, 105)));
-            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0)));
+            // Status Capsule (Visible Border in Light Mode)
+            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 71, 85, 105)));
+            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(42, 71, 85, 105)));
             Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
             Resources["StatusDotBrush"] = themeGlyphBrush;
 
@@ -1776,9 +1784,9 @@ public partial class MainWindow : Window
             Resources["KeycapBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70)));
             Resources["KeycapTextBrush"] = themeGlyphBrush;
 
-            // Status Capsule (Borderless)
-            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(26, 255, 255, 255)));
-            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0)));
+            // Status Capsule (Visible Border in Dark Mode)
+            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 255, 255, 255)));
+            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255)));
             Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
             Resources["StatusDotBrush"] = themeGlyphBrush;
 
@@ -1801,32 +1809,32 @@ public partial class MainWindow : Window
 
         if (animateTransition && themeTransitionOverlay != null)
         {
-            // Decouple overlay animation to DispatcherPriority.Render so the UI thread finishes
-            // invalidating and rendering all updated theme resources BEFORE the fade animation begins.
-            Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
-            {
-                if (themeIconRot != null)
-                {
-                    var rotAnim = new DoubleAnimation(0, 360, new Duration(TimeSpan.FromMilliseconds(260)))
-                    {
-                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                    };
-                    themeIconRot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
-                }
+            // Flush layout and resource changes synchronously under the opaque snapshot overlay
+            // so there is zero layout work or resource thrashing during the crossfade animation.
+            UpdateLayout();
 
-                var fadeOut = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromMilliseconds(260)))
+            // Slower by 20%: 260ms * 1.20 = 312ms
+            const int animMs = 312;
+            if (themeIconRot != null)
+            {
+                var rotAnim = new DoubleAnimation(0, 360, new Duration(TimeSpan.FromMilliseconds(animMs)))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 };
-                fadeOut.Completed += (s, ev) =>
-                {
-                    themeTransitionOverlay.Opacity = 0.0;
-                    themeTransitionOverlay.Visibility = Visibility.Collapsed;
-                    themeTransitionOverlay.Fill = null;
-                    themeTransitionOverlay.CacheMode = null;
-                };
-                themeTransitionOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            });
+                themeIconRot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
+            }
+
+            var fadeOut = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromMilliseconds(animMs)))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            fadeOut.Completed += (s, ev) =>
+            {
+                themeTransitionOverlay.Opacity = 0.0;
+                themeTransitionOverlay.Visibility = Visibility.Collapsed;
+                themeTransitionOverlay.Fill = null;
+            };
+            themeTransitionOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
         }
         else if (themeIconRot != null)
         {

@@ -16,7 +16,7 @@ if (Test-Path -LiteralPath $objDir) {
 }
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $stage=Join-Path $projectRoot ".artifacts/publish-$stamp"
-$arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true','-p:EnableCompressionInSingleFile=true','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
+$arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true','-p:EnableCompressionInSingleFile=false','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
 if($NoRestore){$arguments+='--no-restore'}
 & $DotnetPath @arguments
 if($LASTEXITCODE -ne 0){throw 'Publish failed; package was not updated.'}
