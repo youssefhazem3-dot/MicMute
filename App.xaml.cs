@@ -415,6 +415,99 @@ public partial class App : System.Windows.Application
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NOTIFYICONIDENTIFIER
+    {
+        public uint cbSize;
+        public IntPtr hWnd;
+        public uint uID;
+        public Guid guidItem;
+    }
+
+    [DllImport("shell32.dll", SetLastError = true)]
+    private static extern int Shell_NotifyIconGetRect(ref NOTIFYICONIDENTIFIER identifier, out RECT iconLocation);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string? lpszClass, string? lpszWindow);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    internal System.Drawing.Point? GetTrayIconScreenPosition()
+    {
+        try
+        {
+            if (_notifyIcon != null)
+            {
+                var idField = typeof(NotifyIcon).GetField("id", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var windowField = typeof(NotifyIcon).GetField("window", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (idField != null && windowField != null)
+                {
+                    int id = (int)idField.GetValue(_notifyIcon)!;
+                    NativeWindow win = (NativeWindow)windowField.GetValue(_notifyIcon)!;
+                    if (win != null && win.Handle != IntPtr.Zero)
+                    {
+                        NOTIFYICONIDENTIFIER nid = new NOTIFYICONIDENTIFIER
+                        {
+                            cbSize = (uint)Marshal.SizeOf<NOTIFYICONIDENTIFIER>(),
+                            hWnd = win.Handle,
+                            uID = (uint)id,
+                            guidItem = Guid.Empty
+                        };
+                        if (Shell_NotifyIconGetRect(ref nid, out RECT rect) == 0 && (rect.Right > rect.Left) && (rect.Bottom > rect.Top))
+                        {
+                            return new System.Drawing.Point(
+                                rect.Left + (rect.Right - rect.Left) / 2,
+                                rect.Top + (rect.Bottom - rect.Top) / 2
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
+            IntPtr hTaskbar = FindWindow("Shell_TrayWnd", null);
+            if (hTaskbar != IntPtr.Zero)
+            {
+                IntPtr hTray = FindWindowEx(hTaskbar, IntPtr.Zero, "TrayNotifyWnd", null);
+                IntPtr target = hTray != IntPtr.Zero ? hTray : hTaskbar;
+                if (GetWindowRect(target, out RECT r) && (r.Right > r.Left) && (r.Bottom > r.Top))
+                {
+                    return new System.Drawing.Point(
+                        r.Left + (r.Right - r.Left) / 2,
+                        r.Top + (r.Bottom - r.Top) / 2
+                    );
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
+            var area = System.Windows.Forms.Screen.PrimaryScreen?.WorkingArea ?? System.Drawing.Rectangle.Empty;
+            if (area.Width > 0 && area.Height > 0)
+            {
+                return new System.Drawing.Point(area.Right - 40, area.Bottom - 20);
+            }
+        }
+        catch { }
+
+        return null;
+    }
+
     private static readonly int WM_SHOWME = RegisterWindowMessage("MICMUTE_SHOW_WINDOW_MSG_7FA5D9E0");
 
     protected override void OnStartup(StartupEventArgs e)
@@ -478,8 +571,8 @@ public partial class App : System.Windows.Application
         AppSettings appSettings = SettingsManager.Load();
         StartupManager.SetStartup(appSettings.RunOnStartup, appSettings.RunAsAdmin);
         _audioController = new AudioController();
-        _audioController.SetTargetDeviceAsync(appSettings.SelectedDeviceId).GetAwaiter().GetResult();
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
+        _audioController.SetTargetDevice(appSettings.SelectedDeviceId);
         InitializeTrayIcon();
 
         if (DiagnosticLogger.IsEnabled)
@@ -681,18 +774,25 @@ public partial class App : System.Windows.Application
                 graphics.ResetTransform();
             }
             IntPtr newHIcon = bitmap.GetHicon();
-            Icon icon = Icon.FromHandle(newHIcon);
-            Icon? oldIcon = _notifyIcon.Icon;
-            _notifyIcon.Icon = icon;
-            if (oldIcon != null)
+            try
             {
-                oldIcon.Dispose();
+                Icon icon = Icon.FromHandle(newHIcon);
+                Icon? oldIcon = _notifyIcon.Icon;
+                _notifyIcon.Icon = icon;
+                oldIcon?.Dispose();
+
+                if (_currentHIcon != IntPtr.Zero)
+                {
+                    DestroyIcon(_currentHIcon);
+                }
+                _currentHIcon = newHIcon;
             }
-            if (_currentHIcon != IntPtr.Zero)
+            catch
             {
-                DestroyIcon(_currentHIcon);
+                // Ensure native GDI icon handle is released if Icon.FromHandle or NotifyIcon fails
+                DestroyIcon(newHIcon);
+                throw;
             }
-            _currentHIcon = newHIcon;
         }
         catch (Exception ex)
         {
@@ -737,29 +837,26 @@ public partial class App : System.Windows.Application
         });
     }
 
-    public void ShowToastNotification(string message)
-    {
-        // Notification popups disabled per user request
-    }
-
     private void ShowWindow()
     {
         if (_mainWindow != null)
         {
-            bool needsRestoreAnimation = !_mainWindow.IsVisible || _mainWindow.WindowState == WindowState.Minimized;
-            _mainWindow.Show();
-            _mainWindow.WindowState = WindowState.Normal;
-            _mainWindow.Activate();
-            _mainWindow.Focus();
-            var handle = new WindowInteropHelper(_mainWindow).Handle;
-            if (handle != IntPtr.Zero)
+            bool wasHiddenOrMinimized = !_mainWindow.IsVisible || _mainWindow.WindowState == WindowState.Minimized;
+            var trayPos = GetTrayIconScreenPosition();
+
+            if (wasHiddenOrMinimized)
             {
-                ShowWindow(handle, 9); // SW_RESTORE
-                SetForegroundWindow(handle);
+                _mainWindow.PlayOpenFromTrayAnimation(trayPos);
             }
-            if (needsRestoreAnimation)
+            else
             {
-                _mainWindow.PlayRestoreAnimation();
+                _mainWindow.Activate();
+                _mainWindow.Focus();
+                var handle = new WindowInteropHelper(_mainWindow).Handle;
+                if (handle != IntPtr.Zero)
+                {
+                    SetForegroundWindow(handle);
+                }
             }
         }
     }
@@ -806,6 +903,9 @@ public partial class App : System.Windows.Application
             }
         }
         catch { }
+
+        try { OsdWindow.HideOsd(); } catch { }
+        try { AudioFeedback.Dispose(); } catch { }
 
         try
         {
@@ -858,6 +958,9 @@ public partial class App : System.Windows.Application
             }
         }
         catch { }
+        try { OsdWindow.HideOsd(); } catch { }
+        try { AudioFeedback.Dispose(); } catch { }
+
         try
         {
             _audioController?.Dispose();

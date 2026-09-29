@@ -31,6 +31,8 @@ public partial class OsdWindow : Window
     private const int WS_EX_TRANSPARENT = 0x00000020;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WM_MOUSEACTIVATE = 0x0021;
+    private const int MA_NOACTIVATE = 3;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -165,6 +167,19 @@ public partial class OsdWindow : Window
         exStyle |= WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT;
         SetWindowLong(handle, GWL_EXSTYLE, new IntPtr(exStyle));
         SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+
+        HwndSource? source = HwndSource.FromHwnd(handle);
+        source?.AddHook(WndProc);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_MOUSEACTIVATE)
+        {
+            handled = true;
+            return new IntPtr(MA_NOACTIVATE);
+        }
+        return IntPtr.Zero;
     }
 
     public static void WarmUp()
@@ -212,7 +227,31 @@ public partial class OsdWindow : Window
         double safeDuration = double.IsFinite(durationSeconds)
             ? Math.Clamp(durationSeconds, UiBehavior.MinimumOsdDuration, UiBehavior.MaximumOsdDuration)
             : UiBehavior.MinimumOsdDuration;
-        _instance.BeginFadeSequence(safeDuration, _cts.Token);
+        _ = _instance.BeginFadeSequenceAsync(safeDuration, _cts.Token);
+    }
+
+    /// <summary>
+    /// Immediately cancels any active fade sequence and hides the OSD window.
+    /// Called when the user disables OSD or the application exits.
+    /// </summary>
+    public static void HideOsd()
+    {
+        try
+        {
+            if (_cts != null)
+            {
+                _cts.Cancel();
+                _cts.Dispose();
+                _cts = null;
+            }
+            if (_instance != null)
+            {
+                _instance.BeginAnimation(OpacityProperty, null);
+                _instance.Opacity = 0.0;
+                _instance.Hide();
+            }
+        }
+        catch { }
     }
 
     private void PositionOnActiveScreen(IntPtr handle)
@@ -269,13 +308,11 @@ public partial class OsdWindow : Window
             this.Left = target.Left / scaleX;
             this.Top = target.Top / scaleY;
 
-            BringWindowToTop(handle);
-            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
         }
         catch
         {
-            BringWindowToTop(handle);
-            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
         }
     }
 
@@ -355,12 +392,14 @@ public partial class OsdWindow : Window
         }
     }
 
-    private async void BeginFadeSequence(double durationSeconds, CancellationToken token)
+    private Task BeginFadeSequence(double durationSeconds, CancellationToken token) =>
+        BeginFadeSequenceAsync(durationSeconds, token);
+
+    private async Task BeginFadeSequenceAsync(double durationSeconds, CancellationToken token)
     {
         try
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
-            BringWindowToTop(handle);
             SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 
             double startOpacity = Math.Clamp(this.Opacity, 0.0, 0.95);
@@ -370,12 +409,19 @@ public partial class OsdWindow : Window
             DateTime endTime = DateTime.UtcNow.AddSeconds(durationSeconds);
             while (DateTime.UtcNow < endTime)
             {
-                BringWindowToTop(handle);
                 SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
                 TimeSpan remaining = endTime - DateTime.UtcNow;
                 if (remaining <= TimeSpan.Zero) break;
                 TimeSpan chunk = remaining < TimeSpan.FromMilliseconds(80) ? remaining : TimeSpan.FromMilliseconds(80);
                 await Task.Delay(chunk, token);
+            }
+
+            if (token.IsCancellationRequested)
+            {
+                BeginAnimation(OpacityProperty, null);
+                this.Opacity = 0.0;
+                Hide();
+                return;
             }
 
             DoubleAnimation fadeOut = new DoubleAnimation(0.95, 0.0, TimeSpan.FromSeconds(0.20));
@@ -388,11 +434,15 @@ public partial class OsdWindow : Window
             };
             BeginAnimation(OpacityProperty, fadeOut);
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
+            BeginAnimation(OpacityProperty, null);
+            this.Opacity = 0.0;
+            Hide();
         }
-        catch
+        catch (Exception ex)
         {
+            DiagnosticLogger.LogError("OSD fade sequence error", ex);
         }
     }
 }

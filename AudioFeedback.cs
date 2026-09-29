@@ -9,12 +9,14 @@ public static class AudioFeedback
 {
     private static SoundPlayer? _mutePlayer;
     private static SoundPlayer? _unmutePlayer;
+    private static MemoryStream? _muteStream;
+    private static MemoryStream? _unmuteStream;
     private static byte[]? _rawMuteWavBytes;
     private static byte[]? _rawUnmuteWavBytes;
     private static int _volumePercent = 100;
     private static bool _isInitialized;
-    private static readonly object _initLock = new object();
-    private static readonly object _playLock = new object();
+    private static readonly object _initLock = new();
+    private static readonly object _playLock = new();
 
     public static int CurrentVolume => _volumePercent;
 
@@ -58,23 +60,44 @@ public static class AudioFeedback
         byte[] muteBytes = ScaleWavVolume(_rawMuteWavBytes, factor);
         byte[] unmuteBytes = ScaleWavVolume(_rawUnmuteWavBytes, factor);
 
+        // Pre-create and load players before swapping to minimize audio interruption
+        var newMuteStream = new MemoryStream(muteBytes);
+        var newUnmuteStream = new MemoryStream(unmuteBytes);
+        var newMutePlayer = new SoundPlayer(newMuteStream);
+        var newUnmutePlayer = new SoundPlayer(newUnmuteStream);
+
+        try { newMutePlayer.Load(); } catch { }
+        try { newUnmutePlayer.Load(); } catch { }
+
+        SoundPlayer? oldMute;
+        SoundPlayer? oldUnmute;
+        MemoryStream? oldMuteStream;
+        MemoryStream? oldUnmuteStream;
+
         lock (_playLock)
         {
-            var oldMute = _mutePlayer;
-            var oldUnmute = _unmutePlayer;
+            oldMute = _mutePlayer;
+            oldUnmute = _unmutePlayer;
+            oldMuteStream = _muteStream;
+            oldUnmuteStream = _unmuteStream;
 
-            _mutePlayer = new SoundPlayer(new MemoryStream(muteBytes));
-            _unmutePlayer = new SoundPlayer(new MemoryStream(unmuteBytes));
-            try { _mutePlayer.Load(); } catch { }
-            try { _unmutePlayer.Load(); } catch { }
-
-            oldMute?.Dispose();
-            oldUnmute?.Dispose();
+            _mutePlayer = newMutePlayer;
+            _unmutePlayer = newUnmutePlayer;
+            _muteStream = newMuteStream;
+            _unmuteStream = newUnmuteStream;
         }
+
+        // Explicitly dispose both the SoundPlayer AND the underlying MemoryStream
+        // to prevent unmanaged buffer/stream leaks on rapid volume adjustments
+        oldMute?.Dispose();
+        oldUnmute?.Dispose();
+        oldMuteStream?.Dispose();
+        oldUnmuteStream?.Dispose();
     }
 
     public static void Play(bool isMuted)
     {
+        // Hot-path guard: avoid spawning thread pool tasks when audio feedback is silent
         if (_volumePercent <= 0) return;
         Task.Run(() =>
         {
@@ -99,6 +122,25 @@ public static class AudioFeedback
                 try { SystemSounds.Beep.Play(); } catch { }
             }
         });
+    }
+
+    /// <summary>
+    /// Releases active audio streams and players on application shutdown.
+    /// </summary>
+    public static void Dispose()
+    {
+        lock (_playLock)
+        {
+            _mutePlayer?.Dispose();
+            _unmutePlayer?.Dispose();
+            _muteStream?.Dispose();
+            _unmuteStream?.Dispose();
+            _mutePlayer = null;
+            _unmutePlayer = null;
+            _muteStream = null;
+            _unmuteStream = null;
+            _isInitialized = false;
+        }
     }
 
     private static byte[] LoadRawWavBytes(string resourceName, bool isMuted)

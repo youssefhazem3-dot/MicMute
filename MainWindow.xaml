@@ -10,7 +10,7 @@
         ResizeMode="NoResize"
         ShowInTaskbar="True"
         WindowStartupLocation="Manual"
-        FontFamily="pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Inter, Poppins, Google Sans, Open Sans, Segoe UI, sans-serif"
+        FontFamily="Segoe UI Variable Text, Segoe UI Variable Display, Segoe UI, sans-serif"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="Auto"
         TextOptions.TextHintingMode="Auto"
@@ -194,6 +194,73 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border" Background="{TemplateBinding Background}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonPressedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Title Bar App Menu (DaVinci Resolve Style) Button Style -->
+        <Style x:Key="TitleAppMenuButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="ClickMode" Value="Press" />
+            <Setter Property="Padding" Value="6,4,8,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="False"
+                                RenderOptions.EdgeMode="Unspecified">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource CaptionButtonPressedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- App Menu Dropdown Item Button Style -->
+        <Style x:Key="AppDropdownItemButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}"
+                                Margin="2,1"
+                                SnapsToDevicePixels="False"
+                                RenderOptions.EdgeMode="Unspecified">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -1076,7 +1143,7 @@
         <Border.RenderTransform>
             <TransformGroup x:Name="rootTransformGroup">
                 <ScaleTransform x:Name="rootScaleTransform" ScaleX="1.0" ScaleY="1.0" />
-                <TranslateTransform x:Name="rootTranslateTransform" Y="0.0" />
+                <TranslateTransform x:Name="rootTranslateTransform" X="0.0" Y="0.0" />
             </TransformGroup>
         </Border.RenderTransform>
         <Grid x:Name="rootGrid" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
@@ -1105,23 +1172,143 @@
                     RenderOptions.EdgeMode="Unspecified"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
-                    <!-- Left: App Vector Icon & Title (Icon dynamically follows Theme!) -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0">
-                        <Path x:Name="titleBarIcon"
-                              Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z"
-                              Fill="{DynamicResource TitleTextBrush}"
-                              Stretch="Uniform"
-                              Width="14" Height="14"
-                              VerticalAlignment="Center"
-                              SnapsToDevicePixels="False"
-                              RenderOptions.EdgeMode="Unspecified"
-                              Margin="0,0,7,0" />
-                        <TextBlock Text="MicMute"
-                                   Foreground="{DynamicResource TitleTextBrush}"
-                                   FontWeight="Bold"
-                                   FontSize="12"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+                    <!-- Left: App Vector Icon & Title Menu Button (DaVinci Resolve style dropdown menu) -->
+                    <Button x:Name="btnAppMenu"
+                            Style="{StaticResource TitleAppMenuButtonStyle}"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="8,0,0,0"
+                            ToolTip="MicMute Menu"
+                            Click="BtnAppMenu_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Path x:Name="titleBarIcon"
+                                  Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z"
+                                  Fill="{DynamicResource TitleTextBrush}"
+                                  Stretch="Uniform"
+                                  Width="14" Height="14"
+                                  VerticalAlignment="Center"
+                                  SnapsToDevicePixels="False"
+                                  RenderOptions.EdgeMode="Unspecified"
+                                  Margin="0,0,7,0" />
+                            <TextBlock Text="MicMute"
+                                       Foreground="{DynamicResource TitleTextBrush}"
+                                       FontWeight="Bold"
+                                       FontSize="12"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <!-- DaVinci-Style Dropdown Menu Popup -->
+                    <Popup x:Name="popupAppMenu"
+                           PlacementTarget="{Binding ElementName=btnAppMenu}"
+                           Placement="Bottom"
+                           HorizontalOffset="0"
+                           VerticalOffset="4"
+                           AllowsTransparency="True"
+                           StaysOpen="False"
+                           PopupAnimation="Fade"
+                           TextOptions.TextFormattingMode="Display"
+                           TextOptions.TextRenderingMode="ClearType"
+                           RenderOptions.ClearTypeHint="Enabled"
+                           SnapsToDevicePixels="True"
+                           UseLayoutRounding="True">
+                        <Border x:Name="borderAppMenu"
+                                Background="{DynamicResource InputBgBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="4,6"
+                                MinWidth="190"
+                                Margin="8,4,8,8"
+                                TextElement.FontFamily="Segoe UI Variable Text, Segoe UI Variable Display, Segoe UI, sans-serif">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#000000" />
+                            </Border.Effect>
+                            <StackPanel>
+                                <!-- Option 1: Check for Updates (Top, Clickable Placeholder) -->
+                                <Button x:Name="btnMenuCheckUpdates"
+                                        Style="{StaticResource AppDropdownItemButtonStyle}"
+                                        ToolTip="Check for updates to MicMute (Future Feature)"
+                                        Click="BtnMenuCheckUpdates_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                                              Fill="{DynamicResource TextGrayBrush}"
+                                              Stretch="Uniform"
+                                              Width="12" Height="12"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Check for Updates..."
+                                                   FontSize="12"
+                                                   FontWeight="Normal"
+                                                   Foreground="{DynamicResource TextWhiteBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0,0,0" />
+                                    </Grid>
+                                </Button>
+
+                                <!-- Option 2: About MicMute (Middle, Clickable Placeholder) -->
+                                <Button x:Name="btnMenuAbout"
+                                        Style="{StaticResource AppDropdownItemButtonStyle}"
+                                        ToolTip="About MicMute (Future Feature)"
+                                        Click="BtnMenuAbout_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Data="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-11h2V7h-2v2z"
+                                              Fill="{DynamicResource TextGrayBrush}"
+                                              Stretch="Uniform"
+                                              Width="12" Height="12"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="About MicMute"
+                                                   FontSize="12"
+                                                   FontWeight="Normal"
+                                                   Foreground="{DynamicResource TextWhiteBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0,0,0" />
+                                    </Grid>
+                                </Button>
+
+                                <!-- Divider -->
+                                <Rectangle Height="1"
+                                           Fill="{DynamicResource DividerBrush}"
+                                           Margin="6,4,6,4"
+                                           SnapsToDevicePixels="True" />
+
+                                <!-- Option 3: Version Info (Bottom, Non-clickable) -->
+                                <Border Padding="8,4,8,4" Background="Transparent" IsHitTestVisible="False">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+                                              Fill="{DynamicResource TextDimBrush}"
+                                              Stretch="Uniform"
+                                              Width="11" Height="11"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              Opacity="0.7" />
+                                        <TextBlock x:Name="tbMenuVersion"
+                                                   Grid.Column="1"
+                                                   Text="Version 1.0.0"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextDimBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0,0,0" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
 
                     <!-- Hidden legacy Image for backward compat -->
                     <Image x:Name="imgAppIcon" Width="0" Height="0" Visibility="Collapsed" />
@@ -1221,7 +1408,7 @@
                                 <TextBlock x:Name="tbHeroHotkey"
                                            Text="Insert"
                                            Foreground="{DynamicResource KeycapTextBrush}"
-                                           FontFamily="Consolas, pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Segoe UI"
+                                           FontFamily="Cascadia Mono, Consolas, Segoe UI Variable Text, Segoe UI, monospace"
                                            FontWeight="Bold"
                                            FontSize="10"
                                            Margin="0,1,0,0"
@@ -1340,7 +1527,7 @@
                                         <TextBlock x:Name="tbHotkey"
                                                    Text="Insert"
                                                    Foreground="{DynamicResource KeycapTextBrush}"
-                                                   FontFamily="Consolas, pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Segoe UI"
+                                                   FontFamily="Cascadia Mono, Consolas, Segoe UI Variable Text, Segoe UI, monospace"
                                                    FontWeight="Bold"
                                                    FontSize="11"
                                                    Margin="0,1.5,0,0"
@@ -1412,7 +1599,7 @@
                             </Grid>
 
                             <!-- High-Contrast OSD Duration Slider -->
-                            <Grid Margin="37,0,0,8">
+                            <Grid x:Name="panelOsdDuration" Margin="37,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />

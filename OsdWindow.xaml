@@ -68,7 +68,7 @@
                            Text="ACTIVE"
                            Foreground="#FFFFFF"
                            FontSize="13.5"
-                           FontFamily="pack://application:,,,/MicMute;component/fonts/#Roboto, Roboto, Inter, Poppins, Google Sans, Open Sans, Segoe UI Variable Display, Segoe UI, sans-serif"
+                           FontFamily="Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI, sans-serif"
                            FontWeight="Bold"
                            HorizontalAlignment="Center"
                            Margin="0,7,0,0" />

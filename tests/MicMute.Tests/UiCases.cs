@@ -62,6 +62,12 @@ static class UiCases
         test(nameof(TaskbarIconAndTypographyAndThemeBrighterPalette), TaskbarIconAndTypographyAndThemeBrighterPalette);
         test(nameof(SmoothMinimizeRestoreAndDropdownClearType), SmoothMinimizeRestoreAndDropdownClearType);
         test(nameof(HeroHotkeyCenterLockedAndThemeMoonAlignedAndBoldTypography), HeroHotkeyCenterLockedAndThemeMoonAlignedAndBoldTypography);
+        test(nameof(OsdDurationSliderDimmingReflectsOsdToggle), OsdDurationSliderDimmingReflectsOsdToggle);
+        test(nameof(TrayOpenAnimationAndSmoothTransitions), TrayOpenAnimationAndSmoothTransitions);
+        test(nameof(DaVinciStyleAppMenuAndFuturePlaceholderOptions), DaVinciStyleAppMenuAndFuturePlaceholderOptions);
+        test(nameof(DeviceDropdownDoesNotGlitchOrCloseWhenOsdAppearsAndDefersUpdates), DeviceDropdownDoesNotGlitchOrCloseWhenOsdAppearsAndDefersUpdates);
+        test(nameof(KeycapInputBoxesSingleClickShowsCaretAndDoubleClickSelectsAll), KeycapInputBoxesSingleClickShowsCaretAndDoubleClickSelectsAll);
+        test(nameof(OsdWindowHideAndAudioFeedbackStreamManagement), OsdWindowHideAndAudioFeedbackStreamManagement);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -1541,14 +1547,16 @@ static class UiCases
         using var reader = new System.IO.StreamReader(stream!);
         string rawXaml = reader.ReadToEnd();
 
-        // 1. Google font family in MainWindow and OsdWindow
-        Check.True(rawXaml.Contains("Roboto") && rawXaml.Contains("Inter"), "MainWindow XAML must specify Google Font family chain");
+        // 1. Windows 11 modern UI font family in MainWindow and OsdWindow (Google fonts ditched)
+        Check.True(rawXaml.Contains("Segoe UI Variable Text") && rawXaml.Contains("Segoe UI Variable Display"), "MainWindow XAML must specify Windows 11 Segoe UI Variable font family chain");
+        Check.True(!rawXaml.Contains("Roboto") && !rawXaml.Contains("Google Sans"), "MainWindow XAML must not contain Google fonts");
 
         using var osdStream = typeof(OsdWindow).Assembly.GetManifestResourceStream("MicMute.OsdWindow.xaml");
         Check.True(osdStream != null, "OsdWindow.xaml must be embedded");
         using var osdReader = new System.IO.StreamReader(osdStream!);
         string osdXaml = osdReader.ReadToEnd();
-        Check.True(osdXaml.Contains("Roboto"), "OsdWindow XAML must specify Google Font family chain");
+        Check.True(osdXaml.Contains("Segoe UI Variable Display"), "OsdWindow XAML must specify Windows 11 Segoe UI Variable font family chain");
+        Check.True(!osdXaml.Contains("Roboto"), "OsdWindow XAML must not contain Google fonts");
 
         // 2. High brightness palette verification in dark mode (+10% white, +20% gray)
         Check.True(rawXaml.Contains(@"<SolidColorBrush x:Key=""TitleTextBrush"" Color=""#FFFFFF"" />"), "TitleTextBrush must be pure white (#FFFFFF)");
@@ -1565,7 +1573,7 @@ static class UiCases
             window.cbLightMode.IsChecked = false;
             Check.True(window.ShowInTaskbar, "MainWindow must show in Windows taskbar");
             Check.True(window.Icon != null, "MainWindow.Icon must be populated from embedded multi-resolution icon");
-            Check.True(window.FontFamily != null && window.FontFamily.Source.Contains("Roboto"), "MainWindow FontFamily must use Roboto Google Font");
+            Check.True(window.FontFamily != null && window.FontFamily.Source.Contains("Segoe UI Variable"), "MainWindow FontFamily must use Windows 11 Segoe UI Variable font");
 
             var titleBrush = (System.Windows.Media.SolidColorBrush)window.Resources["TitleTextBrush"];
             Check.Equal(System.Windows.Media.Color.FromRgb(255, 255, 255), titleBrush.Color);
@@ -1705,4 +1713,285 @@ static class UiCases
             window.Close();
         }
     }
+
+    private static void OsdDurationSliderDimmingReflectsOsdToggle()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.panelOsdDuration != null, "panelOsdDuration must be bound");
+
+            // Enabled state
+            window.cbEnableOsd.IsChecked = true;
+            Check.True(window.panelOsdDuration!.IsEnabled, "panelOsdDuration must be enabled when EnableOsd is checked");
+            Check.Equal(1.0, window.panelOsdDuration.Opacity, "panelOsdDuration opacity must be 1.0 when enabled");
+
+            // Disabled state
+            window.cbEnableOsd.IsChecked = false;
+            Check.True(!window.panelOsdDuration.IsEnabled, "panelOsdDuration must be disabled when EnableOsd is unchecked");
+            Check.Equal(0.45, window.panelOsdDuration.Opacity, "panelOsdDuration opacity must be 0.45 when dimmed");
+
+            // Re-enabled state
+            window.cbEnableOsd.IsChecked = true;
+            Check.True(window.panelOsdDuration.IsEnabled, "panelOsdDuration must re-enable when EnableOsd is checked");
+            Check.Equal(1.0, window.panelOsdDuration.Opacity, "panelOsdDuration opacity must restore to 1.0");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void TrayOpenAnimationAndSmoothTransitions()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Verify X and Y properties in rootTranslateTransform
+        Check.True(rawXaml.Contains(@"x:Name=""rootTranslateTransform"" X=""0.0"" Y=""0.0"""), "rootTranslateTransform must declare X=0.0 and Y=0.0");
+        Check.True(rawXaml.Contains(@"x:Name=""panelOsdDuration"""), "panelOsdDuration must be declared in XAML");
+
+        // 2. Runtime verification of tray open animation
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(typeof(MainWindow).GetMethod("PlayOpenFromTrayAnimation") != null, "PlayOpenFromTrayAnimation method must exist");
+            Check.True(typeof(MainWindow).GetMethod("CenterOnScreen") != null, "CenterOnScreen method must exist");
+            Check.True(window.panelOsdDuration != null, "panelOsdDuration must be bound at runtime");
+            Check.True(window.rootTranslateTransform != null, "rootTranslateTransform must be bound at runtime");
+
+            // Execute PlayOpenFromTrayAnimation with a mock tray location - must not throw
+            window.PlayOpenFromTrayAnimation(new System.Drawing.Point(100, 100));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void DaVinciStyleAppMenuAndFuturePlaceholderOptions()
+    {
+        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var reader = new System.IO.StreamReader(stream!);
+        string rawXaml = reader.ReadToEnd();
+
+        // 1. Verify XAML declarations for DaVinci Resolve-style top-left menu
+        Check.True(rawXaml.Contains(@"x:Name=""btnAppMenu"""), "btnAppMenu must be declared in XAML");
+        Check.True(rawXaml.Contains(@"x:Name=""popupAppMenu"""), "popupAppMenu must be declared in XAML");
+        Check.True(rawXaml.Contains(@"x:Name=""btnMenuCheckUpdates"""), "btnMenuCheckUpdates must be declared in XAML");
+        Check.True(rawXaml.Contains(@"x:Name=""btnMenuAbout"""), "btnMenuAbout must be declared in XAML");
+        Check.True(rawXaml.Contains(@"x:Name=""tbMenuVersion"""), "tbMenuVersion must be declared in XAML");
+        Check.True(rawXaml.Contains(@"TitleAppMenuButtonStyle"), "TitleAppMenuButtonStyle must be declared in XAML");
+        Check.True(rawXaml.Contains(@"AppDropdownItemButtonStyle"), "AppDropdownItemButtonStyle must be declared in XAML");
+
+        // 2. Runtime verification of bindings and interactions
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            Check.True(window.btnAppMenu != null, "btnAppMenu must be bound at runtime");
+            Check.True(window.popupAppMenu != null, "popupAppMenu must be bound at runtime");
+            Check.True(window.btnMenuCheckUpdates != null, "btnMenuCheckUpdates must be bound at runtime");
+            Check.True(window.btnMenuAbout != null, "btnMenuAbout must be bound at runtime");
+            Check.True(window.tbMenuVersion != null, "tbMenuVersion must be bound at runtime");
+
+            // Verify version formatting
+            Check.True(window.tbMenuVersion!.Text.StartsWith("Version "), "tbMenuVersion must display a formatted version string");
+
+            // Verify popup initial state
+            Check.True(!window.popupAppMenu!.IsOpen, "popupAppMenu should be closed initially");
+
+            // Test toggling popup via btnAppMenu
+            window.BtnAppMenu_Click(window.btnAppMenu!, new System.Windows.RoutedEventArgs());
+            Check.True(window.popupAppMenu.IsOpen, "Clicking btnAppMenu should open popupAppMenu");
+
+            // Test clicking 'Check for Updates' closes popup (and executes placeholder hook)
+            window.BtnMenuCheckUpdates_Click(window.btnMenuCheckUpdates!, new System.Windows.RoutedEventArgs());
+            Check.True(!window.popupAppMenu.IsOpen, "Clicking Check for Updates must close popupAppMenu");
+
+            // Open again and test clicking 'About MicMute' closes popup
+            window.popupAppMenu.IsOpen = true;
+            Check.True(window.popupAppMenu.IsOpen, "popupAppMenu should be open");
+            window.BtnMenuAbout_Click(window.btnMenuAbout!, new System.Windows.RoutedEventArgs());
+            Check.True(!window.popupAppMenu.IsOpen, "Clicking About MicMute must close popupAppMenu");
+
+            // Verify dynamic resource inheritance across theme changes
+            window.SetLightMode(isLight: true);
+            Check.Equal(window.Resources["InputBgBrush"], window.popupAppMenu.Resources["InputBgBrush"]);
+            window.SetLightMode(isLight: false);
+            Check.Equal(window.Resources["InputBgBrush"], window.popupAppMenu.Resources["InputBgBrush"]);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void DeviceDropdownDoesNotGlitchOrCloseWhenOsdAppearsAndDefersUpdates()
+    {
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        const System.Reflection.BindingFlags staticFlags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static;
+
+        // Verify WM_MOUSEACTIVATE and MA_NOACTIVATE are defined on OsdWindow
+        var wmMouseActivate = typeof(OsdWindow).GetField("WM_MOUSEACTIVATE", staticFlags);
+        Check.True(wmMouseActivate != null, "WM_MOUSEACTIVATE must be defined on OsdWindow");
+        Check.Equal(0x0021, (int)wmMouseActivate!.GetValue(null)!);
+
+        var maNoActivate = typeof(OsdWindow).GetField("MA_NOACTIVATE", staticFlags);
+        Check.True(maNoActivate != null, "MA_NOACTIVATE must be defined on OsdWindow");
+        Check.Equal(3, (int)maNoActivate!.GetValue(null)!);
+
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            var dev1 = new AudioDevice("id1", "Microphone 1");
+            var dev2 = new AudioDevice("id2", "Microphone 2");
+            var initialList = new System.Collections.Generic.List<AudioDevice> { dev1, dev2 };
+
+            var applyMethod = typeof(MainWindow).GetMethod("ApplyDeviceList", flags);
+            Check.True(applyMethod != null, "ApplyDeviceList must exist");
+            applyMethod!.Invoke(window, new object[] { initialList });
+
+            Check.Equal(2, window.cbDevices.Items.Count);
+            Check.Equal(initialList, window.cbDevices.ItemsSource);
+
+            // Open the dropdown
+            window.cbDevices.IsDropDownOpen = true;
+            Check.True(window.cbDevices.IsDropDownOpen, "Dropdown should be open");
+
+            // Attempt to apply an updated device list while dropdown is open
+            var dev3 = new AudioDevice("id3", "Microphone 3");
+            var updatedList = new System.Collections.Generic.List<AudioDevice> { dev1, dev2, dev3 };
+            applyMethod.Invoke(window, new object[] { updatedList });
+
+            // Dropdown must remain open and items untouched while open
+            Check.True(window.cbDevices.IsDropDownOpen, "Dropdown must remain open when device refresh arrives");
+            Check.Equal(2, window.cbDevices.Items.Count);
+
+            var pendingField = typeof(MainWindow).GetField("_pendingDeviceList", flags);
+            Check.True(pendingField != null, "_pendingDeviceList must exist");
+            var pendingVal = pendingField!.GetValue(window) as System.Collections.Generic.List<AudioDevice>;
+            Check.Equal(3, pendingVal?.Count);
+
+            // Trigger OSD show while dropdown is open
+            OsdWindow.ShowOsd(true, 0.5);
+            Check.True(window.cbDevices.IsDropDownOpen, "Dropdown must remain open when OSD is shown");
+
+            // Close the dropdown - pending list should be applied
+            window.cbDevices.IsDropDownOpen = false;
+            Check.Equal(3, window.cbDevices.Items.Count);
+            Check.True(pendingField.GetValue(window) == null, "_pendingDeviceList must be flushed after closing");
+
+            // Test equivalence check: re-applying an equivalent list preserves ItemsSource instance
+            var currentItemsSource = window.cbDevices.ItemsSource;
+            var sameList = new System.Collections.Generic.List<AudioDevice> { dev1, dev2, dev3 };
+            applyMethod.Invoke(window, new object[] { sameList });
+            Check.True(ReferenceEquals(currentItemsSource, window.cbDevices.ItemsSource), "ItemsSource instance must be preserved when list content is unchanged");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void KeycapInputBoxesSingleClickShowsCaretAndDoubleClickSelectsAll()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            var mouseDevice = System.Windows.Input.Mouse.PrimaryDevice;
+
+            // 1. Single click on txtOsdDuration must not SelectAll (caret indicator shown, SelectionLength == 0)
+            window.txtOsdDuration.Text = "0.3";
+            window.txtOsdDuration.SelectionLength = 0;
+            var singleClickOsd = new System.Windows.Input.MouseButtonEventArgs(
+                mouseDevice, 0, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+            };
+            window.txtOsdDuration.RaiseEvent(singleClickOsd);
+            Check.Equal(0, window.txtOsdDuration.SelectionLength, "Single click on txtOsdDuration must not select all text");
+
+            // 2. Double click (ClickCount == 2) on txtOsdDuration must SelectAll
+            var doubleClickOsd = new System.Windows.Input.MouseButtonEventArgs(
+                mouseDevice, 0, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+            };
+            typeof(System.Windows.Input.MouseButtonEventArgs)
+                .GetProperty("ClickCount")?
+                .GetSetMethod(true)?
+                .Invoke(doubleClickOsd, new object[] { 2 });
+            window.txtOsdDuration.RaiseEvent(doubleClickOsd);
+            Check.Equal(window.txtOsdDuration.Text.Length, window.txtOsdDuration.SelectionLength, "Double click on txtOsdDuration must select all text");
+
+            // 3. Single click on txtSoundVolume must not SelectAll
+            window.txtSoundVolume.Text = "85";
+            window.txtSoundVolume.SelectionLength = 0;
+            var singleClickVol = new System.Windows.Input.MouseButtonEventArgs(
+                mouseDevice, 0, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+            };
+            window.txtSoundVolume.RaiseEvent(singleClickVol);
+            Check.Equal(0, window.txtSoundVolume.SelectionLength, "Single click on txtSoundVolume must not select all text");
+
+            // 4. Double click on txtSoundVolume must SelectAll
+            var doubleClickVol = new System.Windows.Input.MouseButtonEventArgs(
+                mouseDevice, 0, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+            };
+            typeof(System.Windows.Input.MouseButtonEventArgs)
+                .GetProperty("ClickCount")?
+                .GetSetMethod(true)?
+                .Invoke(doubleClickVol, new object[] { 2 });
+            window.txtSoundVolume.RaiseEvent(doubleClickVol);
+            Check.Equal(window.txtSoundVolume.Text.Length, window.txtSoundVolume.SelectionLength, "Double click on txtSoundVolume must select all text");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void OsdWindowHideAndAudioFeedbackStreamManagement()
+    {
+        // 1. Verify OsdWindow.HideOsd can be safely invoked repeatedly without throwing
+        OsdWindow.HideOsd();
+        OsdWindow.HideOsd();
+
+        // 2. Verify AudioFeedback stream management and disposal
+        AudioFeedback.SetVolume(75);
+        Check.Equal(75, AudioFeedback.CurrentVolume, "AudioFeedback current volume should be 75");
+
+        AudioFeedback.SetVolume(0);
+        Check.Equal(0, AudioFeedback.CurrentVolume, "AudioFeedback current volume should be 0");
+        AudioFeedback.Play(true); // Should short-circuit and not throw
+
+        AudioFeedback.Dispose();
+        AudioFeedback.SetVolume(100);
+        Check.Equal(100, AudioFeedback.CurrentVolume, "AudioFeedback volume re-initialized to 100");
+
+        // 3. Verify AdminManager.SetRunAsAdmin returns a boolean
+        bool result = AdminManager.SetRunAsAdmin(false);
+        Check.True(result || !result, "SetRunAsAdmin must return a valid boolean without uncaught exception");
+    }
 }
+

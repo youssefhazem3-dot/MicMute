@@ -57,7 +57,7 @@ public static class AdminManager
         return false;
     }
 
-    public static void SetRunAsAdmin(bool enable)
+    public static bool SetRunAsAdmin(bool enable)
     {
         try
         {
@@ -78,11 +78,13 @@ public static class AdminManager
                     if (remaining.Length == 0 || remaining == "~") key.DeleteValue(exePath, throwOnMissingValue: false);
                     else key.SetValue(exePath, remaining);
                 }
+                return true;
             }
         }
         catch
         {
         }
+        return false;
     }
 
     public static bool RestartAsAdmin()
