@@ -56,6 +56,8 @@ public partial class MainWindow : Window
     internal TextBlock? tbMenuVersion;
     private long _lastMenuClosedTicks;
     private bool _menuWasOpened;
+    private long _lastMenuDismissedByOutsideClickTicks;
+    private bool _isOpenFromTrayActive;
     internal System.Windows.Controls.Button? btnMin;
     internal System.Windows.Controls.Button? btnCls;
     internal System.Windows.Controls.ComboBox cbDevices = null!;
@@ -172,6 +174,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         this.StateChanged += MainWindow_StateChanged;
+        this.PreviewMouseDown += MainWindow_PreviewMouseDown;
+        this.Deactivated += MainWindow_Deactivated;
+        this.LocationChanged += MainWindow_LocationChanged;
         _preferredWidth = Width > 0 ? Width : 412.0;
         _deviceRefreshDebouncer = new DispatcherDebouncer(Dispatcher);
         _statusDebouncer = new DispatcherDebouncer(Dispatcher);
@@ -1194,10 +1199,58 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private void MainWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (popupAppMenu != null && popupAppMenu.IsOpen)
+        {
+            if (btnAppMenu != null)
+            {
+                Point p = e.GetPosition(btnAppMenu);
+                if (p.X >= 0 && p.X <= btnAppMenu.ActualWidth && p.Y >= 0 && p.Y <= btnAppMenu.ActualHeight)
+                {
+                    // Click was directly on the app menu toggle button itself; let BtnAppMenu_Click handle it
+                    return;
+                }
+            }
+
+            popupAppMenu.IsOpen = false;
+            _lastMenuDismissedByOutsideClickTicks = Environment.TickCount64;
+        }
+    }
+
+    private void MainWindow_Deactivated(object? sender, EventArgs e)
+    {
+        if (popupAppMenu != null && popupAppMenu.IsOpen)
+        {
+            popupAppMenu.IsOpen = false;
+        }
+    }
+
+    private void MainWindow_LocationChanged(object? sender, EventArgs e)
+    {
+        if (popupAppMenu != null && popupAppMenu.IsOpen)
+        {
+            popupAppMenu.IsOpen = false;
+        }
+    }
+
     public void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is DependencyObject dep && FindVisualParent<System.Windows.Controls.Primitives.ButtonBase>(dep) != null)
         {
+            return;
+        }
+
+        if (popupAppMenu != null && popupAppMenu.IsOpen)
+        {
+            popupAppMenu.IsOpen = false;
+            e.Handled = true;
+            return;
+        }
+
+        if (_lastMenuDismissedByOutsideClickTicks > 0 && Environment.TickCount64 - _lastMenuDismissedByOutsideClickTicks < 150)
+        {
+            e.Handled = true;
             return;
         }
 
@@ -1293,15 +1346,7 @@ public partial class MainWindow : Window
         rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
         rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
 
-        // Dynamic GPU bitmap caching during transition to eliminate re-rasterization micro-stutter
-        rootBorder.CacheMode = new BitmapCache
-        {
-            SnapsToDevicePixels = true,
-            EnableClearType = false,
-            RenderAtScale = 1.0
-        };
-
-        const int animMs = 312;
+        const int animMs = 240;
         var duration = new Duration(TimeSpan.FromMilliseconds(animMs));
         var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
 
@@ -1320,8 +1365,14 @@ public partial class MainWindow : Window
             finally
             {
                 _isMinimizing = false;
+
+                rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+                rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+                rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+
                 // Keep Opacity at 0.0 while minimized to eliminate the single-frame flash before Windows completes hiding the HWND
-                rootBorder.CacheMode = null;
                 rootBorder.Opacity = 0.0;
                 rootScaleTransform.ScaleX = 0.92;
                 rootScaleTransform.ScaleY = 0.92;
@@ -1339,6 +1390,8 @@ public partial class MainWindow : Window
 
     private void MainWindow_StateChanged(object? sender, EventArgs e)
     {
+        if (_isOpenFromTrayActive) return;
+
         if (WindowState == WindowState.Normal)
         {
             _isMinimizing = false;
@@ -1361,6 +1414,8 @@ public partial class MainWindow : Window
 
     public void PlayRestoreAnimation()
     {
+        if (_isOpenFromTrayActive) return;
+
         if (!IsLoaded || !IsVisible || ActualWidth <= 0 || rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
         {
             if (rootBorder != null) rootBorder.Opacity = 1.0;
@@ -1378,21 +1433,13 @@ public partial class MainWindow : Window
         rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
         rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
 
-        // Dynamic GPU bitmap caching during transition to eliminate re-rasterization micro-stutter
-        rootBorder.CacheMode = new BitmapCache
-        {
-            SnapsToDevicePixels = true,
-            EnableClearType = false,
-            RenderAtScale = 1.0
-        };
-
         rootBorder.Opacity = 0.0;
         rootScaleTransform.ScaleX = 0.92;
         rootScaleTransform.ScaleY = 0.92;
         rootTranslateTransform.X = 0.0;
         rootTranslateTransform.Y = 20.0;
 
-        const int animMs = 312;
+        const int animMs = 280;
         var duration = new Duration(TimeSpan.FromMilliseconds(animMs));
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
@@ -1402,11 +1449,16 @@ public partial class MainWindow : Window
         var transXAnim = new DoubleAnimation(0.0, 0.0, duration) { EasingFunction = ease };
         var transYAnim = new DoubleAnimation(20.0, 0.0, duration) { EasingFunction = ease };
 
-        opacityAnim.Completed += (s, ev) =>
+        scaleXAnim.Completed += (s, ev) =>
         {
             _isRestoring = false;
-            // Clear CacheMode immediately upon completion so text and vector elements revert to subpixel ClearType rendering
-            rootBorder.CacheMode = null;
+
+            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+
             rootBorder.Opacity = 1.0;
             rootScaleTransform.ScaleX = 1.0;
             rootScaleTransform.ScaleY = 1.0;
@@ -1423,12 +1475,80 @@ public partial class MainWindow : Window
 
     public void PlayOpenFromTrayAnimation(System.Drawing.Point? trayPixelPoint = null)
     {
-        if (_isRestoring) return;
+        if (_isRestoring || _isOpenFromTrayActive) return;
+        _isOpenFromTrayActive = true;
         _isRestoring = true;
         _isMinimizing = false;
 
+        // Immediately cancel any pending animations and make rootBorder invisible to avoid any 1-frame flash
+        if (rootBorder != null)
+        {
+            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            rootBorder.Opacity = 0.0;
+        }
+        if (rootScaleTransform != null)
+        {
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        }
+        if (rootTranslateTransform != null)
+        {
+            rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+        }
+
         this.WindowState = WindowState.Normal;
         CenterOnScreen();
+
+        // Update layout pass while opacity is 0 so ActualWidth/ActualHeight are properly measured
+        this.UpdateLayout();
+
+        if (rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
+        {
+            _isOpenFromTrayActive = false;
+            _isRestoring = false;
+            if (rootBorder != null) rootBorder.Opacity = 1.0;
+            if (!this.IsVisible) this.Show();
+            this.Activate();
+            return;
+        }
+
+        // Convert tray point from physical pixels to WPF DIPs
+        DpiScale dpi = VisualTreeHelper.GetDpi(this);
+        double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+        double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+        double curWidth = this.ActualWidth > 0 ? this.ActualWidth : _preferredWidth;
+        double curHeight = this.ActualHeight > 0 ? this.ActualHeight : 440.0;
+        double winCenterDipX = this.Left + curWidth / 2.0;
+        double winCenterDipY = this.Top + curHeight / 2.0;
+
+        double trayDipX;
+        double trayDipY;
+
+        if (trayPixelPoint.HasValue && (trayPixelPoint.Value.X != 0 || trayPixelPoint.Value.Y != 0))
+        {
+            trayDipX = trayPixelPoint.Value.X / dpiX;
+            trayDipY = trayPixelPoint.Value.Y / dpiY;
+        }
+        else
+        {
+            var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)(winCenterDipX * dpiX), (int)(winCenterDipY * dpiY))) ?? System.Windows.Forms.Screen.PrimaryScreen;
+            var wa = screen?.WorkingArea ?? new System.Drawing.Rectangle(0, 0, (int)(1920 * dpiX), (int)(1080 * dpiY));
+            trayDipX = (wa.Right - 40) / dpiX;
+            trayDipY = (wa.Bottom - 20) / dpiY;
+        }
+
+        double startDeltaX = trayDipX - winCenterDipX;
+        double startDeltaY = trayDipY - winCenterDipY;
+
+        const double initialScale = 0.70;
+        rootScaleTransform.ScaleX = initialScale;
+        rootScaleTransform.ScaleY = initialScale;
+        rootTranslateTransform.X = startDeltaX;
+        rootTranslateTransform.Y = startDeltaY;
+        rootBorder.Opacity = 0.0;
+
         if (!this.IsVisible)
         {
             this.Show();
@@ -1442,75 +1562,27 @@ public partial class MainWindow : Window
             SetForegroundWindow(hwnd);
         }
 
-        if (rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
-        {
-            _isRestoring = false;
-            return;
-        }
-
-        // Cancel any pending animations
-        rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
-        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
-        rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-
-        // Convert tray point from physical pixels to WPF DIPs
-        DpiScale dpi = VisualTreeHelper.GetDpi(this);
-        double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
-        double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
-
-        double trayDipX;
-        double trayDipY;
-
-        if (trayPixelPoint.HasValue)
-        {
-            trayDipX = trayPixelPoint.Value.X / dpiX;
-            trayDipY = trayPixelPoint.Value.Y / dpiY;
-        }
-        else
-        {
-            var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)(this.Left * dpiX), (int)(this.Top * dpiY)));
-            trayDipX = (screen.WorkingArea.Right - 40) / dpiX;
-            trayDipY = (screen.WorkingArea.Bottom - 20) / dpiY;
-        }
-
-        double curWidth = this.ActualWidth > 0 ? this.ActualWidth : _preferredWidth;
-        double curHeight = this.ActualHeight > 0 ? this.ActualHeight : 400.0;
-        double winCenterDipX = this.Left + curWidth / 2.0;
-        double winCenterDipY = this.Top + curHeight / 2.0;
-
-        double startDeltaX = trayDipX - winCenterDipX;
-        double startDeltaY = trayDipY - winCenterDipY;
-
-        // Dynamic GPU bitmap caching during transition to eliminate re-rasterization micro-stutter
-        rootBorder.CacheMode = new BitmapCache
-        {
-            SnapsToDevicePixels = true,
-            EnableClearType = false,
-            RenderAtScale = 1.0
-        };
-
-        rootBorder.Opacity = 0.0;
-        rootScaleTransform.ScaleX = 0.05;
-        rootScaleTransform.ScaleY = 0.05;
-        rootTranslateTransform.X = startDeltaX;
-        rootTranslateTransform.Y = startDeltaY;
-
-        const int animMs = 312;
+        const int animMs = 280;
         var duration = new Duration(TimeSpan.FromMilliseconds(animMs));
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
-        var opacityAnim = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(180))) { EasingFunction = ease };
-        var scaleXAnim = new DoubleAnimation(0.05, 1.0, duration) { EasingFunction = ease };
-        var scaleYAnim = new DoubleAnimation(0.05, 1.0, duration) { EasingFunction = ease };
+        var opacityAnim = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = ease };
+        var scaleXAnim = new DoubleAnimation(initialScale, 1.0, duration) { EasingFunction = ease };
+        var scaleYAnim = new DoubleAnimation(initialScale, 1.0, duration) { EasingFunction = ease };
         var transXAnim = new DoubleAnimation(startDeltaX, 0.0, duration) { EasingFunction = ease };
         var transYAnim = new DoubleAnimation(startDeltaY, 0.0, duration) { EasingFunction = ease };
 
         scaleXAnim.Completed += (s, ev) =>
         {
+            _isOpenFromTrayActive = false;
             _isRestoring = false;
-            rootBorder.CacheMode = null;
+
+            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+
             rootBorder.Opacity = 1.0;
             rootScaleTransform.ScaleX = 1.0;
             rootScaleTransform.ScaleY = 1.0;

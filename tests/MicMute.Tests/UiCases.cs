@@ -68,6 +68,7 @@ static class UiCases
         test(nameof(DeviceDropdownDoesNotGlitchOrCloseWhenOsdAppearsAndDefersUpdates), DeviceDropdownDoesNotGlitchOrCloseWhenOsdAppearsAndDefersUpdates);
         test(nameof(KeycapInputBoxesSingleClickShowsCaretAndDoubleClickSelectsAll), KeycapInputBoxesSingleClickShowsCaretAndDoubleClickSelectsAll);
         test(nameof(OsdWindowHideAndAudioFeedbackStreamManagement), OsdWindowHideAndAudioFeedbackStreamManagement);
+        test(nameof(MenuOutsideClickDismissalAndOsdSpamResilience), MenuOutsideClickDismissalAndOsdSpamResilience);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -1992,6 +1993,61 @@ static class UiCases
         // 3. Verify AdminManager.SetRunAsAdmin returns a boolean
         bool result = AdminManager.SetRunAsAdmin(false);
         Check.True(result || !result, "SetRunAsAdmin must return a valid boolean without uncaught exception");
+    }
+
+    private static void MenuOutsideClickDismissalAndOsdSpamResilience()
+    {
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            // 1. Menu outside-click dismissal
+            Check.True(window.popupAppMenu != null, "popupAppMenu must not be null");
+            window.popupAppMenu!.IsOpen = true;
+            Check.True(window.popupAppMenu.IsOpen, "Menu should be open");
+
+            // Click outside the menu button (e.g. on window body)
+            var mouseDevice = System.Windows.Input.Mouse.PrimaryDevice;
+            var outsideClick = new System.Windows.Input.MouseButtonEventArgs(
+                mouseDevice, 0, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = System.Windows.UIElement.PreviewMouseDownEvent
+            };
+            window.RaiseEvent(outsideClick);
+            Check.True(!window.popupAppMenu.IsOpen, "Menu should close on outside PreviewMouseDown");
+
+            // Re-open and verify Deactivated dismisses it
+            window.popupAppMenu.IsOpen = true;
+            Check.True(window.popupAppMenu.IsOpen, "Menu should be open again");
+            typeof(MainWindow).GetMethod("MainWindow_Deactivated", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .Invoke(window, new object?[] { null, EventArgs.Empty });
+            Check.True(!window.popupAppMenu.IsOpen, "Menu should close on Deactivated");
+
+            // 2. OSD rapid spamming resilience (does not disappear or zero opacity)
+            OsdWindow.ShowOsd(true, 1.0);
+            OsdWindow.ShowOsd(false, 1.0);
+            OsdWindow.ShowOsd(true, 1.0);
+
+            var instField = typeof(OsdWindow).GetField("_instance", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var inst = instField?.GetValue(null) as OsdWindow;
+            Check.True(inst != null, "OSD instance must be active");
+            Check.True(inst!.IsVisible, "OSD must remain visible when spammed");
+            Check.True(inst.Opacity > 0.5, "OSD opacity must remain active when spammed");
+
+            OsdWindow.HideOsd();
+            Check.Equal(0.0, inst.Opacity, "HideOsd should reset opacity to 0");
+
+            // 3. Tray animation does not allocate BitmapCache
+            window.PlayOpenFromTrayAnimation(new System.Drawing.Point(500, 500));
+            Check.True(window.rootBorder != null && window.rootBorder.CacheMode == null, "rootBorder must not use BitmapCache");
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 }
 

@@ -17,6 +17,7 @@ public partial class OsdWindow : Window
 {
     private static OsdWindow? _instance;
     private static CancellationTokenSource? _cts;
+    private static int _activeSequenceId;
 
     private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
     private const uint SWP_NOSIZE = 0x0001;
@@ -202,15 +203,25 @@ public partial class OsdWindow : Window
 
     public static void ShowOsd(bool isMuted, double durationSeconds)
     {
+        int sequenceId = Interlocked.Increment(ref _activeSequenceId);
+
         CancellationTokenSource? previousCts = _cts;
         _cts = new CancellationTokenSource();
-        previousCts?.Cancel();
-        previousCts?.Dispose();
+        try
+        {
+            previousCts?.Cancel();
+            previousCts?.Dispose();
+        }
+        catch { }
 
         if (_instance == null)
         {
             _instance = new OsdWindow();
         }
+
+        // Cancel any pending opacity animation and restore full visibility immediately
+        _instance.BeginAnimation(OpacityProperty, null);
+        _instance.Opacity = 0.95;
 
         _instance.ApplyTheme(SettingsManager.Load().LightMode);
         _instance.UpdateState(isMuted);
@@ -227,7 +238,7 @@ public partial class OsdWindow : Window
         double safeDuration = double.IsFinite(durationSeconds)
             ? Math.Clamp(durationSeconds, UiBehavior.MinimumOsdDuration, UiBehavior.MaximumOsdDuration)
             : UiBehavior.MinimumOsdDuration;
-        _ = _instance.BeginFadeSequenceAsync(safeDuration, _cts.Token);
+        _ = _instance.BeginFadeSequenceAsync(safeDuration, sequenceId, _cts.Token);
     }
 
     /// <summary>
@@ -238,6 +249,7 @@ public partial class OsdWindow : Window
     {
         try
         {
+            Interlocked.Increment(ref _activeSequenceId);
             if (_cts != null)
             {
                 _cts.Cancel();
@@ -393,9 +405,9 @@ public partial class OsdWindow : Window
     }
 
     private Task BeginFadeSequence(double durationSeconds, CancellationToken token) =>
-        BeginFadeSequenceAsync(durationSeconds, token);
+        BeginFadeSequenceAsync(durationSeconds, _activeSequenceId, token);
 
-    private async Task BeginFadeSequenceAsync(double durationSeconds, CancellationToken token)
+    private async Task BeginFadeSequenceAsync(double durationSeconds, int sequenceId, CancellationToken token)
     {
         try
         {
@@ -403,12 +415,26 @@ public partial class OsdWindow : Window
             SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 
             double startOpacity = Math.Clamp(this.Opacity, 0.0, 0.95);
-            DoubleAnimation fadeIn = new DoubleAnimation(startOpacity, 0.95, TimeSpan.FromSeconds(0.08));
-            BeginAnimation(OpacityProperty, fadeIn);
+            if (startOpacity < 0.95)
+            {
+                DoubleAnimation fadeIn = new DoubleAnimation(startOpacity, 0.95, TimeSpan.FromSeconds(0.06));
+                BeginAnimation(OpacityProperty, fadeIn);
+            }
+            else
+            {
+                this.Opacity = 0.95;
+            }
 
             DateTime endTime = DateTime.UtcNow.AddSeconds(durationSeconds);
             while (DateTime.UtcNow < endTime)
             {
+                if (token.IsCancellationRequested || sequenceId != _activeSequenceId)
+                {
+                    // A newer sequence has taken over or cancellation was requested.
+                    // Return without hiding or zeroing opacity so the newer sequence keeps the window displayed.
+                    return;
+                }
+
                 SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
                 TimeSpan remaining = endTime - DateTime.UtcNow;
                 if (remaining <= TimeSpan.Zero) break;
@@ -416,19 +442,18 @@ public partial class OsdWindow : Window
                 await Task.Delay(chunk, token);
             }
 
-            if (token.IsCancellationRequested)
+            if (token.IsCancellationRequested || sequenceId != _activeSequenceId)
             {
-                BeginAnimation(OpacityProperty, null);
-                this.Opacity = 0.0;
-                Hide();
                 return;
             }
 
             DoubleAnimation fadeOut = new DoubleAnimation(0.95, 0.0, TimeSpan.FromSeconds(0.20));
             fadeOut.Completed += delegate
             {
-                if (!token.IsCancellationRequested)
+                if (!token.IsCancellationRequested && sequenceId == _activeSequenceId)
                 {
+                    BeginAnimation(OpacityProperty, null);
+                    this.Opacity = 0.0;
                     Hide();
                 }
             };
@@ -436,9 +461,8 @@ public partial class OsdWindow : Window
         }
         catch (OperationCanceledException)
         {
-            BeginAnimation(OpacityProperty, null);
-            this.Opacity = 0.0;
-            Hide();
+            // Do not hide or zero opacity if cancelled because a newer sequence is active.
+            // If HideOsd was explicitly called, HideOsd handles hiding directly.
         }
         catch (Exception ex)
         {
