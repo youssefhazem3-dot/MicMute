@@ -1767,6 +1767,12 @@ static class UiCases
 
             // Execute PlayOpenFromTrayAnimation with a mock tray location - must not throw
             window.PlayOpenFromTrayAnimation(new System.Drawing.Point(100, 100));
+
+            // Verify clean smooth animation configuration matching minimize and restore (0.92 scale, Y=20.0 offset, X=0.0)
+            Check.Equal(0.0, window.rootTranslateTransform!.X, "rootTranslateTransform.X must start at 0.0");
+            Check.Equal(20.0, window.rootTranslateTransform.Y, "rootTranslateTransform.Y must start at 20.0 matching restore animation");
+            Check.Equal(0.92, window.rootScaleTransform!.ScaleX, "rootScaleTransform.ScaleX must start at 0.92 matching restore animation");
+            Check.Equal(0.92, window.rootScaleTransform.ScaleY, "rootScaleTransform.ScaleY must start at 0.92 matching restore animation");
         }
         finally
         {

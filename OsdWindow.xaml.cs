@@ -190,10 +190,36 @@ public partial class OsdWindow : Window
             if (_instance == null)
             {
                 _instance = new OsdWindow();
-                new WindowInteropHelper(_instance).EnsureHandle();
-                _instance.Opacity = 0;
+                IntPtr handle = new WindowInteropHelper(_instance).EnsureHandle();
+                _instance.ApplyTheme(SettingsManager.Load().LightMode);
+                _instance.UpdateState(false);
+
+                // Pre-measure and arrange elements so layout pass is already cached
+                _instance.pathActive.Visibility = Visibility.Visible;
+                _instance.pathMuted.Visibility = Visibility.Visible;
+                _instance.Measure(new Size(180, 180));
+                _instance.Arrange(new Rect(0, 0, 180, 180));
+                _instance.UpdateLayout();
+                _instance.UpdateState(false);
+
+                _instance.PositionOnActiveScreen(handle);
+
+                // Render transparently in background to compile D3D shaders, glyphs, and layered window surface
+                _instance.Opacity = 0.0;
                 _instance.Show();
-                _instance.Hide();
+
+                // Once loaded/rendered in background, hide window if no user trigger has occurred
+                _instance.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+                {
+                    try
+                    {
+                        if (_instance != null && _activeSequenceId == 0)
+                        {
+                            _instance.Hide();
+                        }
+                    }
+                    catch { }
+                }));
             }
         }
         catch
@@ -219,9 +245,19 @@ public partial class OsdWindow : Window
             _instance = new OsdWindow();
         }
 
-        // Cancel any pending opacity animation and restore full visibility immediately
+        bool wasVisible = _instance.Visibility == Visibility.Visible;
+
+        // Cancel any pending opacity animation
         _instance.BeginAnimation(OpacityProperty, null);
-        _instance.Opacity = 0.95;
+
+        if (!wasVisible)
+        {
+            _instance.Opacity = 0.0;
+        }
+        else
+        {
+            _instance.Opacity = 0.95;
+        }
 
         _instance.ApplyTheme(SettingsManager.Load().LightMode);
         _instance.UpdateState(isMuted);
@@ -320,11 +356,11 @@ public partial class OsdWindow : Window
             this.Left = target.Left / scaleX;
             this.Top = target.Top / scaleY;
 
-            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
         catch
         {
-            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
     }
 
@@ -417,7 +453,19 @@ public partial class OsdWindow : Window
             double startOpacity = Math.Clamp(this.Opacity, 0.0, 0.95);
             if (startOpacity < 0.95)
             {
-                DoubleAnimation fadeIn = new DoubleAnimation(startOpacity, 0.95, TimeSpan.FromSeconds(0.06));
+                var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+                DoubleAnimation fadeIn = new DoubleAnimation(startOpacity, 0.95, TimeSpan.FromSeconds(0.08))
+                {
+                    EasingFunction = ease
+                };
+                fadeIn.Completed += (s, ev) =>
+                {
+                    if (sequenceId == _activeSequenceId)
+                    {
+                        BeginAnimation(OpacityProperty, null);
+                        this.Opacity = 0.95;
+                    }
+                };
                 BeginAnimation(OpacityProperty, fadeIn);
             }
             else

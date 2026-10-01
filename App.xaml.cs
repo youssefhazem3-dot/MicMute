@@ -669,6 +669,39 @@ public partial class App : System.Windows.Application
         contextMenuStrip.Items.Add(value3);
         _notifyIcon.ContextMenuStrip = contextMenuStrip;
         UpdateTrayIcon(_audioController?.IsMuted ?? false);
+
+        WarmUpContextMenu(contextMenuStrip);
+    }
+
+    private static void WarmUpContextMenu(LiquidGlassContextMenu menu)
+    {
+        try
+        {
+            // Force Win32 HWND creation, triggering OnHandleCreated and ApplyWindowRounding (DwmSetWindowAttribute)
+            _ = menu.Handle;
+
+            // Perform layout calculation
+            menu.PerformLayout();
+
+            // Pre-execute a dummy render pass to JIT compile all renderer methods and initialize GDI/GDI+ caches
+            using Bitmap dummyBmp = new Bitmap(164, 98);
+            using Graphics g = Graphics.FromImage(dummyBmp);
+            Rectangle bounds = new Rectangle(0, 0, 164, 98);
+
+            ToolStripRenderEventArgs bgArgs = new ToolStripRenderEventArgs(g, menu, bounds, Color.Empty);
+            menu.Renderer.DrawToolStripBackground(bgArgs);
+            menu.Renderer.DrawToolStripBorder(bgArgs);
+
+            foreach (ToolStripItem item in menu.Items)
+            {
+                ToolStripItemRenderEventArgs itemArgs = new ToolStripItemRenderEventArgs(g, item);
+                menu.Renderer.DrawMenuItemBackground(itemArgs);
+                ToolStripItemTextRenderEventArgs textArgs = new ToolStripItemTextRenderEventArgs(
+                    g, item, item.Text, item.Bounds, Color.White, item.Font, TextFormatFlags.Default);
+                menu.Renderer.DrawItemText(textArgs);
+            }
+        }
+        catch { }
     }
 
     private void UpdateTrayIcon(bool isMuted)
