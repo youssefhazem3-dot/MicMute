@@ -2556,7 +2556,12 @@ public partial class MainWindow : Window
         catch { }
 
         base.OnClosed(e);
-        _hotkeyManager?.Dispose();
+        if (_hotkeyManager != null)
+        {
+            _hotkeyManager.HotkeyPressed -= HotkeyManager_HotkeyPressed;
+            _hotkeyManager.Dispose();
+            _hotkeyManager = null;
+        }
         try
         {
             if (_hIconSmall != IntPtr.Zero)

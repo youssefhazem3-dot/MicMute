@@ -973,8 +973,12 @@ public partial class App : System.Windows.Application
 
         try
         {
-            _audioController?.Dispose();
-            _audioController = null;
+            if (_audioController != null)
+            {
+                _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
+                _audioController.Dispose();
+                _audioController = null;
+            }
         }
         catch { }
 
@@ -1027,8 +1031,12 @@ public partial class App : System.Windows.Application
 
         try
         {
-            _audioController?.Dispose();
-            _audioController = null;
+            if (_audioController != null)
+            {
+                _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
+                _audioController.Dispose();
+                _audioController = null;
+            }
         }
         catch { }
         try
