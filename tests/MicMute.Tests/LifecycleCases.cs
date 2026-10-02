@@ -7,6 +7,13 @@ internal static class LifecycleCases
     public static void Run(Action<string, Action> test)
     {
         test(nameof(OccupiedInstanceDoesNotTakeOwnershipOrTerminateOwner), OccupiedInstanceDoesNotTakeOwnershipOrTerminateOwner);
+        test(nameof(TaskbarCreatedMessageIsRegistered), TaskbarCreatedMessageIsRegistered);
+    }
+
+    private static void TaskbarCreatedMessageIsRegistered()
+    {
+        Check.True(MainWindow.WM_TASKBARCREATED > 0, "WM_TASKBARCREATED must be registered with Windows");
+        Check.True(MainWindow.WM_TASKBARCREATED != MainWindow.WM_SHOWME, "WM_TASKBARCREATED must be unique from WM_SHOWME");
     }
 
     private static void OccupiedInstanceDoesNotTakeOwnershipOrTerminateOwner()

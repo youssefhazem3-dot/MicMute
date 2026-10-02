@@ -69,6 +69,14 @@ public partial class App : System.Windows.Application
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         private const int DWMWCP_ROUND = 2;
 
+        private bool _isLightMode;
+        public bool IsLightMode => _isLightMode;
+
+        public void RefreshTheme()
+        {
+            try { _isLightMode = SettingsManager.Load().LightMode; } catch { }
+        }
+
         public LiquidGlassContextMenu()
         {
             DoubleBuffered = true;
@@ -77,6 +85,7 @@ public partial class App : System.Windows.Application
             CanOverflow = false;
             Padding = new Padding(4, 4, 4, 4);
             DropShadowEnabled = true;
+            RefreshTheme();
         }
 
         public override System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
@@ -96,6 +105,12 @@ public partial class App : System.Windows.Application
             }
         }
 
+        protected override void OnOpening(CancelEventArgs e)
+        {
+            RefreshTheme();
+            base.OnOpening(e);
+        }
+
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
@@ -107,6 +122,7 @@ public partial class App : System.Windows.Application
             base.OnVisibleChanged(e);
             if (Visible)
             {
+                RefreshTheme();
                 ApplyWindowRounding();
             }
         }
@@ -127,8 +143,11 @@ public partial class App : System.Windows.Application
 
     internal class LiquidGlassMenuRenderer : ToolStripProfessionalRenderer
     {
-        public LiquidGlassMenuRenderer()
-            : base(new LiquidGlassColorTable())
+        private static bool GetLightMode(ToolStrip? toolStrip) =>
+            (toolStrip as LiquidGlassContextMenu)?.IsLightMode ?? SettingsManager.Load().LightMode;
+
+        public LiquidGlassMenuRenderer(LiquidGlassContextMenu? menu = null)
+            : base(new LiquidGlassColorTable(() => menu?.IsLightMode ?? SettingsManager.Load().LightMode))
         {
             RoundedEdges = true;
         }
@@ -136,7 +155,7 @@ public partial class App : System.Windows.Application
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
         {
             if (e.ToolStrip == null) return;
-            bool lightMode = SettingsManager.Load().LightMode;
+            bool lightMode = GetLightMode(e.ToolStrip);
             // Black in Dark Mode, White in Light Mode
             Color bgColor = lightMode ? Color.FromArgb(255, 255, 255) : Color.FromArgb(18, 18, 20);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -152,7 +171,7 @@ public partial class App : System.Windows.Application
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
         {
             if (e.ToolStrip == null) return;
-            bool lightMode = SettingsManager.Load().LightMode;
+            bool lightMode = GetLightMode(e.ToolStrip);
             // Gray border in Light Mode, subtle white in Dark Mode
             Color borderColor = lightMode ? Color.FromArgb(218, 220, 224) : Color.FromArgb(45, 255, 255, 255);
             using Pen pen = new Pen(borderColor, 1f);
@@ -171,7 +190,7 @@ public partial class App : System.Windows.Application
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                bool lightMode = SettingsManager.Load().LightMode;
+                bool lightMode = GetLightMode(e.ToolStrip);
                 Color hoverColor = lightMode ? Color.FromArgb(20, 0, 0, 0) : Color.FromArgb(32, 255, 255, 255);
                 using SolidBrush brush = new SolidBrush(hoverColor);
 
@@ -192,7 +211,7 @@ public partial class App : System.Windows.Application
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
             if (e.Item == null) return;
-            bool lightMode = SettingsManager.Load().LightMode;
+            bool lightMode = GetLightMode(e.ToolStrip);
             // White in Dark Mode, dark gray in Light Mode
             Color textColor = lightMode ? Color.FromArgb(55, 65, 81) : Color.FromArgb(255, 255, 255);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -290,7 +309,14 @@ public partial class App : System.Windows.Application
 
     private class LiquidGlassColorTable : ProfessionalColorTable
     {
-        private bool IsLight => SettingsManager.Load().LightMode;
+        private readonly Func<bool> _getIsLight;
+
+        public LiquidGlassColorTable(Func<bool>? getIsLight = null)
+        {
+            _getIsLight = getIsLight ?? (() => SettingsManager.Load().LightMode);
+        }
+
+        private bool IsLight => _getIsLight();
 
         private Color BgWindow => IsLight ? Color.FromArgb(255, 255, 255) : Color.FromArgb(18, 18, 20);
         private Color Border => IsLight ? Color.FromArgb(218, 220, 224) : Color.FromArgb(45, 255, 255, 255);
@@ -308,6 +334,7 @@ public partial class App : System.Windows.Application
         public override Color ImageMarginGradientMiddle => BgWindow;
     }
 
+    private static bool _frameRateMetadataOverridden;
     private static AppInstanceMutex? _mutex;
     private const string MutexName = "Global\\MicMuteAppMutex_7FA5D9E0-9E11-40EA-B368-C8E649F56A49";
     private NotifyIcon? _notifyIcon;
@@ -361,7 +388,7 @@ public partial class App : System.Windows.Application
             DiagnosticLogger.LogError("WinForms ThreadException", ev.Exception);
             try
             {
-                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MicMute");
+                string p = SettingsManager.GetDataFolderPath();
                 Directory.CreateDirectory(p);
                 File.WriteAllText(Path.Combine(p, "winforms_error.txt"), ev.Exception?.ToString() ?? "Unknown WinForms exception");
             }
@@ -372,7 +399,7 @@ public partial class App : System.Windows.Application
         {
             try
             {
-                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MicMute");
+                string p = SettingsManager.GetDataFolderPath();
                 Directory.CreateDirectory(p);
                 File.WriteAllText(Path.Combine(p, "crash_log.txt"), ev.ExceptionObject?.ToString() ?? "Unknown exception");
             }
@@ -389,7 +416,7 @@ public partial class App : System.Windows.Application
         {
             try
             {
-                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MicMute");
+                string p = SettingsManager.GetDataFolderPath();
                 Directory.CreateDirectory(p);
                 File.WriteAllText(Path.Combine(p, "crash_log.txt"), ex.ToString());
             }
@@ -546,10 +573,14 @@ public partial class App : System.Windows.Application
             {
                 refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 120);
             }
-            Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(Timeline), new FrameworkPropertyMetadata(refreshRate));
-            if (DiagnosticLogger.IsEnabled)
+            if (!_frameRateMetadataOverridden)
             {
-                DiagnosticLogger.LogInfo($"Display refresh rate set to: {refreshRate} FPS");
+                Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(Timeline), new FrameworkPropertyMetadata(refreshRate));
+                _frameRateMetadataOverridden = true;
+                if (DiagnosticLogger.IsEnabled)
+                {
+                    DiagnosticLogger.LogInfo($"Display refresh rate set to: {refreshRate} FPS");
+                }
             }
         }
         catch
@@ -614,7 +645,7 @@ public partial class App : System.Windows.Application
             ShowWindow();
         };
         LiquidGlassContextMenu contextMenuStrip = new LiquidGlassContextMenu();
-        contextMenuStrip.Renderer = new LiquidGlassMenuRenderer();
+        contextMenuStrip.Renderer = new LiquidGlassMenuRenderer(contextMenuStrip);
         try
         {
             contextMenuStrip.Font = new Font("Segoe UI Variable Text", 9f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
@@ -844,6 +875,27 @@ public partial class App : System.Windows.Application
     public void UpdateTrayIconState()
     {
         UpdateTrayIcon(_audioController?.IsMuted ?? false);
+    }
+
+    public void RecreateTrayIcon()
+    {
+        try
+        {
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Visible = true;
+                UpdateTrayIcon(_audioController?.IsMuted ?? false);
+            }
+            else
+            {
+                InitializeTrayIcon();
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("Failed to recreate tray icon after explorer restart", ex);
+        }
     }
 
     private static GraphicsPath CreateRoundedRectanglePath(RectangleF rect, float radius)

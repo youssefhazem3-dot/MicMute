@@ -142,6 +142,7 @@ public partial class MainWindow : Window
     private static extern int RegisterWindowMessage(string lpString);
 
     public static readonly int WM_SHOWME = RegisterWindowMessage("MICMUTE_SHOW_WINDOW_MSG_7FA5D9E0");
+    public static readonly int WM_TASKBARCREATED = RegisterWindowMessage("TaskbarCreated");
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -622,6 +623,8 @@ public partial class MainWindow : Window
         {
             ChangeWindowMessageFilter((uint)WM_SHOWME, 1);
             ChangeWindowMessageFilterEx(hwnd, (uint)WM_SHOWME, 1, IntPtr.Zero);
+            ChangeWindowMessageFilter((uint)WM_TASKBARCREATED, 1);
+            ChangeWindowMessageFilterEx(hwnd, (uint)WM_TASKBARCREATED, 1, IntPtr.Zero);
         }
         catch { }
 
@@ -791,6 +794,8 @@ public partial class MainWindow : Window
         {
             bool wasHiddenOrMin = !this.IsVisible || this.WindowState == WindowState.Minimized;
             this.WindowState = WindowState.Normal;
+            this.Visibility = Visibility.Visible;
+            ShowWindow(hwnd, 9); // SW_RESTORE
             CenterOnScreen();
             this.Show();
             this.Activate();
@@ -800,6 +805,11 @@ public partial class MainWindow : Window
             {
                 PlayOpenFromTrayAnimation();
             }
+            handled = true;
+        }
+        else if (msg == WM_TASKBARCREATED)
+        {
+            (System.Windows.Application.Current as App)?.RecreateTrayIcon();
             handled = true;
         }
         else if (msg == WM_SETTINGCHANGE || msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED || msg == WM_EXITSIZEMOVE)

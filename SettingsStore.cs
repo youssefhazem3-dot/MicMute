@@ -118,10 +118,20 @@ public sealed class SettingsStore : IDisposable
             ThrowIfDisposed();
             string settingsFile = GetSettingsFilePathNoLock();
             AppSettings defaults = new();
-            AtomicWrite(settingsFile, SettingsCodec.Serialize(defaults));
+            try
+            {
+                AtomicWrite(settingsFile, SettingsCodec.Serialize(defaults));
+                _pendingSave = null;
+                _lastSaveFailure = null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                Exception failure = ToIOException("Could not reset settings.", ex);
+                _lastSaveFailure = failure;
+                _pendingSave = new PendingSave(settingsFile, defaults);
+                _saveTimer.Change(SaveDelayMilliseconds, Timeout.Infinite);
+            }
             _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            _pendingSave = null;
-            _lastSaveFailure = null;
             _cachedSettings = defaults;
         }
     }
@@ -283,7 +293,19 @@ public sealed class SettingsStore : IDisposable
         try
         {
             File.WriteAllText(temporary, contents, Utf8NoBom);
-            File.Move(temporary, path, overwrite: true);
+            const int maxRetries = 3;
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    File.Move(temporary, path, overwrite: true);
+                    break;
+                }
+                catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException) && attempt < maxRetries - 1)
+                {
+                    Thread.Sleep(30);
+                }
+            }
         }
         finally
         {
