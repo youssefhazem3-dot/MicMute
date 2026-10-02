@@ -877,27 +877,6 @@ public partial class App : System.Windows.Application
         UpdateTrayIcon(_audioController?.IsMuted ?? false);
     }
 
-    public void RecreateTrayIcon()
-    {
-        try
-        {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.Visible = false;
-                _notifyIcon.Visible = true;
-                UpdateTrayIcon(_audioController?.IsMuted ?? false);
-            }
-            else
-            {
-                InitializeTrayIcon();
-            }
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLogger.LogError("Failed to recreate tray icon after explorer restart", ex);
-        }
-    }
-
     private static GraphicsPath CreateRoundedRectanglePath(RectangleF rect, float radius)
     {
         GraphicsPath path = new GraphicsPath();

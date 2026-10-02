@@ -14,7 +14,6 @@ public class AudioController : IMMNotificationClient, IDisposable
     private MMDeviceEnumerator? _enumerator;
     private readonly AudioMuteState _muteState = new();
     private MMDevice? _currentDevice;
-    private AudioEndpointVolume? _currentVolume;
     private AudioEndpointVolumeNotificationDelegate? _volumeHandler;
     private string _targetDeviceId = string.Empty;
     private string _currentId = string.Empty;
@@ -127,17 +126,17 @@ public class AudioController : IMMNotificationClient, IDisposable
         }
         if (candidate == null)
         {
+            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; }
+            catch { candidate = null; }
+        }
+        if (candidate == null)
+        {
             try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); fallback = true; }
             catch { candidate = null; }
         }
         if (candidate == null)
         {
             try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; }
-            catch { candidate = null; }
-        }
-        if (candidate == null)
-        {
-            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; }
             catch { candidate = null; }
         }
 
@@ -178,9 +177,8 @@ public class AudioController : IMMNotificationClient, IDisposable
             Volatile.Write(ref _currentName, candidate.FriendlyName);
             MMDevice expected = candidate;
             _volumeHandler = data => OnVolumeNotification(expected, data.Muted);
-            _currentVolume = candidate.AudioEndpointVolume;
-            _currentVolume.OnVolumeNotification += _volumeHandler;
-            bool muted = _currentVolume.Mute;
+            candidate.AudioEndpointVolume.OnVolumeNotification += _volumeHandler;
+            bool muted = candidate.AudioEndpointVolume.Mute;
             _muteState.RecordLocalChange(muted);
             Volatile.Write(ref _cachedMuteState, muted ? 1 : 0);
             MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, false));
@@ -221,20 +219,15 @@ public class AudioController : IMMNotificationClient, IDisposable
     private void DetachCurrentDevice()
     {
         MMDevice? previous = _currentDevice;
-        AudioEndpointVolume? previousVolume = _currentVolume;
         AudioEndpointVolumeNotificationDelegate? handler = _volumeHandler;
         _currentDevice = null;
-        _currentVolume = null;
         _volumeHandler = null;
         Volatile.Write(ref _currentId, string.Empty);
         Volatile.Write(ref _currentName, "No Device");
         Volatile.Write(ref _cachedMuteState, -1);
         _muteState.Reset();
-        if (previousVolume != null && handler != null)
-        {
-            try { previousVolume.OnVolumeNotification -= handler; } catch { }
-        }
         if (previous == null) return;
+        try { if (handler != null) previous.AudioEndpointVolume.OnVolumeNotification -= handler; } catch { }
         try { previous.Dispose(); } catch { }
     }
 

@@ -807,11 +807,6 @@ public partial class MainWindow : Window
             }
             handled = true;
         }
-        else if (msg == WM_TASKBARCREATED)
-        {
-            (System.Windows.Application.Current as App)?.RecreateTrayIcon();
-            handled = true;
-        }
         else if (msg == WM_SETTINGCHANGE || msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED || msg == WM_EXITSIZEMOVE)
         {
             ApplyAdaptiveScreenConstraints(isInitialPlacement: false);
