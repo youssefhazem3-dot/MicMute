@@ -73,6 +73,7 @@ internal sealed class HotkeyState
         lock (_sync)
         {
             if (_vk == 0 || vk != _vk || unchecked((int)(timestamp - _lastEventTime)) < 0) return false;
+            int timeSinceEvent = unchecked((int)(timestamp - _lastEventTime));
             if (!isDown)
             {
                 _pollNeedsRelease = false;
@@ -80,7 +81,6 @@ internal sealed class HotkeyState
                 // initial stale-up snapshot cannot release a native-owned press.
                 // But once the key is confirmed down OR sufficient time has elapsed
                 // (past any initial stale snapshot), an up sample must clear the hold.
-                int timeSinceEvent = unchecked((int)(timestamp - _lastEventTime));
                 if (_held && (_pollConfirmedDown || timeSinceEvent >= 40))
                 {
                     _held = false;
@@ -97,7 +97,8 @@ internal sealed class HotkeyState
             }
             // The opposite race exists after a native keyup: wait for an actual up sample
             // before accepting another poll-only press. Native presses still work immediately.
-            if (_pollNeedsRelease) return false;
+            if (_pollNeedsRelease && timeSinceEvent < 40) return false;
+            _pollNeedsRelease = false;
             _held = _pollConfirmedDown = true;
             _lastEventTime = timestamp;
             _lastSource = null;

@@ -24,7 +24,7 @@ internal static class RawKeyboardPacket
         int key = unchecked((ushort)Marshal.ReadInt16(buffer, headerSize + 6));
         int message = Marshal.ReadInt32(buffer, headerSize + 8);
         bool down = (flags & 1) == 0;
-        if (key == 0 || key >= 255 || (down ? message != 0x100 && message != 0x104 : message != 0x101 && message != 0x105))
+        if (key == 0 || key >= 255 || (down ? (message != 0 && message != 0x100 && message != 0x104) : (message != 0 && message != 0x101 && message != 0x105)))
             return false;
         // Raw keyboard packets use generic modifier VKeys; normalize them to hook VKeys.
         if (key == 0x10) key = Marshal.ReadInt16(buffer, headerSize) == 0x36 ? 0xA1 : 0xA0;

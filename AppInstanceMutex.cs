@@ -25,6 +25,7 @@ internal sealed class AppInstanceMutex : IDisposable
         if (mutex == null) return;
         _mutex = null;
         try { mutex.ReleaseMutex(); }
+        catch (ApplicationException ex) { DiagnosticLogger.LogError("AppInstanceMutex release failed", ex); }
         finally { mutex.Dispose(); }
     }
 }

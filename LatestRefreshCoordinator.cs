@@ -52,7 +52,7 @@ internal sealed class LatestRefreshCoordinator<T> : IDisposable
         {
             await _dispatcher.InvokeAsync(() => Complete(version, attempt, result, failure));
         }
-        catch (InvalidOperationException) { }
+        catch (Exception ex) when (ex is InvalidOperationException or OperationCanceledException) { }
     }
 
     private void Complete(long version, int attempt, T? result, Exception? failure)
@@ -86,7 +86,7 @@ internal sealed class LatestRefreshCoordinator<T> : IDisposable
                 _ = LoadAsync(_requestedVersion, version == _requestedVersion ? 1 : 0);
             });
         }
-        catch (InvalidOperationException) { }
+        catch (Exception ex) when (ex is InvalidOperationException or OperationCanceledException) { }
     }
 
     public void Dispose()

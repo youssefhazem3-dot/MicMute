@@ -83,19 +83,31 @@ public class HotkeyManager : IDisposable
         _hwndSource = HwndSource.FromHwnd(hWnd) ?? throw new ArgumentException("A live window handle is required.", nameof(hWnd));
         _proc = HookCallback;
         _rawInputBuffer = Marshal.AllocHGlobal(128);
-        _hookModifiers.Reset(IsKeyDown);
-        _rawModifiers.Reset(IsKeyDown);
-        _hwndSource.AddHook(HwndHook);
         try
         {
-            ChangeWindowMessageFilterEx(hWnd, WM_INPUT, MSGFLT_ALLOW, IntPtr.Zero);
+            _hookModifiers.Reset(IsKeyDown);
+            _rawModifiers.Reset(IsKeyDown);
+            _hwndSource.AddHook(HwndHook);
+            try
+            {
+                ChangeWindowMessageFilterEx(hWnd, WM_INPUT, MSGFLT_ALLOW, IntPtr.Zero);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError("ChangeWindowMessageFilterEx failed", ex);
+            }
+            RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_INPUTSINK, hwndTarget = hWnd } },
+                1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
+            InstallHook();
+            _pollingThread = new Thread(PollLoop) { IsBackground = true, Priority = ThreadPriority.Normal, Name = "MicMute_InputPoller" };
+            _pollingThread.Start();
         }
-        catch { }
-        RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_INPUTSINK, hwndTarget = hWnd } },
-            1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
-        InstallHook();
-        _pollingThread = new Thread(PollLoop) { IsBackground = true, Priority = ThreadPriority.Normal, Name = "MicMute_InputPoller" };
-        _pollingThread.Start();
+        catch
+        {
+            Marshal.FreeHGlobal(_rawInputBuffer);
+            _rawInputBuffer = IntPtr.Zero;
+            throw;
+        }
     }
 
     public bool Register(Key key, ModifierKeys modifiers)
@@ -114,7 +126,7 @@ public class HotkeyManager : IDisposable
         _rawModifiers.Reset(IsKeyDown);
         _state.Register(vk, modifiers, IsKeyDown(vk), TickNow);
         Volatile.Write(ref _currentVk, vk);
-        InstallHook();
+        RefreshHook();
         _pollWake.Set();
         return true;
     }
@@ -124,6 +136,19 @@ public class HotkeyManager : IDisposable
         Interlocked.Increment(ref _bindingVersion);
         _state.Unregister();
         Volatile.Write(ref _currentVk, 0);
+        _currentKey = Key.None;
+        _currentModifiers = ModifierKeys.None;
+    }
+
+    public void RefreshHook()
+    {
+        if (_disposed) return;
+        if (_hookId != IntPtr.Zero)
+        {
+            try { UnhookWindowsHookEx(_hookId); } catch { }
+            _hookId = IntPtr.Zero;
+        }
+        InstallHook();
     }
 
     private static uint TickNow => unchecked((uint)Environment.TickCount);
@@ -137,14 +162,44 @@ public class HotkeyManager : IDisposable
 
     private void PollLoop()
     {
+        long lastPeriodicRefresh = Environment.TickCount64;
         while (!_disposed)
         {
-            int vk = Volatile.Read(ref _currentVk);
-            int version = Volatile.Read(ref _bindingVersion);
-            if (vk != 0 && _state.Poll(vk, IsKeyDown(vk), PhysicalModifiers(), TickNow))
-                QueueActivation(version);
-            _pollWake.WaitOne(vk == 0 ? Timeout.Infinite : 16);
+            try
+            {
+                int vk = Volatile.Read(ref _currentVk);
+                int version = Volatile.Read(ref _bindingVersion);
+                if (vk != 0 && _state.Poll(vk, IsKeyDown(vk), PhysicalModifiers(), TickNow))
+                {
+                    QueueActivation(version);
+                    // Physical poller caught an activation that low-level hook missed.
+                    // The hook may have timed out or been dropped by Windows; self-heal.
+                    ScheduleHookRefresh();
+                }
+                long now = Environment.TickCount64;
+                if (now - lastPeriodicRefresh > 30000)
+                {
+                    lastPeriodicRefresh = now;
+                    ScheduleHookRefresh();
+                }
+                _pollWake.WaitOne(vk == 0 ? Timeout.Infinite : 16);
+            }
+            catch (ObjectDisposedException)
+            {
+                break;
+            }
         }
+    }
+
+    private void ScheduleHookRefresh()
+    {
+        HwndSource? source = _hwndSource;
+        if (_disposed || source == null || source.Dispatcher.HasShutdownStarted) return;
+        try
+        {
+            source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(RefreshHook));
+        }
+        catch (InvalidOperationException) { }
     }
 
     private void QueueActivation(int version)

@@ -12,6 +12,7 @@ internal static class AudioCases
         test(nameof(AudioWorkRunsSeriallyOnStaWithoutBlockingCaller), AudioWorkRunsSeriallyOnStaWithoutBlockingCaller);
         test(nameof(AudioWorkerDisposalDoesNotWaitForStalledDriverWork), AudioWorkerDisposalDoesNotWaitForStalledDriverWork);
         test(nameof(OldNotificationCannotReplaceNewerMuteState), OldNotificationCannotReplaceNewerMuteState);
+        test(nameof(ToggleMuteHandlesUninitializedOrStaleDeviceWithoutCrashing), ToggleMuteHandlesUninitializedOrStaleDeviceWithoutCrashing);
     }
 
     private static void AudioWorkRunsSeriallyOnStaWithoutBlockingCaller()
@@ -82,6 +83,15 @@ internal static class AudioCases
             release.Set();
             disposal.Wait(TimeSpan.FromSeconds(5));
             worker.Dispose();
+        }
+    }
+
+    private static void ToggleMuteHandlesUninitializedOrStaleDeviceWithoutCrashing()
+    {
+        using var controller = new AudioController();
+        for (int i = 0; i < 5; i++)
+        {
+            controller.ToggleMute();
         }
     }
 }

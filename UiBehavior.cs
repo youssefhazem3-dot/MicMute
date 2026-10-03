@@ -10,8 +10,6 @@ public readonly record struct PixelSize(int Width, int Height);
 
 public readonly record struct PixelRect(int Left, int Top, int Width, int Height);
 
-public readonly record struct DipSize(double Width, double Height);
-
 public readonly record struct DipRect(double Left, double Top, double Width, double Height);
 
 public static class UiBehavior

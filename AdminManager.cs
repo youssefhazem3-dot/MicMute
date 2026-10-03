@@ -26,14 +26,7 @@ public static class AdminManager
 
     public static string GetExecutablePath()
     {
-        try
-        {
-            return Process.GetCurrentProcess().MainModule?.FileName ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MicMute.exe");
-        }
-        catch
-        {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MicMute.exe");
-        }
+        return Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MicMute.exe");
     }
 
     public static bool IsRunAsAdminConfigured()
@@ -51,8 +44,9 @@ public static class AdminManager
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            DiagnosticLogger.LogError("IsRunAsAdminConfigured failed", ex);
         }
         return false;
     }
@@ -81,8 +75,9 @@ public static class AdminManager
                 return true;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            DiagnosticLogger.LogError("SetRunAsAdmin failed", ex);
         }
         return false;
     }
@@ -103,11 +98,12 @@ public static class AdminManager
 
             using Process? replacement = Process.Start(startInfo);
             if (replacement == null) return false;
-            System.Windows.Application.Current.Shutdown();
+            System.Windows.Application.Current?.Shutdown();
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            DiagnosticLogger.LogError("RestartAsAdmin failed", ex);
             return false;
         }
     }

@@ -163,6 +163,15 @@ static class HotkeyCases
             // Verify hold was released and next press works immediately:
             Check.True(state.Observe(HotkeySource.Hook, V, true, ModifierKeys.None, 160), "recovered hold allows next press");
         });
+        test("hotkeys: physical poll recovers after native up even without intermediate up sample", () =>
+        {
+            var state = Bound();
+            Check.True(state.Observe(HotkeySource.Hook, V, true, ModifierKeys.None, 10), "first hook down");
+            state.Observe(HotkeySource.Hook, V, false, ModifierKeys.None, 20);
+            // Poller was busy and never saw up sample at 20-39ms.
+            // Key is pressed down again at 70ms and only polled:
+            Check.True(state.Poll(V, true, ModifierKeys.None, 70), "poll activates after release window expires");
+        });
     }
 
     private static HotkeyState Bound(ModifierKeys modifiers = ModifierKeys.None)
@@ -230,6 +239,9 @@ static class HotkeyCases
             Marshal.WriteInt16(memory, header + 2, 1);
             Marshal.WriteInt32(memory, header + 8, 0x101);
             Check.True(RawKeyboardPacket.TryRead(memory, packetSize, 128, 128, out _, out down) && !down, "valid release");
+            Marshal.WriteInt16(memory, header + 2, 0);
+            Marshal.WriteInt32(memory, header + 8, 0);
+            Check.True(RawKeyboardPacket.TryRead(memory, packetSize, 128, 128, out _, out down) && down, "message 0 accepted");
             Marshal.WriteInt32(memory, 0, 0);
             Check.True(!RawKeyboardPacket.TryRead(memory, packetSize, 128, 128, out _, out _), "mouse rejected");
         }

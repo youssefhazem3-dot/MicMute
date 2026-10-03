@@ -52,7 +52,7 @@ public partial class App : System.Windows.Application
         public int dmPanningHeight;
     }
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern bool EnumDisplaySettings(string? deviceName, int modeNum, ref DEVMODE devMode);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -365,22 +365,6 @@ public partial class App : System.Windows.Application
                 return;
             }
         }
-        AppDomain.CurrentDomain.AssemblyResolve += (sender, resolveArgs) =>
-        {
-            string? simpleName = new System.Reflection.AssemblyName(resolveArgs.Name).Name;
-            if (string.IsNullOrEmpty(simpleName)) return null;
-            string resourceName = simpleName + ".dll";
-            using (Stream? stream = typeof(App).Assembly.GetManifestResourceStream(resourceName))
-            {
-                if (stream != null)
-                {
-                    using MemoryStream ms = new MemoryStream();
-                    stream.CopyTo(ms);
-                    return System.Reflection.Assembly.Load(ms.ToArray());
-                }
-            }
-            return null;
-        };
 
         System.Windows.Forms.Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         System.Windows.Forms.Application.ThreadException += (s, ev) =>
@@ -424,6 +408,10 @@ public partial class App : System.Windows.Application
         }
     }
 
+    /// <summary>
+    /// Explicit implementation required when EnableDefaultApplicationDefinition is disabled.
+    /// Application resources are configured programmatically or loaded on demand.
+    /// </summary>
     public void InitializeComponent()
     {
     }
@@ -470,39 +458,45 @@ public partial class App : System.Windows.Application
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+    // WinForms NotifyIcon encapsulates the underlying HWND and icon uID in private fields.
+    // We inspect them via reflection to query exact shell coordinates via Shell_NotifyIconGetRect.
+    // If reflection fails or internal structures change across runtime updates, the method falls back to TrayNotifyWnd bounds below.
+    private static readonly System.Reflection.FieldInfo? NotifyIconIdField =
+        typeof(NotifyIcon).GetField("id", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+    private static readonly System.Reflection.FieldInfo? NotifyIconWindowField =
+        typeof(NotifyIcon).GetField("window", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
     internal System.Drawing.Point? GetTrayIconScreenPosition()
     {
         try
         {
-            if (_notifyIcon != null)
+            if (_notifyIcon != null && NotifyIconIdField != null && NotifyIconWindowField != null)
             {
-                var idField = typeof(NotifyIcon).GetField("id", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var windowField = typeof(NotifyIcon).GetField("window", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (idField != null && windowField != null)
+                int id = (int)NotifyIconIdField.GetValue(_notifyIcon)!;
+                NativeWindow? win = NotifyIconWindowField.GetValue(_notifyIcon) as NativeWindow;
+                if (win != null && win.Handle != IntPtr.Zero)
                 {
-                    int id = (int)idField.GetValue(_notifyIcon)!;
-                    NativeWindow win = (NativeWindow)windowField.GetValue(_notifyIcon)!;
-                    if (win != null && win.Handle != IntPtr.Zero)
+                    NOTIFYICONIDENTIFIER nid = new NOTIFYICONIDENTIFIER
                     {
-                        NOTIFYICONIDENTIFIER nid = new NOTIFYICONIDENTIFIER
-                        {
-                            cbSize = (uint)Marshal.SizeOf<NOTIFYICONIDENTIFIER>(),
-                            hWnd = win.Handle,
-                            uID = (uint)id,
-                            guidItem = Guid.Empty
-                        };
-                        if (Shell_NotifyIconGetRect(ref nid, out RECT rect) == 0 && (rect.Right > rect.Left) && (rect.Bottom > rect.Top))
-                        {
-                            return new System.Drawing.Point(
-                                rect.Left + (rect.Right - rect.Left) / 2,
-                                rect.Top + (rect.Bottom - rect.Top) / 2
-                            );
-                        }
+                        cbSize = (uint)Marshal.SizeOf<NOTIFYICONIDENTIFIER>(),
+                        hWnd = win.Handle,
+                        uID = (uint)id,
+                        guidItem = Guid.Empty
+                    };
+                    if (Shell_NotifyIconGetRect(ref nid, out RECT rect) == 0 && (rect.Right > rect.Left) && (rect.Bottom > rect.Top))
+                    {
+                        return new System.Drawing.Point(
+                            rect.Left + (rect.Right - rect.Left) / 2,
+                            rect.Top + (rect.Bottom - rect.Top) / 2
+                        );
                     }
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("GetTrayIconScreenPosition failed", ex);
+        }
 
         try
         {
@@ -571,7 +565,7 @@ public partial class App : System.Windows.Application
             devMode.dmSize = (short)Marshal.SizeOf(devMode);
             if (EnumDisplaySettings(null, -1, ref devMode) && devMode.dmDisplayFrequency > 30)
             {
-                refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 120);
+                refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 360);
             }
             if (!_frameRateMetadataOverridden)
             {
@@ -898,8 +892,11 @@ public partial class App : System.Windows.Application
         _mainWindow?.Hide();
     }
 
-    private void ExitApp()
+    private void Teardown()
     {
+        try { SettingsManager.Flush(); }
+        catch (Exception ex) { DiagnosticLogger.LogError("SettingsManager.Flush failed during teardown", ex); }
+
         try
         {
             if (_notifyIcon != null)
@@ -910,7 +907,7 @@ public partial class App : System.Windows.Application
                 _notifyIcon = null;
             }
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("NotifyIcon disposal failed during teardown", ex); }
 
         try
         {
@@ -920,9 +917,7 @@ public partial class App : System.Windows.Application
                 _currentHIcon = IntPtr.Zero;
             }
         }
-        catch { }
-
-        try { SettingsManager.Flush(); } catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("Tray icon handle destruction failed during teardown", ex); }
 
         try
         {
@@ -933,10 +928,13 @@ public partial class App : System.Windows.Application
                 _mainWindow = null;
             }
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("MainWindow close failed during teardown", ex); }
 
-        try { OsdWindow.HideOsd(); } catch { }
-        try { AudioFeedback.Dispose(); } catch { }
+        try { OsdWindow.HideOsd(); }
+        catch (Exception ex) { DiagnosticLogger.LogError("OsdWindow.HideOsd failed during teardown", ex); }
+
+        try { AudioFeedback.Dispose(); }
+        catch (Exception ex) { DiagnosticLogger.LogError("AudioFeedback.Dispose failed during teardown", ex); }
 
         try
         {
@@ -947,71 +945,25 @@ public partial class App : System.Windows.Application
                 _audioController = null;
             }
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("AudioController disposal failed during teardown", ex); }
 
         try
         {
             _mutex?.Dispose();
             _mutex = null;
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("Mutex disposal failed during teardown", ex); }
+    }
 
+    private void ExitApp()
+    {
+        Teardown();
         Environment.Exit(0);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        try { SettingsManager.Flush(); }
-        catch { }
-        try
-        {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.Visible = false;
-                _notifyIcon.ContextMenuStrip?.Dispose();
-                _notifyIcon.Dispose();
-                _notifyIcon = null;
-            }
-        }
-        catch { }
-        try
-        {
-            if (_currentHIcon != IntPtr.Zero)
-            {
-                DestroyIcon(_currentHIcon);
-                _currentHIcon = IntPtr.Zero;
-            }
-        }
-        catch { }
-        try
-        {
-            if (_mainWindow != null)
-            {
-                _mainWindow.Closing -= MainWindow_Closing;
-                _mainWindow.Close();
-                _mainWindow = null;
-            }
-        }
-        catch { }
-        try { OsdWindow.HideOsd(); } catch { }
-        try { AudioFeedback.Dispose(); } catch { }
-
-        try
-        {
-            if (_audioController != null)
-            {
-                _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
-                _audioController.Dispose();
-                _audioController = null;
-            }
-        }
-        catch { }
-        try
-        {
-            _mutex?.Dispose();
-            _mutex = null;
-        }
-        catch { }
+        Teardown();
         base.OnExit(e);
     }
 }

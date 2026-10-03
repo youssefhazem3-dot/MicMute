@@ -66,8 +66,10 @@ public static class AudioFeedback
         var newMutePlayer = new SoundPlayer(newMuteStream);
         var newUnmutePlayer = new SoundPlayer(newUnmuteStream);
 
-        try { newMutePlayer.Load(); } catch { }
-        try { newUnmutePlayer.Load(); } catch { }
+        try { newMutePlayer.Load(); }
+        catch (Exception ex) { DiagnosticLogger.LogError("Failed to preload mute player", ex); }
+        try { newUnmutePlayer.Load(); }
+        catch (Exception ex) { DiagnosticLogger.LogError("Failed to preload unmute player", ex); }
 
         SoundPlayer? oldMute;
         SoundPlayer? oldUnmute;
@@ -117,8 +119,9 @@ public static class AudioFeedback
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticLogger.LogError("AudioFeedback Play error", ex);
                 try { SystemSounds.Beep.Play(); } catch { }
             }
         });
@@ -129,17 +132,20 @@ public static class AudioFeedback
     /// </summary>
     public static void Dispose()
     {
-        lock (_playLock)
+        lock (_initLock)
         {
-            _mutePlayer?.Dispose();
-            _unmutePlayer?.Dispose();
-            _muteStream?.Dispose();
-            _unmuteStream?.Dispose();
-            _mutePlayer = null;
-            _unmutePlayer = null;
-            _muteStream = null;
-            _unmuteStream = null;
-            _isInitialized = false;
+            lock (_playLock)
+            {
+                _mutePlayer?.Dispose();
+                _unmutePlayer?.Dispose();
+                _muteStream?.Dispose();
+                _unmuteStream?.Dispose();
+                _mutePlayer = null;
+                _unmutePlayer = null;
+                _muteStream = null;
+                _unmuteStream = null;
+                _isInitialized = false;
+            }
         }
     }
 
@@ -156,7 +162,10 @@ public static class AudioFeedback
                 return ms.ToArray();
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError($"Error loading manifest audio resource {resourceName}", ex);
+        }
 
         // 2. Try loading from disk relative to application directory
         try
@@ -168,7 +177,10 @@ public static class AudioFeedback
                 return File.ReadAllBytes(diskPath);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("Error reading disk audio file", ex);
+        }
 
         // 3. Fallback: Synthesize a smooth, acoustic Discord-like two-tone chime
         return SynthesizeDiscordChimeBytes(isMuted, 1.0);

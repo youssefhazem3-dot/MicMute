@@ -85,10 +85,20 @@ public class AudioController : IMMNotificationClient, IDisposable
     {
         Queue(() =>
         {
-            if (_currentDevice == null) return;
+            if (_currentDevice == null)
+            {
+                UpdateActiveDevice();
+                if (_currentDevice == null) return;
+            }
             bool current;
             try { current = _currentDevice.AudioEndpointVolume.Mute; }
-            catch { current = _muteState.Current ?? false; }
+            catch
+            {
+                UpdateActiveDevice();
+                if (_currentDevice == null) return;
+                try { current = _currentDevice.AudioEndpointVolume.Mute; }
+                catch { current = _muteState.Current ?? false; }
+            }
             SetMuteOnAudioThread(!current);
         });
     }
@@ -97,7 +107,12 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     private void SetMuteOnAudioThread(bool value)
     {
-        if (_disposed || _currentDevice == null) return;
+        if (_disposed) return;
+        if (_currentDevice == null)
+        {
+            UpdateActiveDevice();
+            if (_currentDevice == null) return;
+        }
         try
         {
             _currentDevice.AudioEndpointVolume.Mute = value;
@@ -107,7 +122,25 @@ public class AudioController : IMMNotificationClient, IDisposable
                 MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, true));
             }
         }
-        catch (Exception ex) { WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message); }
+        catch (Exception ex)
+        {
+            try
+            {
+                UpdateActiveDevice();
+                if (_currentDevice != null)
+                {
+                    _currentDevice.AudioEndpointVolume.Mute = value;
+                    if (_muteState.RecordLocalChange(value))
+                    {
+                        Volatile.Write(ref _cachedMuteState, value ? 1 : 0);
+                        MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, true));
+                    }
+                    return;
+                }
+            }
+            catch { }
+            WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message);
+        }
     }
 
     private void UpdateActiveDevice()
@@ -145,7 +178,7 @@ public class AudioController : IMMNotificationClient, IDisposable
         {
             try
             {
-                if (_currentDevice.State == DeviceState.Active && candidate.ID == _currentId)
+                if (_currentDevice.State == DeviceState.Active && string.Equals(candidate.ID, _currentId, StringComparison.OrdinalIgnoreCase))
                 {
                     bool muted = _currentDevice.AudioEndpointVolume.Mute; // also detects invalidated audio-service objects
                     string name = candidate.FriendlyName;
@@ -233,7 +266,11 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     private void NotifyDevicesChanged()
     {
-        Queue(() => DevicesChanged?.Invoke(this, EventArgs.Empty));
+        Queue(() =>
+        {
+            UpdateActiveDevice();
+            DevicesChanged?.Invoke(this, EventArgs.Empty);
+        });
     }
 
     public void OnDeviceStateChanged(string deviceId, DeviceState newState) => NotifyDevicesChanged();
@@ -246,7 +283,7 @@ public class AudioController : IMMNotificationClient, IDisposable
     }
     public void OnPropertyValueChanged(string deviceId, PropertyKey key)
     {
-        if (deviceId == CurrentDeviceId) NotifyDevicesChanged();
+        if (string.Equals(deviceId, CurrentDeviceId, StringComparison.OrdinalIgnoreCase)) NotifyDevicesChanged();
     }
 
     public void Dispose()

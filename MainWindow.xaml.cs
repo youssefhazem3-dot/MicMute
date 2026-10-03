@@ -62,6 +62,7 @@ public partial class MainWindow : Window
     internal System.Windows.Controls.Button? btnCls;
     internal System.Windows.Controls.ComboBox cbDevices = null!;
     private List<AudioDevice>? _pendingDeviceList;
+    private EventHandler? _dropDownOpenHandler;
     internal Border borderHotkey = null!;
     internal TextBlock tbHotkey = null!;
     internal TextBlock? tbHeroHotkey;
@@ -97,11 +98,11 @@ public partial class MainWindow : Window
     private System.Drawing.Icon? _icoBig;
     private IntPtr _hIconSmall = IntPtr.Zero;
     private IntPtr _hIconBig = IntPtr.Zero;
-    private bool _isMinimizing = false;
-    private bool _isRestoring = false;
+    private bool _isMinimizing;
+    private bool _isRestoring;
 
-    private static readonly Geometry IconCheck = Geometry.Parse("M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z");
-    private static readonly Geometry IconWarning = Geometry.Parse("M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z");
+    private static readonly Geometry IconCheck = Freeze(Geometry.Parse("M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"));
+    private static readonly Geometry IconWarning = Freeze(Geometry.Parse("M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"));
 
     private const int WM_SETTINGCHANGE = 0x001A;
     private const int WM_DISPLAYCHANGE = 0x007E;
@@ -175,6 +176,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         this.StateChanged += MainWindow_StateChanged;
+        this.Activated += (s, e) => { _hotkeyManager?.RefreshHook(); };
         this.PreviewMouseDown += MainWindow_PreviewMouseDown;
         this.Deactivated += MainWindow_Deactivated;
         this.LocationChanged += MainWindow_LocationChanged;
@@ -235,7 +237,10 @@ public partial class MainWindow : Window
                     this.Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri(iconPath));
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError("Failed to load custom window icon", ex);
+            }
 
             // Bind all controls from root before detaching content
             btnStateToggle = (System.Windows.Controls.Button)root.FindName("btnStateToggle");
@@ -374,7 +379,10 @@ public partial class MainWindow : Window
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError("Failed to load embedded window icon", ex);
+                }
             }
 
             this.ShowInTaskbar = true;
@@ -399,14 +407,15 @@ public partial class MainWindow : Window
         {
             cbDevices.SelectionChanged += CbDevices_SelectionChanged;
             cbDevices.DropDownClosed += CbDevices_DropDownClosed;
-            System.ComponentModel.DependencyPropertyDescriptor.FromProperty(System.Windows.Controls.ComboBox.IsDropDownOpenProperty, typeof(System.Windows.Controls.ComboBox))
-                ?.AddValueChanged(cbDevices, (s, e) =>
+            _dropDownOpenHandler = (s, e) =>
+            {
+                if (!cbDevices.IsDropDownOpen)
                 {
-                    if (!cbDevices.IsDropDownOpen)
-                    {
-                        CbDevices_DropDownClosed(s, e);
-                    }
-                });
+                    CbDevices_DropDownClosed(s, e);
+                }
+            };
+            System.ComponentModel.DependencyPropertyDescriptor.FromProperty(System.Windows.Controls.ComboBox.IsDropDownOpenProperty, typeof(System.Windows.Controls.ComboBox))
+                ?.AddValueChanged(cbDevices, _dropDownOpenHandler);
         }
         if (btnRecordHotkey != null) btnRecordHotkey.Click += BtnRecordHotkey_Click;
         if (cbEnableOsd != null)
@@ -626,7 +635,10 @@ public partial class MainWindow : Window
             ChangeWindowMessageFilter((uint)WM_TASKBARCREATED, 1);
             ChangeWindowMessageFilterEx(hwnd, (uint)WM_TASKBARCREATED, 1, IntPtr.Zero);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("ChangeWindowMessageFilter failed", ex);
+        }
 
         try
         {
@@ -739,7 +751,10 @@ public partial class MainWindow : Window
                 this.Top = Math.Max(workTop + halfMargin, maxTop);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("ClampWindowBoundsToWorkArea failed", ex);
+        }
     }
 
     private IntPtr HwndMessageHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -763,8 +778,12 @@ public partial class MainWindow : Window
                 return _hIconBig;
             }
         }
-        else if (msg == WM_DEVICECHANGE)
+        else if (msg == WM_DEVICECHANGE || msg == 0x0218)
         {
+            if (msg == 0x0218)
+            {
+                _hotkeyManager?.RefreshHook();
+            }
             TriggerDevicesChanged();
         }
         else if (msg == WM_SYSCOMMAND)
@@ -899,7 +918,6 @@ public partial class MainWindow : Window
         _hotkeyManager?.Unregister();
         if (!RegisterGlobalHotkey(settings.Hotkey, settings.HotkeyModifiers))
             throw new InvalidOperationException("The shortcut could not be configured. Choose a different key.");
-        SetLightMode(settings.LightMode);
     }
 
     private void SettingsManager_SaveFailed(object? sender, string message)
@@ -1048,6 +1066,11 @@ public partial class MainWindow : Window
     private void BtnStateToggle_Click(object sender, RoutedEventArgs e)
     {
         DiagnosticLogger.LogUi("Mute button clicked in UI");
+        if (string.IsNullOrEmpty(_audioController.CurrentDeviceId))
+        {
+            _audioController.ForceUpdateActiveDevice();
+            RefreshDeviceList();
+        }
         _audioController.ToggleMute();
     }
 
@@ -1414,7 +1437,10 @@ public partial class MainWindow : Window
         {
             ApplyAdaptiveScreenConstraints(isInitialPlacement: true);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("CenterOnScreen failed", ex);
+        }
     }
 
     public void PlayRestoreAnimation()
@@ -2380,7 +2406,9 @@ public partial class MainWindow : Window
         else
         {
             AppSettings appSettings = SettingsManager.Load();
+            _isUpdatingOsdTextFromSlider = true;
             txtOsdDuration.Text = UiBehavior.FormatOsdDuration(appSettings.OsdDuration, CultureInfo.CurrentCulture);
+            _isUpdatingOsdTextFromSlider = false;
         }
     }
 
@@ -2474,7 +2502,9 @@ public partial class MainWindow : Window
         else
         {
             AppSettings appSettings = SettingsManager.Load();
+            _isUpdatingSoundVolumeTextFromSlider = true;
             txtSoundVolume.Text = UiBehavior.FormatSoundVolume(appSettings.SoundVolume);
+            _isUpdatingSoundVolumeTextFromSlider = false;
         }
     }
 
@@ -2566,6 +2596,13 @@ public partial class MainWindow : Window
         _audioController.DevicesChanged -= AudioController_DevicesChanged;
         _audioController.WarningNotification -= AudioController_WarningNotification;
 
+        if (cbDevices != null && _dropDownOpenHandler != null)
+        {
+            System.ComponentModel.DependencyPropertyDescriptor.FromProperty(System.Windows.Controls.ComboBox.IsDropDownOpenProperty, typeof(System.Windows.Controls.ComboBox))
+                ?.RemoveValueChanged(cbDevices, _dropDownOpenHandler);
+            _dropDownOpenHandler = null;
+        }
+
         try
         {
             IntPtr hwnd = new WindowInteropHelper(this).Handle;
@@ -2593,18 +2630,13 @@ public partial class MainWindow : Window
         }
         try
         {
-            if (_hIconSmall != IntPtr.Zero)
-            {
-                DestroyIcon(_hIconSmall);
-                _hIconSmall = IntPtr.Zero;
-            }
-            if (_hIconBig != IntPtr.Zero)
-            {
-                DestroyIcon(_hIconBig);
-                _hIconBig = IntPtr.Zero;
-            }
             _icoSmall?.Dispose();
+            _icoSmall = null;
+            _hIconSmall = IntPtr.Zero;
+
             _icoBig?.Dispose();
+            _icoBig = null;
+            _hIconBig = IntPtr.Zero;
         }
         catch { }
     }

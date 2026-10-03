@@ -187,6 +187,12 @@ public partial class OsdWindow : Window
     {
         try
         {
+            var appDispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (appDispatcher != null && !appDispatcher.CheckAccess())
+            {
+                appDispatcher.Invoke(WarmUp);
+                return;
+            }
             if (_instance == null)
             {
                 _instance = new OsdWindow();
@@ -198,11 +204,19 @@ public partial class OsdWindow : Window
         }
         catch
         {
+            // Expected: may fail during early startup before the Application object is ready.
         }
     }
 
     public static void ShowOsd(bool isMuted, double durationSeconds)
     {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher ?? _instance?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(() => ShowOsd(isMuted, durationSeconds));
+            return;
+        }
+
         int sequenceId = Interlocked.Increment(ref _activeSequenceId);
 
         CancellationTokenSource? previousCts = _cts;
@@ -210,7 +224,6 @@ public partial class OsdWindow : Window
         try
         {
             previousCts?.Cancel();
-            previousCts?.Dispose();
         }
         catch { }
 
@@ -247,13 +260,19 @@ public partial class OsdWindow : Window
     /// </summary>
     public static void HideOsd()
     {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher ?? _instance?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(() => HideOsd());
+            return;
+        }
+
         try
         {
             Interlocked.Increment(ref _activeSequenceId);
             if (_cts != null)
             {
-                _cts.Cancel();
-                _cts.Dispose();
+                try { _cts.Cancel(); } catch { }
                 _cts = null;
             }
             if (_instance != null)
@@ -263,7 +282,10 @@ public partial class OsdWindow : Window
                 _instance.Hide();
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("HideOsd error", ex);
+        }
     }
 
     private void PositionOnActiveScreen(IntPtr handle)
@@ -335,8 +357,6 @@ public partial class OsdWindow : Window
     private static readonly SolidColorBrush BrushMutedBorder = CreateFrozenBrush(ColorMutedBorder);
     private static readonly SolidColorBrush BrushDarkMutedBackground = CreateFrozenBrush(Color.FromArgb(0xEE, 0x16, 0x11, 0x12));
 
-    private static readonly Color ColorActive = Color.FromRgb(0xFF, 0xFF, 0xFF); // Pure white
-    private static readonly Color ColorActiveGlow = Color.FromRgb(0x00, 0x00, 0x00); // Clean subtle shadow
     private static readonly SolidColorBrush BrushActiveText = CreateFrozenBrush(Colors.White);
     private static readonly SolidColorBrush BrushActiveBorder = CreateFrozenBrush(Colors.White);
     private static readonly SolidColorBrush BrushDarkActiveBackground = CreateFrozenBrush(Color.FromArgb(0xEE, 0x12, 0x14, 0x18));
@@ -359,6 +379,12 @@ public partial class OsdWindow : Window
 
     public static void UpdateVisibleTheme(bool isLight)
     {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher ?? _instance?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(() => UpdateVisibleTheme(isLight));
+            return;
+        }
         if (_instance?.IsVisible == true) _instance.ApplyTheme(isLight);
     }
 
@@ -403,9 +429,6 @@ public partial class OsdWindow : Window
             }
         }
     }
-
-    private Task BeginFadeSequence(double durationSeconds, CancellationToken token) =>
-        BeginFadeSequenceAsync(durationSeconds, _activeSequenceId, token);
 
     private async Task BeginFadeSequenceAsync(double durationSeconds, int sequenceId, CancellationToken token)
     {

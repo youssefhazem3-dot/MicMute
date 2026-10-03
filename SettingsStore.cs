@@ -89,7 +89,7 @@ public sealed class SettingsStore : IDisposable
             PersistBeforeLocationChangeNoLock();
             bool isDefault = PathsEqual(destination, _defaultFolder);
             AppSettings moved = LoadNoLock() with { CustomDataPath = isDefault ? string.Empty : destination, UsePortableMode = false };
-            MoveSettingsNoLock(destination, moved, isDefault ? false : true, removePortableArtifacts: true, createPortableFlag: false);
+            MoveSettingsNoLock(destination, moved, !isDefault, removePortableArtifacts: true, createPortableFlag: false);
         }
     }
 
@@ -123,6 +123,7 @@ public sealed class SettingsStore : IDisposable
                 AtomicWrite(settingsFile, SettingsCodec.Serialize(defaults));
                 _pendingSave = null;
                 _lastSaveFailure = null;
+                _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
             {
@@ -131,7 +132,6 @@ public sealed class SettingsStore : IDisposable
                 _pendingSave = new PendingSave(settingsFile, defaults);
                 _saveTimer.Change(SaveDelayMilliseconds, Timeout.Infinite);
             }
-            _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
             _cachedSettings = defaults;
         }
     }
@@ -140,7 +140,7 @@ public sealed class SettingsStore : IDisposable
     {
         string folder = GetDataFolderPath();
         Directory.CreateDirectory(folder);
-        Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+        using Process? process = Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
     }
 
     public void Dispose()
@@ -320,7 +320,10 @@ public sealed class SettingsStore : IDisposable
             if (snapshot.Exists) AtomicWrite(path, snapshot.Contents!);
             else if (File.Exists(path)) File.Delete(path);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError($"RestoreSnapshot failed for '{path}'", ex);
+        }
     }
 
     private static void RestorePortableFlag(string path, bool shouldExist)
@@ -335,7 +338,10 @@ public sealed class SettingsStore : IDisposable
             }
             else if (!shouldExist && File.Exists(path)) File.Delete(path);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError($"RestorePortableFlag failed for '{path}'", ex);
+        }
     }
 
     private static IOException ToIOException(string message, Exception exception) =>

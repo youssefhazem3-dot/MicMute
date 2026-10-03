@@ -88,7 +88,7 @@ public static class SettingsCodec
 
     private static string RepairEndpointId(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 
         const string prefix = "0.0.1.";
         bool isEndpoint = (value.StartsWith(prefix, StringComparison.Ordinal) || value.StartsWith("{" + prefix, StringComparison.Ordinal)) &&
