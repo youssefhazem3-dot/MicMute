@@ -1518,11 +1518,40 @@ public partial class MainWindow : Window
             return;
         }
 
-        const double initialScale = 0.92;
+        // Convert tray point from physical pixels to WPF DIPs
+        DpiScale dpi = VisualTreeHelper.GetDpi(this);
+        double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+        double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+        double curWidth = this.ActualWidth > 0 ? this.ActualWidth : _preferredWidth;
+        double curHeight = this.ActualHeight > 0 ? this.ActualHeight : 440.0;
+        double winCenterDipX = this.Left + curWidth / 2.0;
+        double winCenterDipY = this.Top + curHeight / 2.0;
+
+        double trayDipX;
+        double trayDipY;
+
+        if (trayPixelPoint.HasValue && (trayPixelPoint.Value.X != 0 || trayPixelPoint.Value.Y != 0))
+        {
+            trayDipX = trayPixelPoint.Value.X / dpiX;
+            trayDipY = trayPixelPoint.Value.Y / dpiY;
+        }
+        else
+        {
+            var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)(winCenterDipX * dpiX), (int)(winCenterDipY * dpiY))) ?? System.Windows.Forms.Screen.PrimaryScreen;
+            var wa = screen?.WorkingArea ?? new System.Drawing.Rectangle(0, 0, (int)(1920 * dpiX), (int)(1080 * dpiY));
+            trayDipX = (wa.Right - 40) / dpiX;
+            trayDipY = (wa.Bottom - 20) / dpiY;
+        }
+
+        double startDeltaX = trayDipX - winCenterDipX;
+        double startDeltaY = trayDipY - winCenterDipY;
+
+        const double initialScale = 0.70;
         rootScaleTransform.ScaleX = initialScale;
         rootScaleTransform.ScaleY = initialScale;
-        rootTranslateTransform.X = 0.0;
-        rootTranslateTransform.Y = 20.0;
+        rootTranslateTransform.X = startDeltaX;
+        rootTranslateTransform.Y = startDeltaY;
         rootBorder.Opacity = 0.0;
 
         if (!this.IsVisible)
@@ -1545,8 +1574,8 @@ public partial class MainWindow : Window
         var opacityAnim = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = ease };
         var scaleXAnim = new DoubleAnimation(initialScale, 1.0, duration) { EasingFunction = ease };
         var scaleYAnim = new DoubleAnimation(initialScale, 1.0, duration) { EasingFunction = ease };
-        var transXAnim = new DoubleAnimation(0.0, 0.0, duration) { EasingFunction = ease };
-        var transYAnim = new DoubleAnimation(20.0, 0.0, duration) { EasingFunction = ease };
+        var transXAnim = new DoubleAnimation(startDeltaX, 0.0, duration) { EasingFunction = ease };
+        var transYAnim = new DoubleAnimation(startDeltaY, 0.0, duration) { EasingFunction = ease };
 
         scaleXAnim.Completed += (s, ev) =>
         {
