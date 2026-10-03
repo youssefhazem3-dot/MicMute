@@ -225,7 +225,7 @@ public partial class OsdWindow : Window
         {
             previousCts?.Cancel();
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("Error cancelling previous OSD token", ex); }
 
         if (_instance == null)
         {
@@ -272,7 +272,7 @@ public partial class OsdWindow : Window
             Interlocked.Increment(ref _activeSequenceId);
             if (_cts != null)
             {
-                try { _cts.Cancel(); } catch { }
+                try { _cts.Cancel(); } catch (Exception ex) { DiagnosticLogger.LogError("Error cancelling OSD token", ex); }
                 _cts = null;
             }
             if (_instance != null)

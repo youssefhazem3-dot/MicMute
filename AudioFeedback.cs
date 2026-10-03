@@ -229,15 +229,6 @@ public static class AudioFeedback
         return -1;
     }
 
-    /// <summary>
-    /// Fallback acoustic chime generator: Synthesizes a soft, harmonic two-tone chime
-    /// inspired by Discord's smooth marimba earcon (two-tone descending for mute, ascending for unmute).
-    /// </summary>
-    public static SoundPlayer CreateDiscordChimePlayer(bool isMuted, double volume = 1.0)
-    {
-        byte[] wavBytes = SynthesizeDiscordChimeBytes(isMuted, volume);
-        return new SoundPlayer(new MemoryStream(wavBytes));
-    }
 
     public static byte[] SynthesizeDiscordChimeBytes(bool isMuted, double volume = 1.0)
     {

@@ -661,16 +661,16 @@ public partial class MainWindow : Window
                 if (_hIconSmall != IntPtr.Zero)
                 {
                     SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, _hIconSmall);
-                    try { SetClassLongPtr(hwnd, GCLP_HICONSM, _hIconSmall); } catch { }
+                    try { SetClassLongPtr(hwnd, GCLP_HICONSM, _hIconSmall); } catch (Exception ex) { DiagnosticLogger.LogWarning("Failed to set small icon: " + ex.Message); }
                 }
                 if (_hIconBig != IntPtr.Zero)
                 {
                     SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, _hIconBig);
-                    try { SetClassLongPtr(hwnd, GCLP_HICON, _hIconBig); } catch { }
+                    try { SetClassLongPtr(hwnd, GCLP_HICON, _hIconBig); } catch (Exception ex) { DiagnosticLogger.LogWarning("Failed to set big icon: " + ex.Message); }
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("Error setting window icons", ex); }
 
         HwndSource.FromHwnd(hwnd)?.AddHook(HwndMessageHook);
         _hotkeyManager = new HotkeyManager(hwnd);
@@ -2619,7 +2619,7 @@ public partial class MainWindow : Window
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("Error clearing window icons", ex); }
 
         base.OnClosed(e);
         if (_hotkeyManager != null)
@@ -2638,6 +2638,6 @@ public partial class MainWindow : Window
             _icoBig = null;
             _hIconBig = IntPtr.Zero;
         }
-        catch { }
+        catch (Exception ex) { DiagnosticLogger.LogError("Error disposing window icons", ex); }
     }
 }

@@ -326,14 +326,6 @@ static class UiCases
         Check.True(Array.Exists(resourceNames, r => r == "MicMute.sounds.mute.wav"), "MicMute.sounds.mute.wav must be embedded");
         Check.True(Array.Exists(resourceNames, r => r == "MicMute.sounds.unmute.wav"), "MicMute.sounds.unmute.wav must be embedded");
 
-        using var fallbackMute = AudioFeedback.CreateDiscordChimePlayer(isMuted: true);
-        fallbackMute.Load();
-        Check.True(fallbackMute.IsLoadCompleted, "fallback mute chime must load into SoundPlayer");
-
-        using var fallbackUnmute = AudioFeedback.CreateDiscordChimePlayer(isMuted: false);
-        fallbackUnmute.Load();
-        Check.True(fallbackUnmute.IsLoadCompleted, "fallback unmute chime must load into SoundPlayer");
-
         AudioFeedback.Play(isMuted: true);
         AudioFeedback.Play(isMuted: false);
     }

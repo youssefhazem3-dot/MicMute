@@ -145,7 +145,7 @@ public class HotkeyManager : IDisposable
         if (_disposed) return;
         if (_hookId != IntPtr.Zero)
         {
-            try { UnhookWindowsHookEx(_hookId); } catch { }
+            try { UnhookWindowsHookEx(_hookId); } catch (Exception ex) { DiagnosticLogger.LogWarning("Failed to unhook hotkey hook: " + ex.Message); }
             _hookId = IntPtr.Zero;
         }
         InstallHook();

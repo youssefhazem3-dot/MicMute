@@ -74,7 +74,7 @@ public partial class App : System.Windows.Application
 
         public void RefreshTheme()
         {
-            try { _isLightMode = SettingsManager.Load().LightMode; } catch { }
+            try { _isLightMode = SettingsManager.Load().LightMode; } catch (Exception ex) { DiagnosticLogger.LogWarning("Failed to load LightMode setting for theme: " + ex.Message); }
         }
 
         public LiquidGlassContextMenu()

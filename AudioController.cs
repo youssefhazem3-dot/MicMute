@@ -92,12 +92,17 @@ public class AudioController : IMMNotificationClient, IDisposable
             }
             bool current;
             try { current = _currentDevice.AudioEndpointVolume.Mute; }
-            catch
+            catch (Exception ex1)
             {
+                DiagnosticLogger.LogWarning("ToggleMute initial read failed: " + ex1.Message);
                 UpdateActiveDevice();
                 if (_currentDevice == null) return;
                 try { current = _currentDevice.AudioEndpointVolume.Mute; }
-                catch { current = _muteState.Current ?? false; }
+                catch (Exception ex2)
+                {
+                    DiagnosticLogger.LogWarning("ToggleMute retry read failed: " + ex2.Message);
+                    current = _muteState.Current ?? false; 
+                }
             }
             SetMuteOnAudioThread(!current);
         });
@@ -138,7 +143,7 @@ public class AudioController : IMMNotificationClient, IDisposable
                     return;
                 }
             }
-            catch { }
+            catch (Exception retryEx) { DiagnosticLogger.LogError("Retry SetMuteOnAudioThread failed", retryEx); }
             WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message);
         }
     }
@@ -192,7 +197,7 @@ public class AudioController : IMMNotificationClient, IDisposable
                     return;
                 }
             }
-            catch { /* Rebind an invalidated current endpoint. */ }
+            catch (Exception ex) { DiagnosticLogger.LogWarning("Current endpoint invalidated, will rebind: " + ex.Message); }
         }
 
         DetachCurrentDevice();
@@ -260,8 +265,8 @@ public class AudioController : IMMNotificationClient, IDisposable
         Volatile.Write(ref _cachedMuteState, -1);
         _muteState.Reset();
         if (previous == null) return;
-        try { if (handler != null) previous.AudioEndpointVolume.OnVolumeNotification -= handler; } catch { }
-        try { previous.Dispose(); } catch { }
+        try { if (handler != null) previous.AudioEndpointVolume.OnVolumeNotification -= handler; } catch (Exception ex) { DiagnosticLogger.LogError("Failed to unsubscribe OnVolumeNotification", ex); }
+        try { previous.Dispose(); } catch (Exception ex) { DiagnosticLogger.LogError("Failed to dispose MMDevice", ex); }
     }
 
     private void NotifyDevicesChanged()
@@ -292,9 +297,9 @@ public class AudioController : IMMNotificationClient, IDisposable
         _disposed = true;
         Task cleanup = _workQueue.InvokeAsync(() =>
         {
-            try { _enumerator?.UnregisterEndpointNotificationCallback(this); } catch { }
+            try { _enumerator?.UnregisterEndpointNotificationCallback(this); } catch (Exception ex) { DiagnosticLogger.LogError("Failed to unregister notification callback", ex); }
             DetachCurrentDevice();
-            try { _enumerator?.Dispose(); } catch { }
+            try { _enumerator?.Dispose(); } catch (Exception ex) { DiagnosticLogger.LogError("Failed to dispose enumerator", ex); }
             _enumerator = null;
         });
         bool finished;
