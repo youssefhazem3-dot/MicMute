@@ -177,7 +177,7 @@ public class HotkeyManager : IDisposable
                     ScheduleHookRefresh();
                 }
                 long now = Environment.TickCount64;
-                if (now - lastPeriodicRefresh > 30000)
+                if (_hookId == IntPtr.Zero || now - lastPeriodicRefresh > 30000)
                 {
                     lastPeriodicRefresh = now;
                     ScheduleHookRefresh();
@@ -208,7 +208,7 @@ public class HotkeyManager : IDisposable
         if (_disposed || source == null || source.Dispatcher.HasShutdownStarted) return;
         try
         {
-            source.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
             {
                 if (!_disposed && version == Volatile.Read(ref _bindingVersion)) HotkeyPressed?.Invoke();
             }));
@@ -220,6 +220,11 @@ public class HotkeyManager : IDisposable
     {
         if (_disposed || _hookId != IntPtr.Zero) return;
         _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
+        if (_hookId == IntPtr.Zero)
+        {
+            int err = Marshal.GetLastWin32Error();
+            DiagnosticLogger.LogWarning($"SetWindowsHookEx failed with Win32 error {err}");
+        }
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -233,6 +238,7 @@ public class HotkeyManager : IDisposable
                 int vk = Marshal.ReadInt32(lParam);
                 uint timestamp = unchecked((uint)Marshal.ReadInt32(lParam, 12));
                 _hookModifiers.Observe(vk, down);
+                _hookModifiers.Synchronize(IsKeyDown);
                 int version = Volatile.Read(ref _bindingVersion);
                 if (_state.Observe(HotkeySource.Hook, vk, down, _hookModifiers.Current, timestamp))
                     QueueActivation(version);
@@ -252,6 +258,7 @@ public class HotkeyManager : IDisposable
             if (RawKeyboardPacket.TryRead(_rawInputBuffer, bytes, size, 128, out int vk, out bool down))
             {
                 _rawModifiers.Observe(vk, down);
+                _rawModifiers.Synchronize(IsKeyDown);
                 if (_state.Observe(HotkeySource.RawInput, vk, down, _rawModifiers.Current, unchecked((uint)GetMessageTime())))
                     QueueActivation(version);
             }

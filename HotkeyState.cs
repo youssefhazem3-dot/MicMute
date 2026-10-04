@@ -124,6 +124,17 @@ internal sealed class HotkeyModifiers
         if (vk >= 0 && vk < _keys.Length) _keys[vk] = down;
     }
 
+    public void Synchronize(Func<int, bool> isDown)
+    {
+        foreach (int vk in new[] { 0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C })
+        {
+            if (_keys[vk] && !isDown(vk))
+            {
+                _keys[vk] = false;
+            }
+        }
+    }
+
     public ModifierKeys Current =>
         ((_keys[0x10] || _keys[0xA0] || _keys[0xA1]) ? ModifierKeys.Shift : ModifierKeys.None) |
         ((_keys[0x11] || _keys[0xA2] || _keys[0xA3]) ? ModifierKeys.Control : ModifierKeys.None) |

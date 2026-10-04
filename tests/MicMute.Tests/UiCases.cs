@@ -1162,18 +1162,42 @@ static class UiCases
         Check.True(typeof(StartupManager).GetMethod("RemoveScheduledTask") != null, "RemoveScheduledTask must exist");
         Check.True(typeof(StartupManager).GetMethod("IsScheduledTaskConfigured") != null, "IsScheduledTaskConfigured must exist");
 
-        // Querying scheduled task status should not throw
-        bool taskConfigured = StartupManager.IsScheduledTaskConfigured();
-        // Removing scheduled task when it does not exist should not throw and return true
-        bool removed = StartupManager.RemoveScheduledTask();
-        Check.True(removed, "RemoveScheduledTask should succeed or safely report non-existence");
-        // Setting standard startup should not spawn external schtasks processes
-        int schtasksBefore = System.Diagnostics.Process.GetProcessesByName("schtasks").Length;
-        StartupManager.SetStartup(true, false);
-        int schtasksAfter = System.Diagnostics.Process.GetProcessesByName("schtasks").Length;
-        Check.True(schtasksAfter == schtasksBefore, "SetStartup must not spawn schtasks subprocesses");
-        // Querying startup enabled should not throw
-        bool enabled = StartupManager.IsStartupEnabled();
+        string? originalRun = null;
+        try
+        {
+            using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: false))
+            {
+                originalRun = key?.GetValue("MicMute") as string;
+            }
+
+            // Querying scheduled task status should not throw
+            bool taskConfigured = StartupManager.IsScheduledTaskConfigured();
+            // Removing scheduled task when it does not exist should not throw and return true
+            bool removed = StartupManager.RemoveScheduledTask();
+            Check.True(removed, "RemoveScheduledTask should succeed or safely report non-existence");
+            // Setting standard startup should not spawn external schtasks processes
+            int schtasksBefore = System.Diagnostics.Process.GetProcessesByName("schtasks").Length;
+            StartupManager.SetStartup(true, false);
+            int schtasksAfter = System.Diagnostics.Process.GetProcessesByName("schtasks").Length;
+            Check.True(schtasksAfter == schtasksBefore, "SetStartup must not spawn schtasks subprocesses");
+            // Querying startup enabled should not throw
+            bool enabled = StartupManager.IsStartupEnabled();
+        }
+        finally
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+                if (key != null)
+                {
+                    if (originalRun != null)
+                        key.SetValue("MicMute", originalRun);
+                    else
+                        key.DeleteValue("MicMute", throwOnMissingValue: false);
+                }
+            }
+            catch { }
+        }
     }
 
     private static void MainWindowUiAccuratelyClarifiesAdminModeForAntiCheat()

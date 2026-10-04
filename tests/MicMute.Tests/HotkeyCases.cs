@@ -172,6 +172,24 @@ static class HotkeyCases
             // Key is pressed down again at 70ms and only polled:
             Check.True(state.Poll(V, true, ModifierKeys.None, 70), "poll activates after release window expires");
         });
+        test("hotkeys: modifier synchronize clears stale keys when physical state is up", () =>
+        {
+            var mods = new HotkeyModifiers();
+            mods.Reset(vk => false);
+            mods.Observe(0x10, true); // VK_SHIFT down
+            mods.Observe(0x11, true); // VK_CONTROL down
+            Check.Equal(ModifierKeys.Shift | ModifierKeys.Control, mods.Current);
+
+            // Synchronize with physical state reporting all keys up
+            mods.Synchronize(vk => false);
+            Check.Equal(ModifierKeys.None, mods.Current, "Synchronize must clear modifiers when physical state is up");
+
+            // Synchronize with Control actually down
+            mods.Observe(0x11, true);
+            mods.Observe(0x10, true);
+            mods.Synchronize(vk => vk == 0x11);
+            Check.Equal(ModifierKeys.Control, mods.Current, "Synchronize must retain physically held modifiers");
+        });
     }
 
     private static HotkeyState Bound(ModifierKeys modifiers = ModifierKeys.None)

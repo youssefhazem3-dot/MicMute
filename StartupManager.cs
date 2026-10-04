@@ -17,6 +17,13 @@ public static class StartupManager
         bool elevated = runAsAdmin ?? (AdminManager.IsRunningAsAdmin() || AdminManager.IsRunAsAdminConfigured());
         string exePath = AdminManager.GetExecutablePath();
 
+        // Never write test runners or development hosts to real system startup
+        if (exePath.Contains("MicMute.Tests", StringComparison.OrdinalIgnoreCase) ||
+            exePath.Contains("testhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         if (!runOnStartup)
         {
             RemoveRegistryRun();

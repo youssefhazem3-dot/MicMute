@@ -88,7 +88,12 @@ public class AudioController : IMMNotificationClient, IDisposable
             if (_currentDevice == null)
             {
                 UpdateActiveDevice();
-                if (_currentDevice == null) return;
+                if (_currentDevice == null)
+                {
+                    DiagnosticLogger.LogWarning("ToggleMute called but no active capture device found.");
+                    WarningNotification?.Invoke(this, "No active audio capture devices found.");
+                    return;
+                }
             }
             bool current;
             try { current = _currentDevice.AudioEndpointVolume.Mute; }
@@ -96,7 +101,12 @@ public class AudioController : IMMNotificationClient, IDisposable
             {
                 DiagnosticLogger.LogWarning("ToggleMute initial read failed: " + ex1.Message);
                 UpdateActiveDevice();
-                if (_currentDevice == null) return;
+                if (_currentDevice == null)
+                {
+                    DiagnosticLogger.LogWarning("ToggleMute retry failed: no active device.");
+                    WarningNotification?.Invoke(this, "No active audio capture devices found.");
+                    return;
+                }
                 try { current = _currentDevice.AudioEndpointVolume.Mute; }
                 catch (Exception ex2)
                 {
@@ -176,6 +186,56 @@ public class AudioController : IMMNotificationClient, IDisposable
         {
             try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; }
             catch { candidate = null; }
+        }
+        if (candidate == null && _enumerator != null)
+        {
+            try
+            {
+                var endpoints = _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                if (endpoints.Count > 0)
+                {
+                    candidate = endpoints[0];
+                    fallback = true;
+                }
+            }
+            catch { candidate = null; }
+        }
+        if (candidate == null)
+        {
+            try
+            {
+                var fresh = new MMDeviceEnumerator();
+                try { candidate = fresh.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; } catch { }
+                if (candidate == null)
+                {
+                    try { candidate = fresh.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); fallback = true; } catch { }
+                }
+                if (candidate == null)
+                {
+                    try { candidate = fresh.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; } catch { }
+                }
+                if (candidate == null)
+                {
+                    try
+                    {
+                        var endpoints = fresh.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                        if (endpoints.Count > 0) { candidate = endpoints[0]; fallback = true; }
+                    }
+                    catch { }
+                }
+                if (candidate != null)
+                {
+                    try { _enumerator?.UnregisterEndpointNotificationCallback(this); } catch { }
+                    try { _enumerator?.Dispose(); } catch { }
+                    _enumerator = fresh;
+                    try { _enumerator.RegisterEndpointNotificationCallback(this); } catch { }
+                }
+                else
+                {
+                    fresh.Dispose();
+                }
+            }
+            catch { }
         }
 
         // Do not activate a second endpoint-volume listener merely to inspect the candidate.

@@ -13,6 +13,7 @@ internal static class AudioCases
         test(nameof(AudioWorkerDisposalDoesNotWaitForStalledDriverWork), AudioWorkerDisposalDoesNotWaitForStalledDriverWork);
         test(nameof(OldNotificationCannotReplaceNewerMuteState), OldNotificationCannotReplaceNewerMuteState);
         test(nameof(ToggleMuteHandlesUninitializedOrStaleDeviceWithoutCrashing), ToggleMuteHandlesUninitializedOrStaleDeviceWithoutCrashing);
+        test(nameof(SetTargetDeviceAsyncResolvesActiveMicrophoneAndAllowsToggleMute), SetTargetDeviceAsyncResolvesActiveMicrophoneAndAllowsToggleMute);
     }
 
     private static void AudioWorkRunsSeriallyOnStaWithoutBlockingCaller()
@@ -91,6 +92,19 @@ internal static class AudioCases
         using var controller = new AudioController();
         for (int i = 0; i < 5; i++)
         {
+            controller.ToggleMute();
+        }
+    }
+
+    private static void SetTargetDeviceAsyncResolvesActiveMicrophoneAndAllowsToggleMute()
+    {
+        using var controller = new AudioController();
+        controller.SetTargetDeviceAsync(string.Empty).GetAwaiter().GetResult();
+        var devices = controller.GetCaptureDevicesAsync().GetAwaiter().GetResult();
+        if (devices.Count > 0)
+        {
+            Check.True(!string.IsNullOrEmpty(controller.CurrentDeviceName) && controller.CurrentDeviceName != "No Device",
+                "SetTargetDeviceAsync must resolve an active microphone");
             controller.ToggleMute();
         }
     }
