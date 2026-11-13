@@ -19,6 +19,9 @@ public class AudioController : IMMNotificationClient, IDisposable
     private string _currentId = string.Empty;
     private string _currentName = "No Device";
     private volatile bool _isUsingFallback;
+    private volatile bool _syncAllMicrophones;
+    private volatile bool _lockMuteState;
+    private bool? _lockedTargetMute;
     private int _cachedMuteState = -1;
     private volatile bool _disposed;
 
@@ -44,10 +47,22 @@ public class AudioController : IMMNotificationClient, IDisposable
     public bool IsMuted
     {
         get => !_disposed && Volatile.Read(ref _cachedMuteState) == 1;
-        set => Queue(() => SetMuteOnAudioThread(value));
+        set => SetMute(value, showOsd: true);
     }
 
+    public void SetMute(bool value, bool showOsd = true) => Queue(() => SetMuteOnAudioThread(value, showOsd));
+
     public bool IsUsingFallback => _isUsingFallback;
+    public bool SyncAllMicrophones
+    {
+        get => _syncAllMicrophones;
+        set => _syncAllMicrophones = value;
+    }
+    public bool LockMuteState
+    {
+        get => _lockMuteState;
+        set => _lockMuteState = value;
+    }
     public string CurrentDeviceName => Volatile.Read(ref _currentName);
     public string CurrentDeviceId => Volatile.Read(ref _currentId);
 
@@ -114,15 +129,16 @@ public class AudioController : IMMNotificationClient, IDisposable
                     current = _muteState.Current ?? false; 
                 }
             }
-            SetMuteOnAudioThread(!current);
+            SetMuteOnAudioThread(!current, showOsd: true);
         });
     }
 
     public void ForceUpdateActiveDevice() => Queue(UpdateActiveDevice);
 
-    private void SetMuteOnAudioThread(bool value)
+    private void SetMuteOnAudioThread(bool value, bool showOsd = true)
     {
         if (_disposed) return;
+        _lockedTargetMute = value;
         if (_currentDevice == null)
         {
             UpdateActiveDevice();
@@ -131,10 +147,11 @@ public class AudioController : IMMNotificationClient, IDisposable
         try
         {
             _currentDevice.AudioEndpointVolume.Mute = value;
+            if (_syncAllMicrophones) ApplySyncToAllEndpoints(value, _currentDevice.ID);
             if (_muteState.RecordLocalChange(value))
             {
                 Volatile.Write(ref _cachedMuteState, value ? 1 : 0);
-                MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, true));
+                MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, showOsd));
             }
         }
         catch (Exception ex)
@@ -145,16 +162,37 @@ public class AudioController : IMMNotificationClient, IDisposable
                 if (_currentDevice != null)
                 {
                     _currentDevice.AudioEndpointVolume.Mute = value;
+                    if (_syncAllMicrophones) ApplySyncToAllEndpoints(value, _currentDevice.ID);
                     if (_muteState.RecordLocalChange(value))
                     {
                         Volatile.Write(ref _cachedMuteState, value ? 1 : 0);
-                        MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, true));
+                        MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(value, showOsd));
                     }
                     return;
                 }
             }
             catch (Exception retryEx) { DiagnosticLogger.LogError("Retry SetMuteOnAudioThread failed", retryEx); }
             WarningNotification?.Invoke(this, "Failed to set mute state: " + ex.Message);
+        }
+    }
+
+    private void ApplySyncToAllEndpoints(bool value, string excludeDeviceId)
+    {
+        if (_disposed || _enumerator == null) return;
+        try
+        {
+            foreach (MMDevice device in _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+            {
+                using (device)
+                {
+                    if (string.Equals(device.ID, excludeDeviceId, StringComparison.OrdinalIgnoreCase)) continue;
+                    try { device.AudioEndpointVolume.Mute = value; } catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogWarning("SyncAllMicrophones enumeration failed: " + ex.Message);
         }
     }
 
@@ -246,6 +284,16 @@ public class AudioController : IMMNotificationClient, IDisposable
                 if (_currentDevice.State == DeviceState.Active && string.Equals(candidate.ID, _currentId, StringComparison.OrdinalIgnoreCase))
                 {
                     bool muted = _currentDevice.AudioEndpointVolume.Mute; // also detects invalidated audio-service objects
+                    if (_lockMuteState && _lockedTargetMute is bool lockedMuted && muted != lockedMuted)
+                    {
+                        _currentDevice.AudioEndpointVolume.Mute = lockedMuted;
+                        muted = lockedMuted;
+                    }
+                    else
+                    {
+                        _lockedTargetMute = muted;
+                    }
+                    if (_syncAllMicrophones) ApplySyncToAllEndpoints(muted, candidate.ID);
                     string name = candidate.FriendlyName;
                     bool changed = _muteState.Current != muted || name != _currentName || _isUsingFallback != fallback;
                     Volatile.Write(ref _currentName, name);
@@ -277,6 +325,16 @@ public class AudioController : IMMNotificationClient, IDisposable
             _volumeHandler = data => OnVolumeNotification(expected, data.Muted);
             candidate.AudioEndpointVolume.OnVolumeNotification += _volumeHandler;
             bool muted = candidate.AudioEndpointVolume.Mute;
+            if (_lockMuteState && _lockedTargetMute is bool lockedRebindMuted && muted != lockedRebindMuted)
+            {
+                candidate.AudioEndpointVolume.Mute = lockedRebindMuted;
+                muted = lockedRebindMuted;
+            }
+            else
+            {
+                _lockedTargetMute = muted;
+            }
+            if (_syncAllMicrophones) ApplySyncToAllEndpoints(muted, candidate.ID);
             _muteState.RecordLocalChange(muted);
             Volatile.Write(ref _cachedMuteState, muted ? 1 : 0);
             MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(muted, false));
@@ -297,7 +355,15 @@ public class AudioController : IMMNotificationClient, IDisposable
             if (!ReferenceEquals(expected, _currentDevice)) return;
             try
             {
+                if (_lockMuteState && _muteState.Current is bool lockedMuted && muted != lockedMuted)
+                {
+                    expected.AudioEndpointVolume.Mute = lockedMuted;
+                    _muteState.RecordLocalChange(lockedMuted);
+                    Volatile.Write(ref _cachedMuteState, lockedMuted ? 1 : 0);
+                    return;
+                }
                 if (!_muteState.TryApplyNotification(muted, () => expected.AudioEndpointVolume.Mute, out bool current)) return;
+                _lockedTargetMute = current;
                 Volatile.Write(ref _cachedMuteState, current ? 1 : 0);
                 MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(current, true));
             }

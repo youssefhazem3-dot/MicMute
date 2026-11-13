@@ -75,7 +75,22 @@ public class HotkeyManager : IDisposable
     private int _bindingVersion;
     private volatile bool _disposed;
 
+    public const Key MouseMiddleKey = Key.NoName;
+    public const Key MouseXButton1Key = Key.Pa1;
+    public const Key MouseXButton2Key = Key.OemClear;
+
+    public static bool IsMouseKey(Key key) => key is MouseMiddleKey or MouseXButton1Key or MouseXButton2Key;
+
+    public static int ToVirtualKey(Key key) => key switch
+    {
+        MouseMiddleKey => 0x04,
+        MouseXButton1Key => 0x05,
+        MouseXButton2Key => 0x06,
+        _ => KeyInterop.VirtualKeyFromKey(key)
+    };
+
     public event Action? HotkeyPressed;
+    public event Action? HotkeyReleased;
 
     public HotkeyManager(IntPtr hWnd)
     {
@@ -113,7 +128,7 @@ public class HotkeyManager : IDisposable
     public bool Register(Key key, ModifierKeys modifiers)
     {
         if (_disposed) return false;
-        int vk = KeyInterop.VirtualKeyFromKey(key);
+        int vk = ToVirtualKey(key);
         if (vk <= 0 || vk >= 255 || ((int)modifiers & ~15) != 0) return false;
         if (Volatile.Read(ref _currentVk) != 0 && _currentKey == key && _currentModifiers == modifiers) return true;
 
@@ -172,22 +187,29 @@ public class HotkeyManager : IDisposable
                 bool isTargetDown = vk != 0 && IsKeyDown(vk);
                 ModifierKeys modifiers = isTargetDown ? PhysicalModifiers() : ModifierKeys.None;
 
-                if (vk != 0 && _state.Poll(vk, isTargetDown, modifiers, TickNow))
+                if (vk != 0)
                 {
-                    QueueActivation(version);
-                    // Physical poller caught an activation that low-level hook missed.
-                    // The hook may have timed out or been dropped by Windows; self-heal.
-                    ScheduleHookRefresh();
+                    if (_state.Poll(vk, isTargetDown, modifiers, TickNow))
+                    {
+                        QueueActivation(version);
+                        // Physical poller caught an activation that low-level hook missed.
+                        // The hook may have timed out or been dropped by Windows; self-heal.
+                        if (!IsMouseKey(_currentKey)) ScheduleHookRefresh();
+                    }
+                    if (_state.ConsumeRelease())
+                    {
+                        QueueRelease(version);
+                    }
                 }
 
                 long now = Environment.TickCount64;
-                if (Volatile.Read(ref _hookId) == IntPtr.Zero && now - lastHookRecoveryCheck > 5000)
+                if (!IsMouseKey(_currentKey) && Volatile.Read(ref _hookId) == IntPtr.Zero && now - lastHookRecoveryCheck > 5000)
                 {
                     lastHookRecoveryCheck = now;
                     ScheduleHookRefresh();
                 }
 
-                int waitMs = vk == 0 ? Timeout.Infinite : 16;
+                int waitMs = vk == 0 ? Timeout.Infinite : (IsMouseKey(_currentKey) ? 4 : 16);
                 _pollWake.WaitOne(waitMs);
             }
             catch (ObjectDisposedException)
@@ -222,6 +244,20 @@ public class HotkeyManager : IDisposable
         catch (InvalidOperationException) { }
     }
 
+    private void QueueRelease(int version)
+    {
+        HwndSource? source = _hwndSource;
+        if (_disposed || source == null || source.Dispatcher.HasShutdownStarted) return;
+        try
+        {
+            source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            {
+                if (!_disposed && version == Volatile.Read(ref _bindingVersion)) HotkeyReleased?.Invoke();
+            }));
+        }
+        catch (InvalidOperationException) { }
+    }
+
     private void InstallHook()
     {
         if (_disposed || Volatile.Read(ref _hookId) != IntPtr.Zero) return;
@@ -249,6 +285,8 @@ public class HotkeyManager : IDisposable
                 int version = Volatile.Read(ref _bindingVersion);
                 if (_state.Observe(HotkeySource.Hook, vk, down, _hookModifiers.Current, timestamp))
                     QueueActivation(version);
+                if (!down && _state.ConsumeRelease())
+                    QueueRelease(version);
             }
         }
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
@@ -268,6 +306,8 @@ public class HotkeyManager : IDisposable
                 _rawModifiers.Synchronize(IsKeyDown);
                 if (_state.Observe(HotkeySource.RawInput, vk, down, _rawModifiers.Current, unchecked((uint)GetMessageTime())))
                     QueueActivation(version);
+                if (!down && _state.ConsumeRelease())
+                    QueueRelease(version);
             }
         }
         return IntPtr.Zero;

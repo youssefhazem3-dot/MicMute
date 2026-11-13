@@ -1225,10 +1225,97 @@
                                 <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#000000" />
                             </Border.Effect>
                             <StackPanel>
-                                <!-- Option 1: Check for Updates (Top, Clickable Placeholder) -->
+                                <!-- Option 0A: Startup Mic State -->
+                                <Button x:Name="btnMenuStartupState"
+                                        Style="{StaticResource AppDropdownItemButtonStyle}"
+                                        ToolTip="Choose whether MicMute keeps the current mic state or forces Muted/Live on startup"
+                                        Click="BtnMenuStartupState_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Data="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"
+                                              Fill="{DynamicResource TextGrayBrush}"
+                                              Stretch="Uniform"
+                                              Width="12" Height="12"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center" />
+                                        <TextBlock x:Name="tbMenuStartupState"
+                                                   Grid.Column="1"
+                                                   Text="Startup: Keep Last"
+                                                   FontSize="12"
+                                                   FontWeight="Normal"
+                                                   Foreground="{DynamicResource TextWhiteBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0,0,0" />
+                                    </Grid>
+                                </Button>
+
+                                <!-- Option 0B: Sync All Microphones -->
+                                <Button x:Name="btnMenuSyncAllMics"
+                                        Style="{StaticResource AppDropdownItemButtonStyle}"
+                                        ToolTip="Mute and unmute all active capture microphones together"
+                                        Click="BtnMenuSyncAllMics_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Data="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
+                                              Fill="{DynamicResource TextGrayBrush}"
+                                              Stretch="Uniform"
+                                              Width="12" Height="12"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center" />
+                                        <TextBlock x:Name="tbMenuSyncAllMics"
+                                                   Grid.Column="1"
+                                                   Text="Sync All Mics: Off"
+                                                   FontSize="12"
+                                                   FontWeight="Normal"
+                                                   Foreground="{DynamicResource TextWhiteBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0,0,0" />
+                                    </Grid>
+                                </Button>
+
+                                <!-- Option 0C: Mute Lock -->
+                                <Button x:Name="btnMenuLockMute"
+                                        Style="{StaticResource AppDropdownItemButtonStyle}"
+                                        ToolTip="Prevent other apps from changing your microphone mute state"
+                                        Click="BtnMenuLockMute_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Data="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"
+                                              Fill="{DynamicResource TextGrayBrush}"
+                                              Stretch="Uniform"
+                                              Width="12" Height="12"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center" />
+                                        <TextBlock x:Name="tbMenuLockMute"
+                                                   Grid.Column="1"
+                                                   Text="Mute Lock: Off"
+                                                   FontSize="12"
+                                                   FontWeight="Normal"
+                                                   Foreground="{DynamicResource TextWhiteBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0,0,0" />
+                                    </Grid>
+                                </Button>
+
+                                <!-- Divider -->
+                                <Rectangle Height="1"
+                                           Fill="{DynamicResource DividerBrush}"
+                                           Margin="6,4,6,4"
+                                           SnapsToDevicePixels="True" />
+
+                                <!-- Option 1: Check for Updates -->
                                 <Button x:Name="btnMenuCheckUpdates"
                                         Style="{StaticResource AppDropdownItemButtonStyle}"
-                                        ToolTip="Check for updates to MicMute (Future Feature)"
+                                        ToolTip="Check GitHub for the latest MicMute release"
                                         Click="BtnMenuCheckUpdates_Click">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -1251,10 +1338,10 @@
                                     </Grid>
                                 </Button>
 
-                                <!-- Option 2: About MicMute (Middle, Clickable Placeholder) -->
+                                <!-- Option 2: About MicMute -->
                                 <Button x:Name="btnMenuAbout"
                                         Style="{StaticResource AppDropdownItemButtonStyle}"
-                                        ToolTip="About MicMute (Future Feature)"
+                                        ToolTip="View MicMute version and project information"
                                         Click="BtnMenuAbout_Click">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -1395,7 +1482,7 @@
 
                         <!-- Display-only Hotkey Pill: "Press [ Insert ] to toggle" -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
-                            <TextBlock Text="Press " FontWeight="Bold" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                            <TextBlock x:Name="tbHeroHotkeyPrefix" Text="Press " FontWeight="Bold" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
                             <Border Background="{DynamicResource KeycapBgBrush}"
                                     BorderBrush="{DynamicResource KeycapBorderBrush}"
                                     BorderThickness="1"
@@ -1414,7 +1501,7 @@
                                            Margin="0,1,0,0"
                                            VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock Text=" to toggle" FontWeight="Bold" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                            <TextBlock x:Name="tbHeroHotkeySuffix" Text=" to toggle" FontWeight="Bold" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
                         </StackPanel>
                     </StackPanel>
 
@@ -1507,14 +1594,27 @@
                                           VerticalAlignment="Center" />
                                 </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Shortcut Key" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
-                                    <TextBlock Text="Global toggle hotkey" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Shortcut Key" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                                        <Button x:Name="btnHotkeyMode"
+                                                Height="19"
+                                                Content="Toggle"
+                                                FontSize="10"
+                                                Padding="7,0"
+                                                Margin="6,0,0,0"
+                                                ToolTip="Switch between Toggle mode and Hold mode (Push-to-Talk / Push-to-Mute)"
+                                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                                Click="BtnHotkeyMode_Click"
+                                                VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="tbHotkeySubtitle" Text="Global toggle hotkey" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border x:Name="borderHotkey"
                                             Height="28"
+                                            MaxWidth="138"
                                             Background="{DynamicResource KeycapBgBrush}"
                                             BorderBrush="{DynamicResource KeycapBorderBrush}"
                                             BorderThickness="1"
@@ -1530,6 +1630,7 @@
                                                    FontFamily="Cascadia Mono, Consolas, Segoe UI Variable Text, Segoe UI, monospace"
                                                    FontWeight="Bold"
                                                    FontSize="11"
+                                                   TextTrimming="CharacterEllipsis"
                                                    Margin="0,1.5,0,0"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Center" />

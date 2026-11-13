@@ -26,6 +26,7 @@ public static class SettingsCases
         test("background persistence eventually writes the latest cached value", BackgroundPersistence);
         test("pending saves cannot overwrite migrated or reset settings", PendingSavesRespectTransitions);
         test("sound volume serializes, deserializes, and normalizes within bounds", SoundVolumeSettingsCodecSerializationAndClamping);
+        test("power mode settings serialize, deserialize, and normalize within bounds", PowerModeSettingsSerializeDeserializeAndNormalize);
     }
 
     private static void LoadsCompactEscapedJson()
@@ -260,11 +261,33 @@ public static class SettingsCases
         AppSettings clampedHigh = SettingsCodec.Normalize(new AppSettings { SoundVolume = 150 });
         Check.Equal(100, clampedHigh.SoundVolume);
 
-        // Roundtrip serialization
+        // Reset volume to 100% — no, roundtrip
         AppSettings custom = new AppSettings { SoundVolume = 42 };
         string json = SettingsCodec.Serialize(custom);
         AppSettings roundtrip = SettingsCodec.Deserialize(json);
         Check.Equal(42, roundtrip.SoundVolume);
+    }
+
+    private static void PowerModeSettingsSerializeDeserializeAndNormalize()
+    {
+        AppSettings custom = new AppSettings
+        {
+            HoldKeyMode = true,
+            SyncAllMicrophones = true,
+            LockMuteState = true,
+            StartupMuteMode = 2
+        };
+
+        string json = SettingsCodec.Serialize(custom);
+        AppSettings roundtrip = SettingsCodec.Deserialize(json);
+        Check.True(roundtrip.HoldKeyMode, "HoldKeyMode must roundtrip");
+        Check.True(roundtrip.SyncAllMicrophones, "SyncAllMicrophones must roundtrip");
+        Check.True(roundtrip.LockMuteState, "LockMuteState must roundtrip");
+        Check.Equal(2, roundtrip.StartupMuteMode);
+
+        Check.Equal(0, SettingsCodec.Normalize(new AppSettings { StartupMuteMode = -1 }).StartupMuteMode);
+        Check.Equal(0, SettingsCodec.Normalize(new AppSettings { StartupMuteMode = 9 }).StartupMuteMode);
+        Check.Equal(1, SettingsCodec.Normalize(new AppSettings { StartupMuteMode = 1 }).StartupMuteMode);
     }
 
     private sealed class SettingsScope : IDisposable

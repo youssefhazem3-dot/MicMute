@@ -14,6 +14,8 @@ internal sealed class HotkeyState
     private bool _held;
     private bool _pollConfirmedDown;
     private bool _pollNeedsRelease;
+    private bool _activeHold;
+    private bool _releasedPending;
     private uint _lastEventTime;
     private HotkeySource? _lastSource;
 
@@ -26,6 +28,8 @@ internal sealed class HotkeyState
             _held = isCurrentlyDown;
             _pollConfirmedDown = isCurrentlyDown;
             _pollNeedsRelease = isCurrentlyDown;
+            _activeHold = false;
+            _releasedPending = false;
             _lastEventTime = timestamp;
             _lastSource = null;
         }
@@ -37,6 +41,18 @@ internal sealed class HotkeyState
         {
             _vk = 0;
             _held = _pollConfirmedDown = _pollNeedsRelease = false;
+            _activeHold = false;
+            _releasedPending = false;
+        }
+    }
+
+    public bool ConsumeRelease()
+    {
+        lock (_sync)
+        {
+            if (!_releasedPending) return false;
+            _releasedPending = false;
+            return true;
         }
     }
 
@@ -57,6 +73,11 @@ internal sealed class HotkeyState
                 _held = false;
                 _pollConfirmedDown = false;
                 _pollNeedsRelease = true;
+                if (_activeHold)
+                {
+                    _activeHold = false;
+                    _releasedPending = true;
+                }
                 return false;
             }
             if (_held) return false;
@@ -64,7 +85,13 @@ internal sealed class HotkeyState
             _pollConfirmedDown = false;
             // A mismatching first down consumes this hold too. Releasing a modifier while
             // V remains down must never turn Ctrl+V into a plain-V activation.
-            return modifiers == _modifiers;
+            if (modifiers == _modifiers)
+            {
+                _activeHold = true;
+                _releasedPending = false;
+                return true;
+            }
+            return false;
         }
     }
 
@@ -86,6 +113,11 @@ internal sealed class HotkeyState
                     _held = false;
                     _lastEventTime = timestamp;
                     _lastSource = null;
+                    if (_activeHold)
+                    {
+                        _activeHold = false;
+                        _releasedPending = true;
+                    }
                 }
                 _pollConfirmedDown = false;
                 return false;
@@ -102,7 +134,13 @@ internal sealed class HotkeyState
             _held = _pollConfirmedDown = true;
             _lastEventTime = timestamp;
             _lastSource = null;
-            return modifiers == _modifiers;
+            if (modifiers == _modifiers)
+            {
+                _activeHold = true;
+                _releasedPending = false;
+                return true;
+            }
+            return false;
         }
     }
 }

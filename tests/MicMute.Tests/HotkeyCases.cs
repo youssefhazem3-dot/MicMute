@@ -14,6 +14,38 @@ static class HotkeyCases
     public static void Run(Action<string, Action> test)
     {
         test("hotkeys: configured shortcuts remain available to other Windows clients", SharesShortcutWithoutReservingIt);
+        test("hotkeys: hold release signals once after activation", () =>
+        {
+            var state = Bound(ModifierKeys.Control);
+            // Mismatching press must not arm release
+            Check.True(!state.Observe(HotkeySource.Hook, V, true, ModifierKeys.None, 10), "mismatching press rejected");
+            state.Observe(HotkeySource.Hook, V, false, ModifierKeys.None, 20);
+            Check.True(!state.ConsumeRelease(), "unactivated hold release must not fire");
+
+            // Valid native press/release arms and consumes release once
+            Check.True(state.Observe(HotkeySource.Hook, V, true, ModifierKeys.Control, 30), "valid press");
+            Check.True(!state.ConsumeRelease(), "still held");
+            state.Observe(HotkeySource.Hook, V, false, ModifierKeys.Control, 40);
+            Check.True(state.ConsumeRelease(), "release must fire once");
+            Check.True(!state.ConsumeRelease(), "release must consume once");
+
+            // Poll press/release arms and consumes release once
+            state.Poll(V, false, ModifierKeys.Control, 45);
+            Check.True(state.Poll(V, true, ModifierKeys.Control, 50), "poll press");
+            state.Poll(V, false, ModifierKeys.Control, 60);
+            Check.True(state.ConsumeRelease(), "poll release must fire once");
+        });
+        test("hotkeys: mouse button sentinels map to native virtual keys", () =>
+        {
+            Check.True(HotkeyManager.IsMouseKey(HotkeyManager.MouseMiddleKey), "MouseMiddleKey sentinel");
+            Check.True(HotkeyManager.IsMouseKey(HotkeyManager.MouseXButton1Key), "MouseXButton1Key sentinel");
+            Check.True(HotkeyManager.IsMouseKey(HotkeyManager.MouseXButton2Key), "MouseXButton2Key sentinel");
+            Check.True(!HotkeyManager.IsMouseKey(Key.F1), "keyboard key is not mouse key");
+            Check.Equal(0x04, HotkeyManager.ToVirtualKey(HotkeyManager.MouseMiddleKey));
+            Check.Equal(0x05, HotkeyManager.ToVirtualKey(HotkeyManager.MouseXButton1Key));
+            Check.Equal(0x06, HotkeyManager.ToVirtualKey(HotkeyManager.MouseXButton2Key));
+            Check.Equal(0x70, HotkeyManager.ToVirtualKey(Key.F1));
+        });
         test("hotkeys: one activation across hold, repeats and engines", () =>
         {
             var state = Bound();

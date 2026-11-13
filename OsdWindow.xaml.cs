@@ -18,6 +18,8 @@ public partial class OsdWindow : Window
     private static OsdWindow? _instance;
     private static CancellationTokenSource? _cts;
     private static int _activeSequenceId;
+    private static readonly System.Text.RegularExpressions.Regex XClassRegex =
+        new(@"\s+x:Class=""[^""]+""", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
     private const uint SWP_NOSIZE = 0x0001;
@@ -117,7 +119,7 @@ public partial class OsdWindow : Window
                 using (StreamReader sr = new StreamReader(stream))
                 {
                     string xaml = sr.ReadToEnd();
-                    xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
+                    xaml = XClassRegex.Replace(xaml, "");
                     root = (Window)XamlReader.Parse(xaml);
 
                     this.Resources = root.Resources;

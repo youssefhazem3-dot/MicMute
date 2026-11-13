@@ -28,4 +28,9 @@ public sealed record AppSettings
 
     public bool PlaySoundFeedback { get; init; }
     public int SoundVolume { get; init; } = 100;
+
+    public bool HoldKeyMode { get; init; }
+    public bool SyncAllMicrophones { get; init; }
+    public bool LockMuteState { get; init; }
+    public int StartupMuteMode { get; init; }
 }

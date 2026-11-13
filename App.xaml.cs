@@ -61,6 +61,22 @@ public partial class App : System.Windows.Application
     [DllImport("shell32.dll", SetLastError = true)]
     private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
+    [DllImport("psapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+    internal static void TrimWorkingSet()
+    {
+        try
+        {
+            using var proc = System.Diagnostics.Process.GetCurrentProcess();
+            EmptyWorkingSet(proc.Handle);
+        }
+        catch
+        {
+        }
+    }
+
     internal class LiquidGlassContextMenu : ContextMenuStrip
     {
         [DllImport("dwmapi.dll")]
@@ -601,9 +617,21 @@ public partial class App : System.Windows.Application
 
         AppSettings appSettings = SettingsManager.Load();
         StartupManager.SetStartup(appSettings.RunOnStartup, appSettings.RunAsAdmin);
-        _audioController = new AudioController();
+        _audioController = new AudioController
+        {
+            SyncAllMicrophones = appSettings.SyncAllMicrophones,
+            LockMuteState = appSettings.LockMuteState
+        };
         _audioController.MuteStateChanged += AudioController_MuteStateChanged;
         _audioController.SetTargetDevice(appSettings.SelectedDeviceId);
+        if (appSettings.StartupMuteMode == 1)
+        {
+            _audioController.SetMute(true, showOsd: false);
+        }
+        else if (appSettings.StartupMuteMode == 2)
+        {
+            _audioController.SetMute(false, showOsd: false);
+        }
         InitializeTrayIcon();
 
         if (DiagnosticLogger.IsEnabled)
@@ -638,6 +666,7 @@ public partial class App : System.Windows.Application
         else
         {
             _mainWindow.Visibility = Visibility.Hidden;
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(TrimWorkingSet));
         }
         _mainWindow.Closing += MainWindow_Closing;
     }
@@ -673,6 +702,7 @@ public partial class App : System.Windows.Application
 
         ToolStripMenuItem value = new ToolStripMenuItem("Toggle Mute", null, delegate
         {
+            _mainWindow?.ClearHoldToggleState();
             _audioController?.ToggleMute();
         })
         {
@@ -942,6 +972,7 @@ public partial class App : System.Windows.Application
     {
         e.Cancel = true;
         _mainWindow?.Hide();
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(TrimWorkingSet));
     }
 
     private void Teardown()

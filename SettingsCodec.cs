@@ -57,7 +57,11 @@ public static class SettingsCodec
                 UsePortableMode = GetBoolean(root, "UsePortableMode", defaults.UsePortableMode),
                 RunAsAdmin = GetBoolean(root, "RunAsAdmin", defaults.RunAsAdmin),
                 PlaySoundFeedback = GetBoolean(root, "PlaySoundFeedback", defaults.PlaySoundFeedback),
-                SoundVolume = GetInt(root, "SoundVolume", defaults.SoundVolume)
+                SoundVolume = GetInt(root, "SoundVolume", defaults.SoundVolume),
+                HoldKeyMode = GetBoolean(root, "HoldKeyMode", defaults.HoldKeyMode),
+                SyncAllMicrophones = GetBoolean(root, "SyncAllMicrophones", defaults.SyncAllMicrophones),
+                LockMuteState = GetBoolean(root, "LockMuteState", defaults.LockMuteState),
+                StartupMuteMode = GetInt(root, "StartupMuteMode", defaults.StartupMuteMode)
             });
         }
         catch (JsonException)
@@ -72,6 +76,7 @@ public static class SettingsCodec
         double duration = settings.OsdDuration;
         duration = !double.IsFinite(duration) ? 1.5 : Math.Clamp(duration, 0.1, 30.0);
         int volume = Math.Clamp(settings.SoundVolume, 0, 100);
+        int startupMuteMode = settings.StartupMuteMode is >= 0 and <= 2 ? settings.StartupMuteMode : 0;
         return settings with
         {
             SelectedDeviceId = RepairEndpointId(settings.SelectedDeviceId ?? string.Empty),
@@ -82,7 +87,8 @@ public static class SettingsCodec
                 ? settings.Hotkey : Key.F1,
             HotkeyModifiers = ((int)settings.HotkeyModifiers & ~15) == 0 ? settings.HotkeyModifiers : ModifierKeys.None,
             OsdDuration = duration,
-            SoundVolume = volume
+            SoundVolume = volume,
+            StartupMuteMode = startupMuteMode
         };
     }
 

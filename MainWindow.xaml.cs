@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -41,6 +45,22 @@ public partial class MainWindow : Window
     private double? _osdDurationBeforeEdit;
     private int? _soundVolumeBeforeEdit;
     private int _themeTransitionVersion;
+    private bool _holdToggledActive;
+    private static readonly Regex XClassRegex = new(@"\s+x:Class=""[^""]+""", RegexOptions.Compiled);
+    private static readonly Regex EventAttrRegex = new(
+        @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""",
+        RegexOptions.Compiled);
+    private static readonly HttpClient UpdateHttpClient = CreateUpdateHttpClient();
+    private static Dictionary<string, object>? _cachedLightTheme;
+    private static Dictionary<string, object>? _cachedDarkTheme;
+
+    private static HttpClient CreateUpdateHttpClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("MicMute/1.0");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        return client;
+    }
 
     public event EventHandler? TaskbarCreated;
 
@@ -55,6 +75,12 @@ public partial class MainWindow : Window
     internal System.Windows.Shapes.Path? titleBarIcon;
     internal System.Windows.Controls.Button? btnAppMenu;
     internal System.Windows.Controls.Primitives.Popup? popupAppMenu;
+    internal System.Windows.Controls.Button? btnMenuStartupState;
+    internal TextBlock? tbMenuStartupState;
+    internal System.Windows.Controls.Button? btnMenuSyncAllMics;
+    internal TextBlock? tbMenuSyncAllMics;
+    internal System.Windows.Controls.Button? btnMenuLockMute;
+    internal TextBlock? tbMenuLockMute;
     internal System.Windows.Controls.Button? btnMenuCheckUpdates;
     internal System.Windows.Controls.Button? btnMenuAbout;
     internal TextBlock? tbMenuVersion;
@@ -69,7 +95,11 @@ public partial class MainWindow : Window
     private EventHandler? _dropDownOpenHandler;
     internal Border borderHotkey = null!;
     internal TextBlock tbHotkey = null!;
+    internal TextBlock? tbHotkeySubtitle;
+    internal TextBlock? tbHeroHotkeyPrefix;
     internal TextBlock? tbHeroHotkey;
+    internal TextBlock? tbHeroHotkeySuffix;
+    internal System.Windows.Controls.Button? btnHotkeyMode;
     internal System.Windows.Controls.Button btnRecordHotkey = null!;
     internal System.Windows.Controls.CheckBox cbEnableOsd = null!;
     internal Grid? panelOsdDuration;
@@ -107,6 +137,8 @@ public partial class MainWindow : Window
 
     private static readonly Geometry IconCheck = Freeze(Geometry.Parse("M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"));
     private static readonly Geometry IconWarning = Freeze(Geometry.Parse("M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"));
+    private static readonly Geometry MoonIconGeometry = Freeze(Geometry.Parse("M21,12.79A9,9 0 1 1 11.21,3 7,7 0 0 0 21,12.79z"));
+    private static readonly Geometry SunIconGeometry = Freeze(Geometry.Parse("M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z"));
 
     private const int WM_SETTINGCHANGE = 0x001A;
     private const int WM_DISPLAYCHANGE = 0x007E;
@@ -246,6 +278,12 @@ public partial class MainWindow : Window
             titleBarIcon = root.FindName("titleBarIcon") as System.Windows.Shapes.Path;
             btnAppMenu = root.FindName("btnAppMenu") as System.Windows.Controls.Button;
             popupAppMenu = root.FindName("popupAppMenu") as System.Windows.Controls.Primitives.Popup;
+            btnMenuStartupState = root.FindName("btnMenuStartupState") as System.Windows.Controls.Button;
+            tbMenuStartupState = root.FindName("tbMenuStartupState") as TextBlock;
+            btnMenuSyncAllMics = root.FindName("btnMenuSyncAllMics") as System.Windows.Controls.Button;
+            tbMenuSyncAllMics = root.FindName("tbMenuSyncAllMics") as TextBlock;
+            btnMenuLockMute = root.FindName("btnMenuLockMute") as System.Windows.Controls.Button;
+            tbMenuLockMute = root.FindName("tbMenuLockMute") as TextBlock;
             btnMenuCheckUpdates = root.FindName("btnMenuCheckUpdates") as System.Windows.Controls.Button;
             btnMenuAbout = root.FindName("btnMenuAbout") as System.Windows.Controls.Button;
             tbMenuVersion = root.FindName("tbMenuVersion") as TextBlock;
@@ -270,6 +308,21 @@ public partial class MainWindow : Window
                 btnAppMenu.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
             }
 
+            if (btnMenuStartupState != null)
+            {
+                btnMenuStartupState.Click += BtnMenuStartupState_Click;
+            }
+
+            if (btnMenuSyncAllMics != null)
+            {
+                btnMenuSyncAllMics.Click += BtnMenuSyncAllMics_Click;
+            }
+
+            if (btnMenuLockMute != null)
+            {
+                btnMenuLockMute.Click += BtnMenuLockMute_Click;
+            }
+
             if (btnMenuCheckUpdates != null)
             {
                 btnMenuCheckUpdates.Click += BtnMenuCheckUpdates_Click;
@@ -289,7 +342,11 @@ public partial class MainWindow : Window
             cbDevices = (System.Windows.Controls.ComboBox)root.FindName("cbDevices");
             borderHotkey = (Border)root.FindName("borderHotkey");
             tbHotkey = (TextBlock)root.FindName("tbHotkey");
+            tbHotkeySubtitle = root.FindName("tbHotkeySubtitle") as TextBlock;
+            tbHeroHotkeyPrefix = root.FindName("tbHeroHotkeyPrefix") as TextBlock;
             tbHeroHotkey = root.FindName("tbHeroHotkey") as TextBlock;
+            tbHeroHotkeySuffix = root.FindName("tbHeroHotkeySuffix") as TextBlock;
+            btnHotkeyMode = root.FindName("btnHotkeyMode") as System.Windows.Controls.Button;
             btnRecordHotkey = (System.Windows.Controls.Button)root.FindName("btnRecordHotkey");
             cbEnableOsd = (System.Windows.Controls.CheckBox)root.FindName("cbEnableOsd");
             panelOsdDuration = root.FindName("panelOsdDuration") as Grid;
@@ -411,6 +468,7 @@ public partial class MainWindow : Window
             System.ComponentModel.DependencyPropertyDescriptor.FromProperty(System.Windows.Controls.ComboBox.IsDropDownOpenProperty, typeof(System.Windows.Controls.ComboBox))
                 ?.AddValueChanged(cbDevices, _dropDownOpenHandler);
         }
+        if (btnHotkeyMode != null) btnHotkeyMode.Click += BtnHotkeyMode_Click;
         if (btnRecordHotkey != null) btnRecordHotkey.Click += BtnRecordHotkey_Click;
         if (cbEnableOsd != null)
         {
@@ -589,9 +647,8 @@ public partial class MainWindow : Window
 
     private static Window ParseWindowRoot(string xaml)
     {
-        xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+x:Class=""[^""]+""", "");
-        xaml = System.Text.RegularExpressions.Regex.Replace(xaml,
-            @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
+        xaml = XClassRegex.Replace(xaml, "");
+        xaml = EventAttrRegex.Replace(xaml, "");
         Window root = (Window)XamlReader.Parse(xaml);
         bool valid = root.FindName("btnStateToggle") is System.Windows.Controls.Button
             && root.FindName("tbStatusText") is TextBlock
@@ -669,6 +726,7 @@ public partial class MainWindow : Window
         HwndSource.FromHwnd(hwnd)?.AddHook(HwndMessageHook);
         _hotkeyManager = new HotkeyManager(hwnd);
         _hotkeyManager.HotkeyPressed += HotkeyManager_HotkeyPressed;
+        _hotkeyManager.HotkeyReleased += HotkeyManager_HotkeyReleased;
         AppSettings appSettings = SettingsManager.Load();
         RegisterGlobalHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
         ApplyAdaptiveScreenConstraints(isInitialPlacement: true);
@@ -889,6 +947,7 @@ public partial class MainWindow : Window
             AudioFeedback.SetVolume(appSettings.SoundVolume);
             SetLightMode(appSettings.LightMode);
             DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
+            UpdatePowerModeUi(appSettings);
             tbStoragePath.Text = SettingsManager.GetDataFolderPath();
         }
         finally
@@ -911,12 +970,52 @@ public partial class MainWindow : Window
 
     private void ApplySettingsToRuntime(AppSettings settings)
     {
+        _audioController.SyncAllMicrophones = settings.SyncAllMicrophones;
+        _audioController.LockMuteState = settings.LockMuteState;
         _audioController.SetTargetDevice(settings.SelectedDeviceId);
         StartupManager.SetStartup(settings.RunOnStartup, settings.RunAsAdmin);
         AdminManager.SetRunAsAdmin(settings.RunAsAdmin);
+        _holdToggledActive = false;
         _hotkeyManager?.Unregister();
         if (!RegisterGlobalHotkey(settings.Hotkey, settings.HotkeyModifiers))
             throw new InvalidOperationException("The shortcut could not be configured. Choose a different key.");
+    }
+
+    private void UpdatePowerModeUi(AppSettings settings)
+    {
+        if (btnHotkeyMode != null)
+        {
+            btnHotkeyMode.Content = settings.HoldKeyMode ? "Hold" : "Toggle";
+        }
+        if (tbHeroHotkeyPrefix != null)
+        {
+            tbHeroHotkeyPrefix.Text = settings.HoldKeyMode ? "Hold " : "Press ";
+        }
+        if (tbHeroHotkeySuffix != null)
+        {
+            tbHeroHotkeySuffix.Text = " to toggle";
+        }
+        if (tbHotkeySubtitle != null)
+        {
+            tbHotkeySubtitle.Text = settings.HoldKeyMode ? "Hold key to toggle" : "Global toggle hotkey";
+        }
+        if (tbMenuStartupState != null)
+        {
+            tbMenuStartupState.Text = settings.StartupMuteMode switch
+            {
+                1 => "Startup: Always Muted",
+                2 => "Startup: Always Live",
+                _ => "Startup: Keep Last"
+            };
+        }
+        if (tbMenuSyncAllMics != null)
+        {
+            tbMenuSyncAllMics.Text = settings.SyncAllMicrophones ? "Sync All Mics: On" : "Sync All Mics: Off";
+        }
+        if (tbMenuLockMute != null)
+        {
+            tbMenuLockMute.Text = settings.LockMuteState ? "Mute Lock: On" : "Mute Lock: Off";
+        }
     }
 
     private void SettingsManager_SaveFailed(object? sender, string message)
@@ -1065,6 +1164,7 @@ public partial class MainWindow : Window
     private void BtnStateToggle_Click(object sender, RoutedEventArgs e)
     {
         DiagnosticLogger.LogUi("Mute button clicked in UI");
+        _holdToggledActive = false;
         if (string.IsNullOrEmpty(_audioController.CurrentDeviceId))
         {
             _audioController.ForceUpdateActiveDevice();
@@ -1218,10 +1318,25 @@ public partial class MainWindow : Window
         });
     }
 
+    internal void ClearHoldToggleState() => _holdToggledActive = false;
+
     private void HotkeyManager_HotkeyPressed()
     {
-        DiagnosticLogger.LogHotkey("Global shortcut key triggered -> Toggling mute");
+        bool holdMode = SettingsManager.Load().HoldKeyMode;
+        _holdToggledActive = holdMode;
+        DiagnosticLogger.LogHotkey(holdMode ? "Hold shortcut pressed -> Toggling mute" : "Global shortcut key triggered -> Toggling mute");
         _audioController.ToggleMute();
+    }
+
+    private void HotkeyManager_HotkeyReleased()
+    {
+        if (!_holdToggledActive) return;
+        _holdToggledActive = false;
+        if (SettingsManager.Load().HoldKeyMode)
+        {
+            DiagnosticLogger.LogHotkey("Hold shortcut released -> Reverting mute");
+            _audioController.ToggleMute();
+        }
     }
 
     private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
@@ -1239,6 +1354,28 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (_isRecordingHotkey)
+        {
+            Key? mouseKey = e.ChangedButton switch
+            {
+                MouseButton.Middle => HotkeyManager.MouseMiddleKey,
+                MouseButton.XButton1 => HotkeyManager.MouseXButton1Key,
+                MouseButton.XButton2 => HotkeyManager.MouseXButton2Key,
+                _ => null
+            };
+            if (mouseKey.HasValue)
+            {
+                e.Handled = true;
+                StopRecordingHotkey(success: true, mouseKey.Value, System.Windows.Input.Keyboard.Modifiers);
+                return;
+            }
+            DependencyObject? dep = e.OriginalSource as DependencyObject;
+            if (dep == null || FindVisualParent<System.Windows.Controls.Button>(dep) != btnRecordHotkey)
+            {
+                StopRecordingHotkey(success: false);
+            }
+        }
+
         if (popupAppMenu != null && popupAppMenu.IsOpen)
         {
             if (btnAppMenu != null)
@@ -1323,6 +1460,76 @@ public partial class MainWindow : Window
         popupAppMenu.IsOpen = true;
     }
 
+    public void BtnHotkeyMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isReloadingSettings) return;
+        _holdToggledActive = false;
+        AppSettings current = SettingsManager.Load();
+        AppSettings updated = current with { HoldKeyMode = !current.HoldKeyMode };
+        SettingsManager.Save(updated);
+        UpdatePowerModeUi(updated);
+        ShowTemporaryStatus(updated.HoldKeyMode
+            ? "Shortcut mode: Hold (Push-to-Talk / Push-to-Mute)."
+            : "Shortcut mode: Toggle.");
+    }
+
+    public void BtnMenuStartupState_Click(object sender, RoutedEventArgs e)
+    {
+        if (popupAppMenu != null)
+        {
+            popupAppMenu.IsOpen = false;
+        }
+        AppSettings current = SettingsManager.Load();
+        int nextMode = (current.StartupMuteMode + 1) % 3;
+        AppSettings updated = current with { StartupMuteMode = nextMode };
+        SettingsManager.Save(updated);
+        UpdatePowerModeUi(updated);
+        ShowTemporaryStatus(nextMode switch
+        {
+            1 => "Startup mic state: Always Start Muted.",
+            2 => "Startup mic state: Always Start Live.",
+            _ => "Startup mic state: Keep Last State."
+        });
+    }
+
+    public void BtnMenuSyncAllMics_Click(object sender, RoutedEventArgs e)
+    {
+        if (popupAppMenu != null)
+        {
+            popupAppMenu.IsOpen = false;
+        }
+        AppSettings current = SettingsManager.Load();
+        bool nextSync = !current.SyncAllMicrophones;
+        AppSettings updated = current with { SyncAllMicrophones = nextSync };
+        SettingsManager.Save(updated);
+        _audioController.SyncAllMicrophones = nextSync;
+        if (nextSync && !string.IsNullOrEmpty(_audioController.CurrentDeviceId))
+        {
+            _audioController.SetMute(_audioController.IsMuted, showOsd: false);
+        }
+        UpdatePowerModeUi(updated);
+        ShowTemporaryStatus(nextSync
+            ? "Sync All Microphones enabled."
+            : "Sync All Microphones disabled.");
+    }
+
+    public void BtnMenuLockMute_Click(object sender, RoutedEventArgs e)
+    {
+        if (popupAppMenu != null)
+        {
+            popupAppMenu.IsOpen = false;
+        }
+        AppSettings current = SettingsManager.Load();
+        bool nextLock = !current.LockMuteState;
+        AppSettings updated = current with { LockMuteState = nextLock };
+        SettingsManager.Save(updated);
+        _audioController.LockMuteState = nextLock;
+        UpdatePowerModeUi(updated);
+        ShowTemporaryStatus(nextLock
+            ? "Mute Lock enabled (external changes blocked)."
+            : "Mute Lock disabled.");
+    }
+
     public void BtnMenuCheckUpdates_Click(object sender, RoutedEventArgs e)
     {
         if (popupAppMenu != null)
@@ -1330,13 +1537,53 @@ public partial class MainWindow : Window
             popupAppMenu.IsOpen = false;
         }
 
-        // =====================================================================
-        // FUTURE IMPLEMENTATION HOOK: "Check for Updates..."
-        // =====================================================================
-        // This button is reserved for future auto-update functionality.
-        // When implemented, this will query GitHub Releases or an update service,
-        // compare semantic versions, and notify the user if an update is available.
-        // =====================================================================
+        ShowTemporaryStatus("Checking GitHub for updates...");
+        if (System.Windows.Application.Current != null)
+        {
+            _ = CheckGitHubReleaseAsync();
+        }
+    }
+
+    private async Task CheckGitHubReleaseAsync()
+    {
+        try
+        {
+            using HttpResponseMessage response = await UpdateHttpClient.GetAsync(
+                "https://api.github.com/repos/youssefhazem3-dot/MicMute/releases/latest").ConfigureAwait(false);
+            var localVersion = typeof(MainWindow).Assembly.GetName().Version ?? new Version(1, 0, 0);
+            string localDisplay = $"{localVersion.Major}.{localVersion.Minor}.{localVersion.Build}";
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus($"MicMute v{localDisplay} is up to date."); });
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus("Could not check updates (GitHub returned " + (int)response.StatusCode + ")."); });
+                return;
+            }
+
+            string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using JsonDocument doc = JsonDocument.Parse(json);
+            string tag = doc.RootElement.TryGetProperty("tag_name", out JsonElement tagEl) && tagEl.ValueKind == JsonValueKind.String
+                ? (tagEl.GetString() ?? string.Empty).Trim().TrimStart('v', 'V')
+                : string.Empty;
+
+            if (Version.TryParse(tag, out Version? remoteVersion) && remoteVersion > new Version(localVersion.Major, localVersion.Minor, localVersion.Build))
+            {
+                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus($"Update available: v{tag} on GitHub Releases!"); });
+            }
+            else
+            {
+                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus($"MicMute v{localDisplay} is up to date."); });
+            }
+        }
+        catch
+        {
+            _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus("Could not check updates (offline or timed out)."); });
+        }
     }
 
     public void BtnMenuAbout_Click(object sender, RoutedEventArgs e)
@@ -1346,13 +1593,9 @@ public partial class MainWindow : Window
             popupAppMenu.IsOpen = false;
         }
 
-        // =====================================================================
-        // FUTURE IMPLEMENTATION HOOK: "About MicMute"
-        // =====================================================================
-        // This button is reserved for a future About dialog/window.
-        // When implemented, this will display an About modal showing app credits,
-        // repository link, license details, and system diagnostics info.
-        // =====================================================================
+        var ver = typeof(MainWindow).Assembly.GetName().Version;
+        string versionText = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.0.0";
+        ShowTemporaryStatus($"MicMute v{versionText} — Ultra-light Windows 11 Mic Controller (github.com/youssefhazem3-dot/MicMute)");
     }
 
     public void MinimizeButton_Click(object sender, RoutedEventArgs e)
@@ -1438,6 +1681,7 @@ public partial class MainWindow : Window
         else if (WindowState == WindowState.Minimized)
         {
             _isRestoring = false;
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(App.TrimWorkingSet));
         }
     }
 
@@ -1687,6 +1931,7 @@ public partial class MainWindow : Window
     private void StopRecordingHotkey(bool success, Key key = Key.None, ModifierKeys modifiers = ModifierKeys.None)
     {
         _isRecordingHotkey = false;
+        _holdToggledActive = false;
         btnRecordHotkey.Content = "Record";
         PreviewKeyDown -= MainWindow_PreviewKeyDown;
         AppSettings appSettings = SettingsManager.Load();
@@ -1800,7 +2045,14 @@ public partial class MainWindow : Window
         }
         if (key != Key.None)
         {
-            list.Add(key.ToString());
+            string keyLabel = key switch
+            {
+                HotkeyManager.MouseMiddleKey => "Mouse Middle",
+                HotkeyManager.MouseXButton1Key => "Mouse 4",
+                HotkeyManager.MouseXButton2Key => "Mouse 5",
+                _ => key.ToString()
+            };
+            list.Add(keyLabel);
         }
         else if (list.Count > 0)
         {
@@ -2012,6 +2264,196 @@ public partial class MainWindow : Window
         }
     }
 
+    private static Dictionary<string, object> GetOrBuildThemeResources(bool isLight)
+    {
+        ref Dictionary<string, object>? cache = ref isLight ? ref _cachedLightTheme : ref _cachedDarkTheme;
+        if (cache != null) return cache;
+
+        static SolidColorBrush Solid(byte r, byte g, byte b) => Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(r, g, b)));
+        static SolidColorBrush Alpha(byte a, byte r, byte g, byte b) => Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, r, g, b)));
+
+        System.Windows.Media.Color accentColor = isLight
+            ? System.Windows.Media.Color.FromRgb(71, 85, 105)
+            : System.Windows.Media.Color.FromRgb(255, 255, 255);
+        SolidColorBrush themeGlyphBrush = isLight ? Solid(55, 65, 81) : Solid(255, 255, 255);
+
+        var dict = new Dictionary<string, object>(36)
+        {
+            ["AccentColor"] = accentColor,
+            ["AccentBrush"] = Freeze(new SolidColorBrush(accentColor)),
+            ["AccentHoverBrush"] = isLight ? Alpha(18, 71, 85, 105) : Alpha(34, 255, 255, 255),
+            ["TitleTextBrush"] = themeGlyphBrush,
+            ["TextWhiteBrush"] = themeGlyphBrush,
+            ["SquircleIconBrush"] = themeGlyphBrush,
+            ["KeycapTextBrush"] = themeGlyphBrush,
+            ["StatusCapsuleTextBrush"] = themeGlyphBrush,
+            ["StatusDotBrush"] = themeGlyphBrush,
+            ["WarningTextBrush"] = themeGlyphBrush,
+        };
+
+        if (isLight)
+        {
+            dict["WindowBgBrush"] = Freeze(new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(174, 248, 249, 250),
+                System.Windows.Media.Color.FromArgb(174, 233, 236, 239),
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            dict["CaptionButtonHoverBrush"] = Alpha(18, 0, 0, 0);
+            dict["CaptionButtonPressedBrush"] = Alpha(35, 0, 0, 0);
+            dict["CardBgBrush"] = Alpha(180, 255, 255, 255);
+            dict["InputBgBrush"] = Solid(244, 244, 245);
+            dict["TitleBarBgBrush"] = Alpha(0, 255, 255, 255);
+            dict["TextGrayBrush"] = Solid(107, 114, 128);
+            dict["TextDimBrush"] = Solid(156, 163, 175);
+            dict["BorderBrush"] = Alpha(28, 0, 0, 0);
+            dict["DividerBrush"] = Alpha(18, 0, 0, 0);
+
+            dict["ToggleOnBrush"] = Solid(71, 85, 105);
+            dict["ToggleOnBorderBrush"] = Solid(71, 85, 105);
+            dict["ToggleOffBrush"] = Solid(228, 228, 231);
+            dict["ToggleOffBorderBrush"] = Solid(212, 212, 216);
+            dict["ToggleKnobBrush"] = Solid(71, 85, 105);
+            dict["ToggleKnobBorderBrush"] = Solid(212, 212, 216);
+            dict["ToggleKnobActiveBrush"] = Solid(255, 255, 255);
+            dict["ToggleKnobActiveBorderBrush"] = Solid(228, 228, 231);
+
+            dict["SliderTrackBrush"] = Solid(71, 85, 105);
+            dict["SliderTrackEmptyBrush"] = Solid(228, 228, 231);
+            dict["SliderTrackBorderBrush"] = Solid(212, 212, 216);
+            dict["SliderThumbBgBrush"] = Solid(255, 255, 255);
+            dict["SliderThumbBorderBrush"] = Solid(71, 85, 105);
+
+            dict["JewelRingBgBrush"] = Freeze(new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(180, 255, 255, 255),
+                System.Windows.Media.Color.FromArgb(120, 244, 244, 245),
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            dict["JewelRingBorderBrush"] = Alpha(180, 255, 255, 255);
+
+            var heroLensLight = new RadialGradientBrush
+            {
+                Center = new Point(0.35, 0.25),
+                GradientOrigin = new Point(0.35, 0.25),
+                RadiusX = 0.65,
+                RadiusY = 0.65
+            };
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(108, 122, 142), 0.0));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(85, 99, 120), 0.35));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(71, 85, 105), 0.70));
+            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(55, 67, 83), 1.0));
+            dict["HeroLensActiveBrush"] = Freeze(heroLensLight);
+
+            var heroGlowLight = new RadialGradientBrush
+            {
+                Center = new Point(0.5, 0.40),
+                GradientOrigin = new Point(0.5, 0.30),
+                RadiusX = 0.5,
+                RadiusY = 0.5
+            };
+            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(35, 71, 85, 105), 0.0));
+            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(12, 71, 85, 105), 0.5));
+            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 71, 85, 105), 1.0));
+            dict["HeroGlowActiveBrush"] = Freeze(heroGlowLight);
+            dict["HeroIconActiveBrush"] = Solid(255, 255, 255);
+
+            dict["SquircleBgBrush"] = Alpha(14, 0, 0, 0);
+            dict["SquircleBorderBrush"] = Alpha(24, 0, 0, 0);
+
+            dict["KeycapBgBrush"] = Solid(244, 244, 245);
+            dict["KeycapBorderBrush"] = Solid(228, 228, 231);
+
+            dict["StatusCapsuleBgBrush"] = Alpha(24, 71, 85, 105);
+            dict["StatusCapsuleBorderBrush"] = Alpha(42, 71, 85, 105);
+
+            dict["WarningBgBrush"] = Alpha(12, 0, 0, 0);
+            dict["WarningBorderBrush"] = Alpha(22, 0, 0, 0);
+
+            dict["ScrollBarThumbBrush"] = Alpha(40, 0, 0, 0);
+            dict["ScrollBarThumbHoverBrush"] = Alpha(70, 0, 0, 0);
+            dict["ScrollBarThumbDragBrush"] = Alpha(100, 0, 0, 0);
+        }
+        else
+        {
+            dict["WindowBgBrush"] = Freeze(new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(242, 24, 24, 27),
+                System.Windows.Media.Color.FromArgb(242, 9, 9, 11),
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            dict["CaptionButtonHoverBrush"] = Alpha(24, 255, 255, 255);
+            dict["CaptionButtonPressedBrush"] = Alpha(48, 255, 255, 255);
+            dict["CardBgBrush"] = Alpha(20, 255, 255, 255);
+            dict["InputBgBrush"] = Solid(24, 24, 27);
+            dict["TitleBarBgBrush"] = Alpha(0, 0, 0, 0);
+            dict["TextGrayBrush"] = Solid(193, 193, 204);
+            dict["TextDimBrush"] = Solid(136, 136, 146);
+            dict["BorderBrush"] = Alpha(32, 255, 255, 255);
+            dict["DividerBrush"] = Alpha(20, 255, 255, 255);
+
+            dict["ToggleOnBrush"] = Solid(184, 192, 204);
+            dict["ToggleOnBorderBrush"] = Solid(184, 192, 204);
+            dict["ToggleOffBrush"] = Solid(28, 28, 31);
+            dict["ToggleOffBorderBrush"] = Solid(63, 63, 70);
+            dict["ToggleKnobBrush"] = Solid(228, 228, 231);
+            dict["ToggleKnobBorderBrush"] = Solid(193, 193, 204);
+            dict["ToggleKnobActiveBrush"] = Solid(24, 24, 27);
+            dict["ToggleKnobActiveBorderBrush"] = Solid(39, 39, 42);
+
+            dict["SliderTrackBrush"] = Solid(184, 192, 204);
+            dict["SliderTrackEmptyBrush"] = Solid(39, 39, 42);
+            dict["SliderTrackBorderBrush"] = Solid(63, 63, 70);
+            dict["SliderThumbBgBrush"] = Solid(255, 255, 255);
+            dict["SliderThumbBorderBrush"] = Solid(24, 24, 27);
+
+            dict["JewelRingBgBrush"] = Freeze(new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(34, 255, 255, 255),
+                System.Windows.Media.Color.FromArgb(5, 255, 255, 255),
+                new Point(0.0, 0.0), new Point(1.0, 1.0)));
+            dict["JewelRingBorderBrush"] = Alpha(60, 255, 255, 255);
+
+            var heroLensDark = new RadialGradientBrush
+            {
+                Center = new Point(0.35, 0.25),
+                GradientOrigin = new Point(0.35, 0.25),
+                RadiusX = 0.65,
+                RadiusY = 0.65
+            };
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(255, 255, 255), 0.0));
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(228, 228, 231), 0.45));
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(212, 212, 216), 0.85));
+            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(193, 193, 204), 1.0));
+            dict["HeroLensActiveBrush"] = Freeze(heroLensDark);
+
+            var heroGlowDark = new RadialGradientBrush
+            {
+                Center = new Point(0.5, 0.40),
+                GradientOrigin = new Point(0.5, 0.30),
+                RadiusX = 0.5,
+                RadiusY = 0.5
+            };
+            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(65, 255, 255, 255), 0.0));
+            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(20, 255, 255, 255), 0.5));
+            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 1.0));
+            dict["HeroGlowActiveBrush"] = Freeze(heroGlowDark);
+            dict["HeroIconActiveBrush"] = Solid(24, 24, 27);
+
+            dict["SquircleBgBrush"] = Alpha(20, 255, 255, 255);
+            dict["SquircleBorderBrush"] = Alpha(32, 255, 255, 255);
+
+            dict["KeycapBgBrush"] = Solid(39, 39, 42);
+            dict["KeycapBorderBrush"] = Solid(63, 63, 70);
+
+            dict["StatusCapsuleBgBrush"] = Alpha(28, 255, 255, 255);
+            dict["StatusCapsuleBorderBrush"] = Alpha(40, 255, 255, 255);
+
+            dict["WarningBgBrush"] = Alpha(20, 255, 255, 255);
+            dict["WarningBorderBrush"] = Alpha(32, 255, 255, 255);
+
+            dict["ScrollBarThumbBrush"] = Alpha(36, 255, 255, 255);
+            dict["ScrollBarThumbHoverBrush"] = Alpha(65, 255, 255, 255);
+            dict["ScrollBarThumbDragBrush"] = Alpha(100, 255, 255, 255);
+        }
+
+        cache = dict;
+        return dict;
+    }
+
     internal void SetLightMode(bool isLight)
     {
         int transitionVersion = ++_themeTransitionVersion;
@@ -2039,18 +2481,17 @@ public partial class MainWindow : Window
             }
         }
 
-        System.Windows.Media.Color accentColor = isLight ? System.Windows.Media.Color.FromRgb(71, 85, 105) : System.Windows.Media.Color.FromRgb(255, 255, 255);
-        Resources["AccentColor"] = accentColor;
-        Resources["AccentBrush"] = Freeze(new SolidColorBrush(accentColor));
-        Resources["AccentHoverBrush"] = Freeze(new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(18, 71, 85, 105) : System.Windows.Media.Color.FromArgb(34, 255, 255, 255)));
+        var theme = GetOrBuildThemeResources(isLight);
+        foreach (var kv in theme)
+        {
+            Resources[kv.Key] = kv.Value;
+        }
 
-        var themeGlyphBrush = Freeze(new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(55, 65, 81) : System.Windows.Media.Color.FromRgb(255, 255, 255)));
+        var themeGlyphBrush = (System.Windows.Media.Brush)theme["TitleTextBrush"];
         if (pathTitleTheme != null)
         {
             pathTitleTheme.Fill = themeGlyphBrush;
-            pathTitleTheme.Data = Geometry.Parse(isLight
-                ? "M21,12.79A9,9 0 1 1 11.21,3 7,7 0 0 0 21,12.79z"
-                : "M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z");
+            pathTitleTheme.Data = isLight ? MoonIconGeometry : SunIconGeometry;
         }
         if (titleBarIcon != null)
         {
@@ -2071,198 +2512,6 @@ public partial class MainWindow : Window
         if (txtSoundVolume != null)
         {
             txtSoundVolume.CaretBrush = themeGlyphBrush;
-        }
-
-        if (isLight)
-        {
-            Resources["WindowBgBrush"] = Freeze(new LinearGradientBrush(
-                System.Windows.Media.Color.FromArgb(174, 248, 249, 250),
-                System.Windows.Media.Color.FromArgb(174, 233, 236, 239),
-                new Point(0.0, 0.0), new Point(1.0, 1.0)));
-            Resources["CaptionButtonHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0)));
-            Resources["CaptionButtonPressedBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 0, 0, 0)));
-            Resources["CardBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255)));
-            Resources["InputBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245)));
-            Resources["TitleBarBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 255, 255, 255)));
-            Resources["TitleTextBrush"] = themeGlyphBrush;
-            Resources["TextWhiteBrush"] = themeGlyphBrush;
-            Resources["TextGrayBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(107, 114, 128)));
-            Resources["TextDimBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)));
-            Resources["BorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 0, 0, 0)));
-            Resources["DividerBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 0, 0, 0)));
-
-            // Liquid Switches (Soft Graphite in Light Mode)
-            Resources["ToggleOnBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
-            Resources["ToggleOnBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
-            Resources["ToggleOffBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
-            Resources["ToggleOffBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216)));
-            Resources["ToggleKnobBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
-            Resources["ToggleKnobBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216)));
-            Resources["ToggleKnobActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
-            Resources["ToggleKnobActiveBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
-
-            // Liquid OSD Duration Slider (Soft Graphite in Light Mode)
-            Resources["SliderTrackBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
-            Resources["SliderTrackEmptyBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
-            Resources["SliderTrackBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216)));
-            Resources["SliderThumbBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
-            Resources["SliderThumbBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105)));
-
-            // Jewel Ring
-            Resources["JewelRingBgBrush"] = Freeze(new LinearGradientBrush(
-                System.Windows.Media.Color.FromArgb(180, 255, 255, 255),
-                System.Windows.Media.Color.FromArgb(120, 244, 244, 245),
-                new Point(0.0, 0.0), new Point(1.0, 1.0)));
-            Resources["JewelRingBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255)));
-
-            // Hero Mute Button: Liquid Slate-Graphite Lens matching Toggle Switches in Light Mode
-            var heroLensLight = new RadialGradientBrush
-            {
-                Center = new Point(0.35, 0.25),
-                GradientOrigin = new Point(0.35, 0.25),
-                RadiusX = 0.65,
-                RadiusY = 0.65
-            };
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(108, 122, 142), 0.0));
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(85, 99, 120), 0.35));
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(71, 85, 105), 0.70));
-            heroLensLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(55, 67, 83), 1.0));
-            Resources["HeroLensActiveBrush"] = Freeze(heroLensLight);
-
-            var heroGlowLight = new RadialGradientBrush
-            {
-                Center = new Point(0.5, 0.40),
-                GradientOrigin = new Point(0.5, 0.30),
-                RadiusX = 0.5,
-                RadiusY = 0.5
-            };
-            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(35, 71, 85, 105), 0.0));
-            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(12, 71, 85, 105), 0.5));
-            heroGlowLight.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 71, 85, 105), 1.0));
-            Resources["HeroGlowActiveBrush"] = Freeze(heroGlowLight);
-            Resources["HeroIconActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
-
-            // Monochrome Squircle Tiles
-            Resources["SquircleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(14, 0, 0, 0)));
-            Resources["SquircleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 0, 0, 0)));
-            Resources["SquircleIconBrush"] = themeGlyphBrush;
-
-            // Keycaps
-            Resources["KeycapBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 244, 245)));
-            Resources["KeycapBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
-            Resources["KeycapTextBrush"] = themeGlyphBrush;
-
-            // Status Capsule (Visible Border in Light Mode)
-            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 71, 85, 105)));
-            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(42, 71, 85, 105)));
-            Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
-            Resources["StatusDotBrush"] = themeGlyphBrush;
-
-            // Warning / Status Message Box (Monochrome Black & White Theme)
-            Resources["WarningBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(12, 0, 0, 0)));
-            Resources["WarningBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(22, 0, 0, 0)));
-            Resources["WarningTextBrush"] = themeGlyphBrush;
-
-            // Scrollbars
-            Resources["ScrollBarThumbBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 0, 0, 0)));
-            Resources["ScrollBarThumbHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(70, 0, 0, 0)));
-            Resources["ScrollBarThumbDragBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 0, 0, 0)));
-        }
-        else
-        {
-            // True Neutral Gray-Black Dark Mode (Zero Blue)
-            Resources["WindowBgBrush"] = Freeze(new LinearGradientBrush(
-                System.Windows.Media.Color.FromArgb(242, 24, 24, 27),
-                System.Windows.Media.Color.FromArgb(242, 9, 9, 11),
-                new Point(0.0, 0.0), new Point(1.0, 1.0)));
-            Resources["CaptionButtonHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 255, 255, 255)));
-            Resources["CaptionButtonPressedBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, 255, 255, 255)));
-            Resources["CardBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
-            Resources["InputBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
-            Resources["TitleBarBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(0, 0, 0, 0)));
-            Resources["TitleTextBrush"] = themeGlyphBrush;
-            Resources["TextWhiteBrush"] = themeGlyphBrush;
-            Resources["TextGrayBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204)));
-            Resources["TextDimBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(136, 136, 146)));
-            Resources["BorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255)));
-            Resources["DividerBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
-
-            // Liquid Switches (25% Softened White Liquid in Dark Mode)
-            Resources["ToggleOnBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204)));
-            Resources["ToggleOnBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204)));
-            Resources["ToggleOffBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(28, 28, 31)));
-            Resources["ToggleOffBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70)));
-            Resources["ToggleKnobBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 228, 231)));
-            Resources["ToggleKnobBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(193, 193, 204)));
-            Resources["ToggleKnobActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
-            Resources["ToggleKnobActiveBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42)));
-
-            // Liquid OSD Duration Slider
-            Resources["SliderTrackBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(184, 192, 204)));
-            Resources["SliderTrackEmptyBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42)));
-            Resources["SliderTrackBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70)));
-            Resources["SliderThumbBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)));
-            Resources["SliderThumbBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
-
-            // Jewel Ring
-            Resources["JewelRingBgBrush"] = Freeze(new LinearGradientBrush(
-                System.Windows.Media.Color.FromArgb(34, 255, 255, 255),
-                System.Windows.Media.Color.FromArgb(5, 255, 255, 255),
-                new Point(0.0, 0.0), new Point(1.0, 1.0)));
-            Resources["JewelRingBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 255, 255)));
-
-            // Hero Mute Button: Liquid White-Zinc Lens in Dark Mode
-            var heroLensDark = new RadialGradientBrush
-            {
-                Center = new Point(0.35, 0.25),
-                GradientOrigin = new Point(0.35, 0.25),
-                RadiusX = 0.65,
-                RadiusY = 0.65
-            };
-            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(255, 255, 255), 0.0));
-            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(228, 228, 231), 0.45));
-            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(212, 212, 216), 0.85));
-            heroLensDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(193, 193, 204), 1.0));
-            Resources["HeroLensActiveBrush"] = Freeze(heroLensDark);
-
-            var heroGlowDark = new RadialGradientBrush
-            {
-                Center = new Point(0.5, 0.40),
-                GradientOrigin = new Point(0.5, 0.30),
-                RadiusX = 0.5,
-                RadiusY = 0.5
-            };
-            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(65, 255, 255, 255), 0.0));
-            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(20, 255, 255, 255), 0.5));
-            heroGlowDark.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 1.0));
-            Resources["HeroGlowActiveBrush"] = Freeze(heroGlowDark);
-            Resources["HeroIconActiveBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 27)));
-
-            // Monochrome Squircle Tiles: Pure White Icon in Dark Mode
-            Resources["SquircleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
-            Resources["SquircleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255)));
-            Resources["SquircleIconBrush"] = themeGlyphBrush;
-
-            // Keycaps
-            Resources["KeycapBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 39, 42)));
-            Resources["KeycapBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromRgb(63, 63, 70)));
-            Resources["KeycapTextBrush"] = themeGlyphBrush;
-
-            // Status Capsule (Visible Border in Dark Mode)
-            Resources["StatusCapsuleBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 255, 255, 255)));
-            Resources["StatusCapsuleBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255)));
-            Resources["StatusCapsuleTextBrush"] = themeGlyphBrush;
-            Resources["StatusDotBrush"] = themeGlyphBrush;
-
-            // Warning / Status Message Box (Monochrome Black & White Theme)
-            Resources["WarningBgBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)));
-            Resources["WarningBorderBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(32, 255, 255, 255)));
-            Resources["WarningTextBrush"] = themeGlyphBrush;
-
-            // Scrollbars
-            Resources["ScrollBarThumbBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(36, 255, 255, 255)));
-            Resources["ScrollBarThumbHoverBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(65, 255, 255, 255)));
-            Resources["ScrollBarThumbDragBrush"] = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 255, 255, 255)));
         }
 
         if (popupAppMenu != null)
@@ -2663,6 +2912,7 @@ public partial class MainWindow : Window
         if (_hotkeyManager != null)
         {
             _hotkeyManager.HotkeyPressed -= HotkeyManager_HotkeyPressed;
+            _hotkeyManager.HotkeyReleased -= HotkeyManager_HotkeyReleased;
             _hotkeyManager.Dispose();
             _hotkeyManager = null;
         }

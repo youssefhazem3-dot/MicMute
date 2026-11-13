@@ -20,10 +20,10 @@
     <AssemblyName>MicMute</AssemblyName>
 
     <PublishSingleFile Condition="'$(PublishSingleFile)' == ''">false</PublishSingleFile>
-    <SelfContained Condition="'$(PublishSingleFile)' == 'true'">true</SelfContained>
+    <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(SelfContained)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile Condition="'$(SelfContained)' == 'true'">true</EnableCompressionInSingleFile>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
   </PropertyGroup>

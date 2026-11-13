@@ -69,6 +69,7 @@ static class UiCases
         test(nameof(KeycapInputBoxesSingleClickShowsCaretAndDoubleClickSelectsAll), KeycapInputBoxesSingleClickShowsCaretAndDoubleClickSelectsAll);
         test(nameof(OsdWindowHideAndAudioFeedbackStreamManagement), OsdWindowHideAndAudioFeedbackStreamManagement);
         test(nameof(MenuOutsideClickDismissalAndOsdSpamResilience), MenuOutsideClickDismissalAndOsdSpamResilience);
+        test(nameof(PowerModesAndMouseShortcutAndMenuActions), PowerModesAndMouseShortcutAndMenuActions);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -2061,6 +2062,83 @@ static class UiCases
         }
         finally
         {
+            window.Close();
+        }
+    }
+
+    private static void PowerModesAndMouseShortcutAndMenuActions()
+    {
+        AppSettings originalSettings = SettingsManager.Load();
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            // 1. Mouse button formatting in DisplayHotkey
+            window.DisplayHotkey(HotkeyManager.MouseMiddleKey, System.Windows.Input.ModifierKeys.None);
+            Check.Equal("Mouse Middle", window.tbHotkey.Text);
+            window.DisplayHotkey(HotkeyManager.MouseXButton1Key, System.Windows.Input.ModifierKeys.Control);
+            Check.Equal("Ctrl + Mouse 4", window.tbHotkey.Text);
+            window.DisplayHotkey(HotkeyManager.MouseXButton2Key, System.Windows.Input.ModifierKeys.None);
+            Check.Equal("Mouse 5", window.tbHotkey.Text);
+
+            // 2. Hold mode toggle button + hero prompt + subtitle
+            Check.True(window.btnHotkeyMode != null, "btnHotkeyMode must be bound");
+            Check.Equal("Toggle", window.btnHotkeyMode!.Content as string);
+            window.BtnHotkeyMode_Click(window.btnHotkeyMode, new System.Windows.RoutedEventArgs());
+            Check.True(SettingsManager.Load().HoldKeyMode, "HoldKeyMode should toggle to true");
+            Check.Equal("Hold", window.btnHotkeyMode.Content as string);
+            Check.Equal("Hold ", window.tbHeroHotkeyPrefix?.Text);
+            Check.Equal(" to toggle", window.tbHeroHotkeySuffix?.Text);
+            Check.Equal("Hold key to toggle", window.tbHotkeySubtitle?.Text);
+
+            // 2b. Left-clicking elsewhere while recording cancels shortcut recording
+            window.StartRecordingHotkey();
+            Check.Equal("Cancel", window.btnRecordHotkey.Content as string);
+            var leftClick = new System.Windows.Input.MouseButtonEventArgs(
+                System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = System.Windows.UIElement.PreviewMouseDownEvent
+            };
+            window.RaiseEvent(leftClick);
+            Check.Equal("Record", window.btnRecordHotkey.Content as string, "Clicking outside Record button must cancel recording");
+
+            // 3. Startup mic state cycling
+            window.BtnMenuStartupState_Click(window.btnMenuStartupState!, new System.Windows.RoutedEventArgs());
+            Check.Equal(1, SettingsManager.Load().StartupMuteMode);
+            Check.Equal("Startup: Always Muted", window.tbMenuStartupState?.Text);
+            window.BtnMenuStartupState_Click(window.btnMenuStartupState!, new System.Windows.RoutedEventArgs());
+            Check.Equal(2, SettingsManager.Load().StartupMuteMode);
+            Check.Equal("Startup: Always Live", window.tbMenuStartupState?.Text);
+            window.BtnMenuStartupState_Click(window.btnMenuStartupState!, new System.Windows.RoutedEventArgs());
+            Check.Equal(0, SettingsManager.Load().StartupMuteMode);
+            Check.Equal("Startup: Keep Last", window.tbMenuStartupState?.Text);
+
+            // 4. Sync All Microphones & Mute Lock toggles
+            window.BtnMenuSyncAllMics_Click(window.btnMenuSyncAllMics!, new System.Windows.RoutedEventArgs());
+            Check.True(SettingsManager.Load().SyncAllMicrophones, "SyncAllMicrophones should enable");
+            Check.True(audio.SyncAllMicrophones, "AudioController.SyncAllMicrophones should sync");
+            Check.Equal("Sync All Mics: On", window.tbMenuSyncAllMics?.Text);
+
+            window.BtnMenuLockMute_Click(window.btnMenuLockMute!, new System.Windows.RoutedEventArgs());
+            Check.True(SettingsManager.Load().LockMuteState, "LockMuteState should enable");
+            Check.True(audio.LockMuteState, "AudioController.LockMuteState should sync");
+            Check.Equal("Mute Lock: On", window.tbMenuLockMute?.Text);
+
+            // 5. GitHub Update check & About menu feedback
+            window.BtnMenuCheckUpdates_Click(window.btnMenuCheckUpdates!, new System.Windows.RoutedEventArgs());
+            Check.Equal("Checking GitHub for updates...", new System.Windows.Documents.TextRange(window.tbWarningMessage.ContentStart, window.tbWarningMessage.ContentEnd).Text);
+
+            window.BtnMenuAbout_Click(window.btnMenuAbout!, new System.Windows.RoutedEventArgs());
+            string aboutText = new System.Windows.Documents.TextRange(window.tbWarningMessage.ContentStart, window.tbWarningMessage.ContentEnd).Text;
+            Check.True(aboutText.Contains("github.com/youssefhazem3-dot/MicMute", StringComparison.Ordinal), "About status should include project URL");
+        }
+        finally
+        {
+            SettingsManager.Save(originalSettings);
+            SettingsManager.Flush();
             window.Close();
         }
     }
