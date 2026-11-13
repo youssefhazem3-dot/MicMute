@@ -10,13 +10,9 @@ if(!$SkipTests){
     & (Join-Path $PSScriptRoot 'test.ps1') -DotnetPath $DotnetPath -NoRestore:$NoRestore
     if($LASTEXITCODE -ne 0){throw 'Regression tests failed; package was not updated.'}
 }
-$objDir = Join-Path $projectRoot 'obj'
-if (Test-Path -LiteralPath $objDir) {
-    Remove-Item -LiteralPath $objDir -Recurse -Force -ErrorAction SilentlyContinue
-}
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $stage=Join-Path $projectRoot ".artifacts/publish-$stamp"
-$arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true','-p:EnableCompressionInSingleFile=false','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
+$arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true','-p:EnableCompressionInSingleFile=true','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
 if($NoRestore){$arguments+='--no-restore'}
 & $DotnetPath @arguments
 if($LASTEXITCODE -ne 0){throw 'Publish failed; package was not updated.'}
@@ -25,46 +21,57 @@ foreach($required in @('MicMute.exe')){
     if($required -notin $files.Name){throw "Missing release artifact: $required"}
 }
 # Verify that launching the SDK-generated host will not open a console window.
-$hostBytes=[IO.File]::ReadAllBytes((Join-Path $stage 'MicMute.exe'))
-$peOffset=[BitConverter]::ToInt32($hostBytes,0x3c)
-if([BitConverter]::ToUInt16($hostBytes,$peOffset+0x5c) -ne 2){throw 'The release executable is not a Windows GUI application.'}
+$exeStagePath = Join-Path $stage 'MicMute.exe'
+$fs = [IO.File]::OpenRead($exeStagePath)
+try {
+    $header = New-Object byte[] 4096
+    [void]$fs.Read($header, 0, $header.Length)
+    $peOffset = [BitConverter]::ToInt32($header, 0x3c)
+    if ([BitConverter]::ToUInt16($header, $peOffset + 0x5c) -ne 2) {
+        throw 'The release executable is not a Windows GUI application.'
+    }
+} finally {
+    $fs.Dispose()
+}
 
 function Copy-Release([string]$destination){
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
-    # Preflight all destination files before changing any of them.
     foreach($file in $files){
         $target=Join-Path $destination $file.Name
         if(Test-Path -LiteralPath $target){
             try{$stream=[IO.File]::Open($target,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None);$stream.Dispose()}
-            catch{Write-Warning "Release is locked at $destination; its files were left unchanged. Extract the new ZIP after closing that instance.";return $false}
+            catch{Write-Warning "Release is locked at $destination; its files were left unchanged.";return $false}
         }
     }
-    $backup=Join-Path $projectRoot ('.artifacts/previous-release/'+$stamp+'/'+$(if($destination -eq $projectRoot){'root'}else{'publish'}))
-    New-Item -ItemType Directory -Path $backup -Force | Out-Null
-    foreach($file in $files){$target=Join-Path $destination $file.Name;if(Test-Path -LiteralPath $target){Copy-Item -LiteralPath $target -Destination $backup -Force}}
     foreach($file in $files){Copy-Item -LiteralPath $file.FullName -Destination $destination -Force}
     return $true
 }
 
-$stageZip=Join-Path $projectRoot ".artifacts/MicMute-$stamp.zip"
-Compress-Archive -LiteralPath $files.FullName -DestinationPath $stageZip -CompressionLevel Optimal
 $zipPath=Join-Path $projectRoot 'MicMute.zip'
-if(Test-Path -LiteralPath $zipPath){Copy-Item -LiteralPath $zipPath -Destination (Join-Path $projectRoot ".artifacts/MicMute-before-$stamp.zip")}
-Copy-Item -LiteralPath $stageZip -Destination $zipPath -Force
+Compress-Archive -LiteralPath $files.FullName -DestinationPath $zipPath -CompressionLevel Optimal -Force
 $publishUpdated=Copy-Release (Join-Path $projectRoot 'publish')
-$rootUpdated=if($UpdateRoot){Copy-Release $projectRoot}else{$false}
+$rootUpdated=if($UpdateRoot){
+    $r = Copy-Release $projectRoot
+    $parentDir = Split-Path -Parent $projectRoot
+    if ($parentDir -and (Test-Path -LiteralPath (Join-Path $parentDir 'MicMute.exe'))) {
+        [void](Copy-Release $parentDir)
+    }
+    $r
+}else{$false}
 
-# Prune older publish directories and ZIP backups to prevent disk bloat (keep latest 2)
+# Prune older staging directories and legacy backup bloat to protect SSD space and lifespan
 $artifactsDir = Join-Path $projectRoot '.artifacts'
 if (Test-Path -LiteralPath $artifactsDir) {
+    $legacyPrev = Join-Path $artifactsDir 'previous-release'
+    if (Test-Path -LiteralPath $legacyPrev) {
+        Remove-Item -LiteralPath $legacyPrev -Recurse -Force -ErrorAction SilentlyContinue
+    }
     Get-ChildItem -LiteralPath $artifactsDir -Directory -Filter 'publish-*' |
         Sort-Object CreationTime -Descending |
-        Select-Object -Skip 2 |
+        Select-Object -Skip 1 |
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
     Get-ChildItem -LiteralPath $artifactsDir -File -Filter 'MicMute-*.zip' |
-        Sort-Object CreationTime -Descending |
-        Select-Object -Skip 4 |
         Remove-Item -Force -ErrorAction SilentlyContinue
 }
 

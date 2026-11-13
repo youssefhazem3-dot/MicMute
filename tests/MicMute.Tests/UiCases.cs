@@ -658,18 +658,15 @@ static class UiCases
         var rect = new System.Drawing.Rectangle(0, 0, 164, 29);
         var flags = System.Windows.Forms.TextFormatFlags.Left | System.Windows.Forms.TextFormatFlags.VerticalCenter;
 
-        // Render full menu simulation to scratch image for visual verification in both dark and light modes
+        // Validate menu rendering in both dark and light modes without leaving scratch artifacts or dirty settings
+        var originalSettings = SettingsManager.Load();
         try
         {
-            string scratchDir = @"C:\Users\PoolFrty\.gemini\antigravity\brain\0300b3b7-33af-4964-8387-3d792bce1b30\scratch";
-            if (!System.IO.Directory.Exists(scratchDir)) System.IO.Directory.CreateDirectory(scratchDir);
-
             foreach (bool light in new[] { false, true })
             {
                 var settings = SettingsManager.Load();
                 SettingsManager.Save(settings with { LightMode = light });
 
-                string outPath = System.IO.Path.Combine(scratchDir, light ? "tray_light.png" : "tray_dark.png");
                 using var fullBmp = new System.Drawing.Bitmap(170, 100);
                 using var fullG = System.Drawing.Graphics.FromImage(fullBmp);
                 
@@ -679,7 +676,7 @@ static class UiCases
                 var borderMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderToolStripBorder", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 borderMethod?.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripRenderEventArgs(fullG, menu) });
 
-                // Item 1 (Hovered / Selected, just like in the user's reference photo)
+                // Item 1 (Hovered / Selected)
                 item1.Select();
                 using var item1Bmp = new System.Drawing.Bitmap(164, 29);
                 using (var item1G = System.Drawing.Graphics.FromImage(item1Bmp))
@@ -705,8 +702,6 @@ static class UiCases
                 }
                 fullG.DrawImage(item3Bmp, 4, 64);
 
-                fullBmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
-
                 // Verify item3 has drawn glyphs
                 int item3Pixels = 0;
                 for (int py = 0; py < item3Bmp.Height; py++)
@@ -715,10 +710,10 @@ static class UiCases
                 Check.True(item3Pixels > 30, "Item 3 (Quit) must render both icon and text pixels");
             }
         }
-        catch (Exception ex)
+        finally
         {
-            Console.WriteLine("PREVIEW ERROR: " + ex);
-            throw;
+            SettingsManager.Save(originalSettings);
+            SettingsManager.Flush();
         }
     }
 
@@ -1374,6 +1369,7 @@ static class UiCases
 
     private static void OsdDurationAndSoundVolumeKeycapsSupportClampingAndKeyboardInteraction()
     {
+        var originalSettings = SettingsManager.Load();
         using var audio = new AudioController();
         var window = new MainWindow(audio);
         try
@@ -1441,6 +1437,9 @@ static class UiCases
         }
         finally
         {
+            SettingsManager.Save(originalSettings);
+            SettingsManager.Flush();
+            AudioFeedback.SetVolume(originalSettings.SoundVolume);
             window.Close();
         }
     }

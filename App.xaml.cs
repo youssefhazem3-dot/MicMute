@@ -344,7 +344,13 @@ public partial class App : System.Windows.Application
     [DllImport("user32.dll", EntryPoint = "FindWindow", SetLastError = true)]
     private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
-    private static IntPtr _currentHIcon = IntPtr.Zero;
+    private int _cachedTrayIconSize;
+    private Icon? _trayIconMuted;
+    private IntPtr _hIconMuted = IntPtr.Zero;
+    private Icon? _trayIconActiveDark;
+    private IntPtr _hIconActiveDark = IntPtr.Zero;
+    private Icon? _trayIconActiveLight;
+    private IntPtr _hIconActiveLight = IntPtr.Zero;
 
     [STAThread]
     public static void Main(string[] args)
@@ -557,7 +563,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        // Automatic High Refresh Rate Detection (144Hz, 240Hz, 360Hz)
+        // Automatic High Refresh Rate Detection (capped at 120 FPS to avoid heavy DWM layered composition)
         try
         {
             int refreshRate = 60;
@@ -565,7 +571,7 @@ public partial class App : System.Windows.Application
             devMode.dmSize = (short)Marshal.SizeOf(devMode);
             if (EnumDisplaySettings(null, -1, ref devMode) && devMode.dmDisplayFrequency > 30)
             {
-                refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 360);
+                refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 120);
             }
             if (!_frameRateMetadataOverridden)
             {
@@ -607,6 +613,15 @@ public partial class App : System.Windows.Application
         }
 
         _mainWindow = new MainWindow(_audioController);
+        _mainWindow.TaskbarCreated += (_, _) =>
+        {
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Visible = true;
+                UpdateTrayIconState();
+            }
+        };
         if (!UiBehavior.ShouldStartMinimized(appSettings.StartMinimized, e.Args))
         {
             _mainWindow.Show();
@@ -704,133 +719,170 @@ public partial class App : System.Windows.Application
         }
         string text = _audioController?.CurrentDeviceName ?? "No microphone";
         string text2 = string.IsNullOrEmpty(_audioController?.CurrentDeviceId) ? "NO MICROPHONE" : isMuted ? "MUTED" : "ACTIVE";
-        _notifyIcon.Text = UiBehavior.LimitTooltip("Mic Mute (" + text2 + ")\nDevice: " + text);
+        string tooltip = UiBehavior.LimitTooltip("Mic Mute (" + text2 + ")\nDevice: " + text);
+        if (!string.Equals(_notifyIcon.Text, tooltip, StringComparison.Ordinal))
+        {
+            _notifyIcon.Text = tooltip;
+        }
         try
         {
             int size = Math.Max(16, SystemInformation.SmallIconSize.Width);
-            using Bitmap bitmap = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            using (Graphics graphics = Graphics.FromImage(bitmap))
+            if (_cachedTrayIconSize != size)
             {
-                graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                graphics.Clear(Color.Transparent);
-
-                bool lightMode = SettingsManager.Load().LightMode;
-
-                // Squircle badge background & border
-                float s = size;
-                RectangleF badgeRect = new RectangleF(0.5f, 0.5f, s - 1f, s - 1f);
-                float cornerRadius = s * 0.28f;
-
-                Color badgeBg = isMuted
-                    ? Color.FromArgb(225, 45, 45) // Standard clean UI red (#E12D2D)
-                    : (lightMode ? Color.FromArgb(45, 45, 48) : Color.FromArgb(24, 24, 27)); // Sleek neutral glass
-                Color badgeBorder = isMuted
-                    ? Color.FromArgb(248, 113, 113) // Crisp highlight rim (#F87171)
-                    : (lightMode ? Color.FromArgb(70, 70, 75) : Color.FromArgb(46, 46, 52));
-
-                using (GraphicsPath badgePath = CreateRoundedRectanglePath(badgeRect, cornerRadius))
-                {
-                    using (SolidBrush bgBrush = new SolidBrush(badgeBg))
-                        graphics.FillPath(bgBrush, badgePath);
-                    using (Pen borderPen = new Pen(badgeBorder, 1f))
-                        graphics.DrawPath(borderPen, badgePath);
-                }
-
-                // Center and scale microphone glyph from Gemini reference design (24x24 box)
-                float cx = s / 2f;
-                float cy = s / 2f;
-                float scale = (s * 0.65f) / 24f;
-
-                graphics.TranslateTransform(cx, cy);
-                graphics.ScaleTransform(scale, scale);
-                graphics.TranslateTransform(-12f, -12f);
-
-                // Microphone Capsule (Solid rounded pill)
-                using (GraphicsPath capsule = new GraphicsPath())
-                {
-                    capsule.AddArc(8.25f, 2.5f, 7.5f, 7.5f, 180, 180);
-                    capsule.AddLine(15.75f, 6.25f, 15.75f, 10.5f);
-                    capsule.AddArc(8.25f, 6.75f, 7.5f, 7.5f, 0, 180);
-                    capsule.AddLine(8.25f, 10.5f, 8.25f, 6.25f);
-                    capsule.CloseFigure();
-
-                    using (SolidBrush micBrush = new SolidBrush(Color.White))
-                        graphics.FillPath(micBrush, capsule);
-                }
-
-                // Microphone Cradle, Stem, and Foot
-                using (Pen cradlePen = new Pen(Color.White, 2.0f))
-                {
-                    cradlePen.StartCap = LineCap.Round;
-                    cradlePen.EndCap = LineCap.Round;
-
-                    using (GraphicsPath cradle = new GraphicsPath())
-                    {
-                        cradle.AddLine(6.0f, 7.5f, 6.0f, 10.5f);
-                        cradle.AddArc(6.0f, 4.5f, 12.0f, 12.0f, 180, -180);
-                        cradle.AddLine(18.0f, 10.5f, 18.0f, 7.5f);
-                        graphics.DrawPath(cradlePen, cradle);
-                    }
-
-                    // Neck / stem
-                    graphics.DrawLine(cradlePen, 12.0f, 16.5f, 12.0f, 20.0f);
-                    // Foot base
-                    graphics.DrawLine(cradlePen, 8.0f, 20.0f, 16.0f, 20.0f);
-                }
-
-                // Muted diagonal slash
-                if (isMuted)
-                {
-                    using (Pen slashBacking = new Pen(Color.FromArgb(140, 0, 0, 0), 4.2f))
-                    {
-                        slashBacking.StartCap = LineCap.Round;
-                        slashBacking.EndCap = LineCap.Round;
-                        graphics.DrawLine(slashBacking, 3.5f, 3.5f, 20.5f, 20.5f);
-                    }
-                    using (Pen slashWhite = new Pen(Color.White, 2.2f))
-                    {
-                        slashWhite.StartCap = LineCap.Round;
-                        slashWhite.EndCap = LineCap.Round;
-                        graphics.DrawLine(slashWhite, 3.5f, 3.5f, 20.5f, 20.5f);
-                    }
-                }
-
-                graphics.ResetTransform();
+                DisposeCachedTrayIcons();
+                _cachedTrayIconSize = size;
             }
-            IntPtr newHIcon = bitmap.GetHicon();
-            try
+
+            bool lightMode = SettingsManager.Load().LightMode;
+            Icon? icon = GetOrCreateCachedTrayIcon(size, isMuted, lightMode);
+            if (icon != null && !ReferenceEquals(_notifyIcon.Icon, icon))
             {
-                Icon icon = Icon.FromHandle(newHIcon);
-                Icon? oldIcon = _notifyIcon.Icon;
                 _notifyIcon.Icon = icon;
-                oldIcon?.Dispose();
-
-                if (_currentHIcon != IntPtr.Zero)
-                {
-                    DestroyIcon(_currentHIcon);
-                }
-                _currentHIcon = newHIcon;
-            }
-            catch
-            {
-                // Ensure native GDI icon handle is released if Icon.FromHandle or NotifyIcon fails
-                DestroyIcon(newHIcon);
-                throw;
             }
         }
         catch (Exception ex)
         {
-            try
-            {
-                string text3 = SettingsManager.GetDataFolderPath();
-                Directory.CreateDirectory(text3);
-                File.WriteAllText(Path.Combine(text3, "gdi_error.txt"), ex.ToString());
-            }
-            catch
-            {
-            }
+            DiagnosticLogger.LogError("UpdateTrayIcon failed", ex);
         }
+    }
+
+    private Icon? GetOrCreateCachedTrayIcon(int size, bool isMuted, bool lightMode)
+    {
+        if (isMuted)
+        {
+            if (_trayIconMuted == null)
+                (_trayIconMuted, _hIconMuted) = RenderTrayIcon(size, isMuted: true, lightMode: false);
+            return _trayIconMuted;
+        }
+        if (lightMode)
+        {
+            if (_trayIconActiveLight == null)
+                (_trayIconActiveLight, _hIconActiveLight) = RenderTrayIcon(size, isMuted: false, lightMode: true);
+            return _trayIconActiveLight;
+        }
+        if (_trayIconActiveDark == null)
+            (_trayIconActiveDark, _hIconActiveDark) = RenderTrayIcon(size, isMuted: false, lightMode: false);
+        return _trayIconActiveDark;
+    }
+
+    private static (Icon Icon, IntPtr Handle) RenderTrayIcon(int size, bool isMuted, bool lightMode)
+    {
+        using Bitmap bitmap = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (Graphics graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            graphics.Clear(Color.Transparent);
+
+            // Squircle badge background & border
+            float s = size;
+            RectangleF badgeRect = new RectangleF(0.5f, 0.5f, s - 1f, s - 1f);
+            float cornerRadius = s * 0.28f;
+
+            Color badgeBg = isMuted
+                ? Color.FromArgb(225, 45, 45) // Standard clean UI red (#E12D2D)
+                : (lightMode ? Color.FromArgb(45, 45, 48) : Color.FromArgb(24, 24, 27)); // Sleek neutral glass
+            Color badgeBorder = isMuted
+                ? Color.FromArgb(248, 113, 113) // Crisp highlight rim (#F87171)
+                : (lightMode ? Color.FromArgb(70, 70, 75) : Color.FromArgb(46, 46, 52));
+
+            using (GraphicsPath badgePath = CreateRoundedRectanglePath(badgeRect, cornerRadius))
+            {
+                using (SolidBrush bgBrush = new SolidBrush(badgeBg))
+                    graphics.FillPath(bgBrush, badgePath);
+                using (Pen borderPen = new Pen(badgeBorder, 1f))
+                    graphics.DrawPath(borderPen, badgePath);
+            }
+
+            // Center and scale microphone glyph from reference design (24x24 box)
+            float cx = s / 2f;
+            float cy = s / 2f;
+            float scale = (s * 0.65f) / 24f;
+
+            graphics.TranslateTransform(cx, cy);
+            graphics.ScaleTransform(scale, scale);
+            graphics.TranslateTransform(-12f, -12f);
+
+            // Microphone Capsule (Solid rounded pill)
+            using (GraphicsPath capsule = new GraphicsPath())
+            {
+                capsule.AddArc(8.25f, 2.5f, 7.5f, 7.5f, 180, 180);
+                capsule.AddLine(15.75f, 6.25f, 15.75f, 10.5f);
+                capsule.AddArc(8.25f, 6.75f, 7.5f, 7.5f, 0, 180);
+                capsule.AddLine(8.25f, 10.5f, 8.25f, 6.25f);
+                capsule.CloseFigure();
+
+                using (SolidBrush micBrush = new SolidBrush(Color.White))
+                    graphics.FillPath(micBrush, capsule);
+            }
+
+            // Microphone Cradle, Stem, and Foot
+            using (Pen cradlePen = new Pen(Color.White, 2.0f))
+            {
+                cradlePen.StartCap = LineCap.Round;
+                cradlePen.EndCap = LineCap.Round;
+
+                using (GraphicsPath cradle = new GraphicsPath())
+                {
+                    cradle.AddLine(6.0f, 7.5f, 6.0f, 10.5f);
+                    cradle.AddArc(6.0f, 4.5f, 12.0f, 12.0f, 180, -180);
+                    cradle.AddLine(18.0f, 10.5f, 18.0f, 7.5f);
+                    graphics.DrawPath(cradlePen, cradle);
+                }
+
+                // Neck / stem
+                graphics.DrawLine(cradlePen, 12.0f, 16.5f, 12.0f, 20.0f);
+                // Foot base
+                graphics.DrawLine(cradlePen, 8.0f, 20.0f, 16.0f, 20.0f);
+            }
+
+            // Muted diagonal slash
+            if (isMuted)
+            {
+                using (Pen slashBacking = new Pen(Color.FromArgb(140, 0, 0, 0), 4.2f))
+                {
+                    slashBacking.StartCap = LineCap.Round;
+                    slashBacking.EndCap = LineCap.Round;
+                    graphics.DrawLine(slashBacking, 3.5f, 3.5f, 20.5f, 20.5f);
+                }
+                using (Pen slashWhite = new Pen(Color.White, 2.2f))
+                {
+                    slashWhite.StartCap = LineCap.Round;
+                    slashWhite.EndCap = LineCap.Round;
+                    graphics.DrawLine(slashWhite, 3.5f, 3.5f, 20.5f, 20.5f);
+                }
+            }
+
+            graphics.ResetTransform();
+        }
+
+        IntPtr hIcon = bitmap.GetHicon();
+        try
+        {
+            return (Icon.FromHandle(hIcon), hIcon);
+        }
+        catch
+        {
+            DestroyIcon(hIcon);
+            throw;
+        }
+    }
+
+    private void DisposeCachedTrayIcons()
+    {
+        if (_notifyIcon != null) _notifyIcon.Icon = null;
+
+        _trayIconMuted?.Dispose();
+        _trayIconMuted = null;
+        if (_hIconMuted != IntPtr.Zero) { DestroyIcon(_hIconMuted); _hIconMuted = IntPtr.Zero; }
+
+        _trayIconActiveDark?.Dispose();
+        _trayIconActiveDark = null;
+        if (_hIconActiveDark != IntPtr.Zero) { DestroyIcon(_hIconActiveDark); _hIconActiveDark = IntPtr.Zero; }
+
+        _trayIconActiveLight?.Dispose();
+        _trayIconActiveLight = null;
+        if (_hIconActiveLight != IntPtr.Zero) { DestroyIcon(_hIconActiveLight); _hIconActiveLight = IntPtr.Zero; }
     }
 
     public void UpdateTrayIconState()
@@ -911,11 +963,7 @@ public partial class App : System.Windows.Application
 
         try
         {
-            if (_currentHIcon != IntPtr.Zero)
-            {
-                DestroyIcon(_currentHIcon);
-                _currentHIcon = IntPtr.Zero;
-            }
+            DisposeCachedTrayIcons();
         }
         catch (Exception ex) { DiagnosticLogger.LogError("Tray icon handle destruction failed during teardown", ex); }
 
@@ -930,8 +978,8 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex) { DiagnosticLogger.LogError("MainWindow close failed during teardown", ex); }
 
-        try { OsdWindow.HideOsd(); }
-        catch (Exception ex) { DiagnosticLogger.LogError("OsdWindow.HideOsd failed during teardown", ex); }
+        try { OsdWindow.CloseOsd(); }
+        catch (Exception ex) { DiagnosticLogger.LogError("OsdWindow.CloseOsd failed during teardown", ex); }
 
         try { AudioFeedback.Dispose(); }
         catch (Exception ex) { DiagnosticLogger.LogError("AudioFeedback.Dispose failed during teardown", ex); }

@@ -154,7 +154,9 @@ public partial class OsdWindow : Window
 
                     var content = root.Content;
                     root.Content = null;
+                    root.Resources = new ResourceDictionary();
                     this.Content = content;
+                    try { root.Close(); } catch { }
                 }
             }
         }
@@ -220,7 +222,8 @@ public partial class OsdWindow : Window
         int sequenceId = Interlocked.Increment(ref _activeSequenceId);
 
         CancellationTokenSource? previousCts = _cts;
-        _cts = new CancellationTokenSource();
+        var currentCts = new CancellationTokenSource();
+        _cts = currentCts;
         try
         {
             previousCts?.Cancel();
@@ -251,7 +254,7 @@ public partial class OsdWindow : Window
         double safeDuration = double.IsFinite(durationSeconds)
             ? Math.Clamp(durationSeconds, UiBehavior.MinimumOsdDuration, UiBehavior.MaximumOsdDuration)
             : UiBehavior.MinimumOsdDuration;
-        _ = _instance.BeginFadeSequenceAsync(safeDuration, sequenceId, _cts.Token);
+        _ = _instance.BeginFadeSequenceAsync(safeDuration, sequenceId, currentCts);
     }
 
     /// <summary>
@@ -285,6 +288,33 @@ public partial class OsdWindow : Window
         catch (Exception ex)
         {
             DiagnosticLogger.LogError("HideOsd error", ex);
+        }
+    }
+
+    /// <summary>
+    /// Closes and releases the shared OSD window instance on application exit.
+    /// </summary>
+    public static void CloseOsd()
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher ?? _instance?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(CloseOsd);
+            return;
+        }
+
+        HideOsd();
+        try
+        {
+            if (_instance != null)
+            {
+                _instance.Close();
+                _instance = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("CloseOsd error", ex);
         }
     }
 
@@ -430,8 +460,9 @@ public partial class OsdWindow : Window
         }
     }
 
-    private async Task BeginFadeSequenceAsync(double durationSeconds, int sequenceId, CancellationToken token)
+    private async Task BeginFadeSequenceAsync(double durationSeconds, int sequenceId, CancellationTokenSource cts)
     {
+        CancellationToken token = cts.Token;
         try
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
@@ -461,7 +492,7 @@ public partial class OsdWindow : Window
                 SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
                 TimeSpan remaining = endTime - DateTime.UtcNow;
                 if (remaining <= TimeSpan.Zero) break;
-                TimeSpan chunk = remaining < TimeSpan.FromMilliseconds(80) ? remaining : TimeSpan.FromMilliseconds(80);
+                TimeSpan chunk = remaining < TimeSpan.FromMilliseconds(500) ? remaining : TimeSpan.FromMilliseconds(500);
                 await Task.Delay(chunk, token);
             }
 
@@ -490,6 +521,14 @@ public partial class OsdWindow : Window
         catch (Exception ex)
         {
             DiagnosticLogger.LogError("OSD fade sequence error", ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_cts, cts))
+            {
+                _cts = null;
+            }
+            cts.Dispose();
         }
     }
 }

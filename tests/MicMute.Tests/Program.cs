@@ -22,10 +22,27 @@ internal static class Program
             .Where(t => area == "all" || t.Name.Equals(area + "Cases", StringComparison.OrdinalIgnoreCase))
             .OrderBy(t => t.Name).ToArray();
         if (cases.Length == 0) { Console.Error.WriteLine("No test cases found for " + area); return 2; }
-        foreach (Type type in cases)
+
+        string testSandboxRoot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MicMute.TestRun", Guid.NewGuid().ToString("N"));
+        string testDefaultDir = System.IO.Path.Combine(testSandboxRoot, "appdata");
+        string testAppDir = System.IO.Path.Combine(testSandboxRoot, "portable");
+        System.IO.Directory.CreateDirectory(testDefaultDir);
+        System.IO.Directory.CreateDirectory(testAppDir);
+        using var sandboxStore = new SettingsStore(testDefaultDir, testAppDir);
+        SettingsStore originalStore = SettingsManager.ReplaceStoreForTesting(sandboxStore);
+        try
         {
-            try { type.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, new object[] { (Action<string, Action>)Run }); }
-            catch (Exception ex) { failed++; Console.WriteLine("FAIL suite " + type.Name + ": " + ex.GetBaseException()); }
+            foreach (Type type in cases)
+            {
+                try { type.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, new object[] { (Action<string, Action>)Run }); }
+                catch (Exception ex) { failed++; Console.WriteLine("FAIL suite " + type.Name + ": " + ex.GetBaseException()); }
+            }
+        }
+        finally
+        {
+            SettingsManager.ReplaceStoreForTesting(originalStore);
+            try { sandboxStore.Dispose(); } catch { }
+            try { if (System.IO.Directory.Exists(testSandboxRoot)) System.IO.Directory.Delete(testSandboxRoot, recursive: true); } catch { }
         }
         Console.WriteLine($"RESULT: {passed} passed, {failed} failed");
         return failed == 0 && passed > 0 ? 0 : 1;

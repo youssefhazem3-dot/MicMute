@@ -34,11 +34,15 @@ public partial class MainWindow : Window
     private bool _isDisposed;
     private readonly DispatcherDebouncer _deviceRefreshDebouncer;
     private readonly DispatcherDebouncer _statusDebouncer;
+    private readonly DispatcherDebouncer _volumeAudioDebouncer;
     private readonly LatestRefreshCoordinator<List<AudioDevice>> _deviceRefreshCoordinator;
     private readonly double _preferredWidth;
     private bool _hasInitialCentered;
     private double? _osdDurationBeforeEdit;
     private int? _soundVolumeBeforeEdit;
+    private int _themeTransitionVersion;
+
+    public event EventHandler? TaskbarCreated;
 
     internal System.Windows.Controls.Button btnStateToggle = null!;
     internal TextBlock tbStatusText = null!;
@@ -183,6 +187,7 @@ public partial class MainWindow : Window
         _preferredWidth = Width > 0 ? Width : 412.0;
         _deviceRefreshDebouncer = new DispatcherDebouncer(Dispatcher);
         _statusDebouncer = new DispatcherDebouncer(Dispatcher);
+        _volumeAudioDebouncer = new DispatcherDebouncer(Dispatcher);
         _audioController = audioController;
         _deviceRefreshCoordinator = new LatestRefreshCoordinator<List<AudioDevice>>(
             _audioController.GetCaptureDevicesAsync,
@@ -228,19 +233,6 @@ public partial class MainWindow : Window
             RenderOptions.SetClearTypeHint(this, RenderOptions.GetClearTypeHint(root));
             RenderOptions.SetEdgeMode(this, RenderOptions.GetEdgeMode(root));
             RenderOptions.SetBitmapScalingMode(this, RenderOptions.GetBitmapScalingMode(root));
-
-            try
-            {
-                string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.ico");
-                if (System.IO.File.Exists(iconPath))
-                {
-                    this.Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri(iconPath));
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError("Failed to load custom window icon", ex);
-            }
 
             // Bind all controls from root before detaching content
             btnStateToggle = (System.Windows.Controls.Button)root.FindName("btnStateToggle");
@@ -392,10 +384,12 @@ public partial class MainWindow : Window
             }
             this.FontWeight = root.FontWeight;
 
-            // Now safely detach content and attach to this Window
+            // Now safely detach content, attach to this Window, and close temporary XAML root
             var content = root.Content;
             root.Content = null;
+            root.Resources = new ResourceDictionary();
             this.Content = content;
+            try { root.Close(); } catch { }
         }
 
         if (btnStateToggle != null)
@@ -812,19 +806,24 @@ public partial class MainWindow : Window
         else if (msg == WM_SHOWME)
         {
             bool wasHiddenOrMin = !this.IsVisible || this.WindowState == WindowState.Minimized;
-            this.WindowState = WindowState.Normal;
-            this.Visibility = Visibility.Visible;
-            ShowWindow(hwnd, 9); // SW_RESTORE
-            CenterOnScreen();
-            this.Show();
-            this.Activate();
-            this.Focus();
-            SetForegroundWindow(hwnd);
-            if (wasHiddenOrMin)
+            if (wasHiddenOrMin && !_isRestoring && !_isOpenFromTrayActive)
             {
                 PlayOpenFromTrayAnimation();
             }
+            else
+            {
+                if (!this.IsVisible) this.Show();
+                if (this.WindowState == WindowState.Minimized) this.WindowState = WindowState.Normal;
+                CenterOnScreen();
+                this.Activate();
+                this.Focus();
+                SetForegroundWindow(hwnd);
+            }
             handled = true;
+        }
+        else if (msg == WM_TASKBARCREATED && WM_TASKBARCREATED != 0)
+        {
+            TaskbarCreated?.Invoke(this, EventArgs.Empty);
         }
         else if (msg == WM_SETTINGCHANGE || msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED || msg == WM_EXITSIZEMOVE)
         {
@@ -1074,6 +1073,32 @@ public partial class MainWindow : Window
         _audioController.ToggleMute();
     }
 
+    private static readonly SolidColorBrush BrushNoMicCapsuleBg = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 100, 116, 139)));
+    private static readonly SolidColorBrush BrushNoMicCapsuleBorderLight = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 100, 116, 139)));
+    private static readonly SolidColorBrush BrushNoMicCapsuleBorderDark = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 255, 255, 255)));
+
+    private static readonly System.Windows.Media.Color ColorMutedTextLight = System.Windows.Media.Color.FromRgb(220, 38, 38);
+    private static readonly System.Windows.Media.Color ColorMutedTextDark = System.Windows.Media.Color.FromRgb(248, 113, 113);
+    private static readonly System.Windows.Media.Color ColorMutedDotLight = System.Windows.Media.Color.FromRgb(220, 38, 38);
+    private static readonly System.Windows.Media.Color ColorMutedDotDark = System.Windows.Media.Color.FromRgb(239, 68, 68);
+    private static readonly SolidColorBrush BrushMutedTextLight = Freeze(new SolidColorBrush(ColorMutedTextLight));
+    private static readonly SolidColorBrush BrushMutedTextDark = Freeze(new SolidColorBrush(ColorMutedTextDark));
+    private static readonly SolidColorBrush BrushMutedDotLight = Freeze(new SolidColorBrush(ColorMutedDotLight));
+    private static readonly SolidColorBrush BrushMutedDotDark = Freeze(new SolidColorBrush(ColorMutedDotDark));
+    private static readonly SolidColorBrush BrushMutedCapsuleBgLight = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 220, 38, 38)));
+    private static readonly SolidColorBrush BrushMutedCapsuleBgDark = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 239, 68, 68)));
+    private static readonly SolidColorBrush BrushMutedCapsuleBorderLight = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 220, 38, 38)));
+    private static readonly SolidColorBrush BrushMutedCapsuleBorderDark = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 239, 68, 68)));
+
+    private static readonly System.Windows.Media.Color ColorActiveLight = System.Windows.Media.Color.FromRgb(71, 85, 105);
+    private static readonly System.Windows.Media.Color ColorActiveDark = System.Windows.Media.Color.FromRgb(244, 244, 245);
+    private static readonly SolidColorBrush BrushActiveLight = Freeze(new SolidColorBrush(ColorActiveLight));
+    private static readonly SolidColorBrush BrushActiveDark = Freeze(new SolidColorBrush(ColorActiveDark));
+    private static readonly SolidColorBrush BrushActiveCapsuleBgLight = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(24, 71, 85, 105)));
+    private static readonly SolidColorBrush BrushActiveCapsuleBgDark = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 255, 255, 255)));
+    private static readonly SolidColorBrush BrushActiveCapsuleBorderLight = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(42, 71, 85, 105)));
+    private static readonly SolidColorBrush BrushActiveCapsuleBorderDark = Freeze(new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255)));
+
     private void UpdateMuteStateUI(bool isMuted)
     {
         bool hasDevice = !string.IsNullOrEmpty(_audioController.CurrentDeviceId);
@@ -1089,11 +1114,9 @@ public partial class MainWindow : Window
             if (dotGlow != null) dotGlow.Opacity = 0;
             if (borderStatusCapsule != null)
             {
-                borderStatusCapsule.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 100, 116, 139));
+                borderStatusCapsule.Background = BrushNoMicCapsuleBg;
                 borderStatusCapsule.BorderThickness = new Thickness(1);
-                borderStatusCapsule.BorderBrush = new SolidColorBrush(isLight
-                    ? System.Windows.Media.Color.FromArgb(35, 100, 116, 139)
-                    : System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
+                borderStatusCapsule.BorderBrush = isLight ? BrushNoMicCapsuleBorderLight : BrushNoMicCapsuleBorderDark;
             }
             ShowWarningMessage("No active audio capture devices found.", "");
             borderWarning.Visibility = Visibility.Visible;
@@ -1105,50 +1128,37 @@ public partial class MainWindow : Window
 
         if (isMuted)
         {
-            // Standard balanced UI red: clean coral/ruby text, pure red dot, subtle translucent red wash
-            var redTextColor = isLight ? System.Windows.Media.Color.FromRgb(220, 38, 38) : System.Windows.Media.Color.FromRgb(248, 113, 113);
-            var redDotColor = isLight ? System.Windows.Media.Color.FromRgb(220, 38, 38) : System.Windows.Media.Color.FromRgb(239, 68, 68);
-
-            tbStatusText.Foreground = new SolidColorBrush(redTextColor);
-            if (dotStatus != null) dotStatus.Fill = new SolidColorBrush(redDotColor);
+            tbStatusText.Foreground = isLight ? BrushMutedTextLight : BrushMutedTextDark;
+            if (dotStatus != null) dotStatus.Fill = isLight ? BrushMutedDotLight : BrushMutedDotDark;
             if (dotGlow != null)
             {
-                dotGlow.Color = redDotColor;
+                dotGlow.Color = isLight ? ColorMutedDotLight : ColorMutedDotDark;
                 dotGlow.Opacity = isLight ? 0.35 : 0.55;
                 dotGlow.BlurRadius = 6;
             }
             if (borderStatusCapsule != null)
             {
-                borderStatusCapsule.Background = new SolidColorBrush(
-                    isLight ? System.Windows.Media.Color.FromArgb(20, 220, 38, 38)
-                            : System.Windows.Media.Color.FromArgb(24, 239, 68, 68));
+                borderStatusCapsule.Background = isLight ? BrushMutedCapsuleBgLight : BrushMutedCapsuleBgDark;
                 borderStatusCapsule.BorderThickness = new Thickness(1);
-                borderStatusCapsule.BorderBrush = new SolidColorBrush(
-                    isLight ? System.Windows.Media.Color.FromArgb(50, 220, 38, 38)
-                            : System.Windows.Media.Color.FromArgb(45, 239, 68, 68));
+                borderStatusCapsule.BorderBrush = isLight ? BrushMutedCapsuleBorderLight : BrushMutedCapsuleBorderDark;
             }
         }
         else
         {
-            var activeColor = isLight ? System.Windows.Media.Color.FromRgb(71, 85, 105) : System.Windows.Media.Color.FromRgb(244, 244, 245);
-            var activeBrush = new SolidColorBrush(activeColor);
+            var activeBrush = isLight ? BrushActiveLight : BrushActiveDark;
             tbStatusText.Foreground = activeBrush;
             if (dotStatus != null) dotStatus.Fill = activeBrush;
             if (dotGlow != null)
             {
-                dotGlow.Color = activeColor;
+                dotGlow.Color = isLight ? ColorActiveLight : ColorActiveDark;
                 dotGlow.Opacity = isLight ? 0.25 : 0.85;
                 dotGlow.BlurRadius = 8;
             }
             if (borderStatusCapsule != null)
             {
-                borderStatusCapsule.Background = new SolidColorBrush(isLight
-                    ? System.Windows.Media.Color.FromArgb(24, 71, 85, 105)
-                    : System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
+                borderStatusCapsule.Background = isLight ? BrushActiveCapsuleBgLight : BrushActiveCapsuleBgDark;
                 borderStatusCapsule.BorderThickness = new Thickness(1);
-                borderStatusCapsule.BorderBrush = new SolidColorBrush(isLight
-                    ? System.Windows.Media.Color.FromArgb(42, 71, 85, 105)
-                    : System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
+                borderStatusCapsule.BorderBrush = isLight ? BrushActiveCapsuleBorderLight : BrushActiveCapsuleBorderDark;
             }
         }
     }
@@ -1443,13 +1453,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ResetRootTransformsToIdentity()
+    {
+        if (rootBorder != null)
+        {
+            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            rootBorder.Opacity = 1.0;
+        }
+        if (rootScaleTransform != null)
+        {
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            rootScaleTransform.ScaleX = 1.0;
+            rootScaleTransform.ScaleY = 1.0;
+        }
+        if (rootTranslateTransform != null)
+        {
+            rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            rootTranslateTransform.X = 0.0;
+            rootTranslateTransform.Y = 0.0;
+        }
+    }
+
     public void PlayRestoreAnimation()
     {
         if (_isOpenFromTrayActive) return;
 
         if (!IsLoaded || !IsVisible || ActualWidth <= 0 || rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
         {
-            if (rootBorder != null) rootBorder.Opacity = 1.0;
+            ResetRootTransformsToIdentity();
             return;
         }
 
@@ -1483,18 +1516,7 @@ public partial class MainWindow : Window
         scaleXAnim.Completed += (s, ev) =>
         {
             _isRestoring = false;
-
-            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
-            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
-            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-
-            rootBorder.Opacity = 1.0;
-            rootScaleTransform.ScaleX = 1.0;
-            rootScaleTransform.ScaleY = 1.0;
-            rootTranslateTransform.X = 0.0;
-            rootTranslateTransform.Y = 0.0;
+            ResetRootTransformsToIdentity();
         };
 
         rootBorder.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
@@ -1538,7 +1560,7 @@ public partial class MainWindow : Window
         {
             _isOpenFromTrayActive = false;
             _isRestoring = false;
-            if (rootBorder != null) rootBorder.Opacity = 1.0;
+            ResetRootTransformsToIdentity();
             if (!this.IsVisible) this.Show();
             this.Activate();
             return;
@@ -1992,6 +2014,7 @@ public partial class MainWindow : Window
 
     internal void SetLightMode(bool isLight)
     {
+        int transitionVersion = ++_themeTransitionVersion;
         bool animateTransition = IsLoaded && IsVisible && ActualWidth > 0 && rootBorder != null && themeTransitionOverlay != null;
         if (animateTransition)
         {
@@ -2276,6 +2299,7 @@ public partial class MainWindow : Window
             };
             fadeOut.Completed += (s, ev) =>
             {
+                if (transitionVersion != _themeTransitionVersion) return;
                 themeTransitionOverlay.Opacity = 0.0;
                 themeTransitionOverlay.Visibility = Visibility.Collapsed;
                 themeTransitionOverlay.Fill = null;
@@ -2327,16 +2351,21 @@ public partial class MainWindow : Window
     {
         if (_isInitialized && !_isReloadingSettings && !_isUpdatingOsdTextFromSlider)
         {
+            double rounded = Math.Round(e.NewValue, 1);
             if (txtOsdDuration != null && !txtOsdDuration.IsFocused)
             {
                 _isUpdatingOsdTextFromSlider = true;
-                txtOsdDuration.Text = UiBehavior.FormatOsdDuration(e.NewValue, CultureInfo.CurrentCulture);
+                txtOsdDuration.Text = UiBehavior.FormatOsdDuration(rounded, CultureInfo.CurrentCulture);
                 _isUpdatingOsdTextFromSlider = false;
             }
-            SettingsManager.Save(SettingsManager.Load() with
+            AppSettings current = SettingsManager.Load();
+            if (Math.Abs(current.OsdDuration - rounded) > 0.001)
             {
-                OsdDuration = e.NewValue
-            });
+                SettingsManager.Save(current with
+                {
+                    OsdDuration = rounded
+                });
+            }
         }
     }
 
@@ -2423,11 +2452,15 @@ public partial class MainWindow : Window
                 txtSoundVolume.Text = UiBehavior.FormatSoundVolume(volume);
                 _isUpdatingSoundVolumeTextFromSlider = false;
             }
-            SettingsManager.Save(SettingsManager.Load() with
+            AppSettings current = SettingsManager.Load();
+            if (current.SoundVolume != volume)
             {
-                SoundVolume = volume
-            });
-            AudioFeedback.SetVolume(volume);
+                SettingsManager.Save(current with
+                {
+                    SoundVolume = volume
+                });
+            }
+            _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(35), () => AudioFeedback.SetVolume(volume));
         }
     }
 
@@ -2450,6 +2483,7 @@ public partial class MainWindow : Window
             int restoreVal = _soundVolumeBeforeEdit ?? SettingsManager.Load().SoundVolume;
             SettingsManager.Save(SettingsManager.Load() with { SoundVolume = restoreVal });
             AudioFeedback.SetVolume(restoreVal);
+            _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(1), () => AudioFeedback.SetVolume(restoreVal));
             _isUpdatingSoundVolumeTextFromSlider = true;
             sliderSoundVolume.Value = restoreVal;
             txtSoundVolume.Text = UiBehavior.FormatSoundVolume(restoreVal);
@@ -2473,7 +2507,7 @@ public partial class MainWindow : Window
                 {
                     SoundVolume = result
                 });
-                AudioFeedback.SetVolume(result);
+                _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(35), () => AudioFeedback.SetVolume(result));
                 _isUpdatingSoundVolumeTextFromSlider = true;
                 sliderSoundVolume.Value = result;
                 _isUpdatingSoundVolumeTextFromSlider = false;
@@ -2494,6 +2528,7 @@ public partial class MainWindow : Window
                 SoundVolume = clamped
             });
             AudioFeedback.SetVolume(clamped);
+            _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(1), () => AudioFeedback.SetVolume(clamped));
             _isUpdatingSoundVolumeTextFromSlider = true;
             sliderSoundVolume.Value = clamped;
             txtSoundVolume.Text = UiBehavior.FormatSoundVolume(clamped);
@@ -2590,6 +2625,7 @@ public partial class MainWindow : Window
         _isDisposed = true;
         _deviceRefreshDebouncer.Dispose();
         _statusDebouncer.Dispose();
+        _volumeAudioDebouncer.Dispose();
         _deviceRefreshCoordinator.Dispose();
         SettingsManager.SaveFailed -= SettingsManager_SaveFailed;
         _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
@@ -2612,10 +2648,12 @@ public partial class MainWindow : Window
                 if (_hIconSmall != IntPtr.Zero)
                 {
                     SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, IntPtr.Zero);
+                    try { SetClassLongPtr(hwnd, GCLP_HICONSM, IntPtr.Zero); } catch { }
                 }
                 if (_hIconBig != IntPtr.Zero)
                 {
                     SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, IntPtr.Zero);
+                    try { SetClassLongPtr(hwnd, GCLP_HICON, IntPtr.Zero); } catch { }
                 }
             }
         }

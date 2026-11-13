@@ -143,10 +143,10 @@ public class HotkeyManager : IDisposable
     public void RefreshHook()
     {
         if (_disposed) return;
-        if (_hookId != IntPtr.Zero)
+        IntPtr prev = Interlocked.Exchange(ref _hookId, IntPtr.Zero);
+        if (prev != IntPtr.Zero)
         {
-            try { UnhookWindowsHookEx(_hookId); } catch (Exception ex) { DiagnosticLogger.LogWarning("Failed to unhook hotkey hook: " + ex.Message); }
-            _hookId = IntPtr.Zero;
+            try { UnhookWindowsHookEx(prev); } catch (Exception ex) { DiagnosticLogger.LogWarning("Failed to unhook hotkey hook: " + ex.Message); }
         }
         InstallHook();
     }
@@ -162,27 +162,33 @@ public class HotkeyManager : IDisposable
 
     private void PollLoop()
     {
-        long lastPeriodicRefresh = Environment.TickCount64;
+        long lastHookRecoveryCheck = Environment.TickCount64;
         while (!_disposed)
         {
             try
             {
                 int vk = Volatile.Read(ref _currentVk);
                 int version = Volatile.Read(ref _bindingVersion);
-                if (vk != 0 && _state.Poll(vk, IsKeyDown(vk), PhysicalModifiers(), TickNow))
+                bool isTargetDown = vk != 0 && IsKeyDown(vk);
+                ModifierKeys modifiers = isTargetDown ? PhysicalModifiers() : ModifierKeys.None;
+
+                if (vk != 0 && _state.Poll(vk, isTargetDown, modifiers, TickNow))
                 {
                     QueueActivation(version);
                     // Physical poller caught an activation that low-level hook missed.
                     // The hook may have timed out or been dropped by Windows; self-heal.
                     ScheduleHookRefresh();
                 }
+
                 long now = Environment.TickCount64;
-                if (_hookId == IntPtr.Zero || now - lastPeriodicRefresh > 30000)
+                if (Volatile.Read(ref _hookId) == IntPtr.Zero && now - lastHookRecoveryCheck > 5000)
                 {
-                    lastPeriodicRefresh = now;
+                    lastHookRecoveryCheck = now;
                     ScheduleHookRefresh();
                 }
-                _pollWake.WaitOne(vk == 0 ? Timeout.Infinite : 16);
+
+                int waitMs = vk == 0 ? Timeout.Infinite : 16;
+                _pollWake.WaitOne(waitMs);
             }
             catch (ObjectDisposedException)
             {
@@ -218,9 +224,10 @@ public class HotkeyManager : IDisposable
 
     private void InstallHook()
     {
-        if (_disposed || _hookId != IntPtr.Zero) return;
-        _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
-        if (_hookId == IntPtr.Zero)
+        if (_disposed || Volatile.Read(ref _hookId) != IntPtr.Zero) return;
+        IntPtr installed = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
+        Volatile.Write(ref _hookId, installed);
+        if (installed == IntPtr.Zero)
         {
             int err = Marshal.GetLastWin32Error();
             DiagnosticLogger.LogWarning($"SetWindowsHookEx failed with Win32 error {err}");

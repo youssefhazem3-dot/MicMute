@@ -13,8 +13,10 @@ public static class AudioFeedback
     private static MemoryStream? _unmuteStream;
     private static byte[]? _rawMuteWavBytes;
     private static byte[]? _rawUnmuteWavBytes;
+    private static byte[]? _scaledMuteWavBytes;
+    private static byte[]? _scaledUnmuteWavBytes;
     private static int _volumePercent = 100;
-    private static bool _isInitialized;
+    private static volatile bool _isInitialized;
     private static readonly object _initLock = new();
     private static readonly object _playLock = new();
 
@@ -28,8 +30,12 @@ public static class AudioFeedback
             if (_isInitialized) return;
             try
             {
-                _rawMuteWavBytes = LoadRawWavBytes("MicMute.sounds.mute.wav", isMuted: true);
-                _rawUnmuteWavBytes = LoadRawWavBytes("MicMute.sounds.unmute.wav", isMuted: false);
+                _rawMuteWavBytes ??= LoadRawWavBytes("MicMute.sounds.mute.wav", isMuted: true);
+                _rawUnmuteWavBytes ??= LoadRawWavBytes("MicMute.sounds.unmute.wav", isMuted: false);
+                if (_scaledMuteWavBytes == null || _scaledMuteWavBytes.Length != _rawMuteWavBytes.Length)
+                    _scaledMuteWavBytes = (byte[])_rawMuteWavBytes.Clone();
+                if (_scaledUnmuteWavBytes == null || _scaledUnmuteWavBytes.Length != _rawUnmuteWavBytes.Length)
+                    _scaledUnmuteWavBytes = (byte[])_rawUnmuteWavBytes.Clone();
                 ApplyVolumeLocked(_volumePercent);
                 _isInitialized = true;
             }
@@ -43,6 +49,7 @@ public static class AudioFeedback
     public static void SetVolume(int volumePercent)
     {
         int clamped = Math.Clamp(volumePercent, 0, 100);
+        bool needInit = false;
         lock (_initLock)
         {
             if (_isInitialized && _volumePercent == clamped) return;
@@ -51,26 +58,23 @@ public static class AudioFeedback
             {
                 ApplyVolumeLocked(clamped);
             }
+            else
+            {
+                needInit = true;
+            }
         }
+        if (needInit) Initialize();
     }
 
     private static void ApplyVolumeLocked(int volumePercent)
     {
+        if (_rawMuteWavBytes == null || _rawUnmuteWavBytes == null) return;
+        if (_scaledMuteWavBytes == null || _scaledMuteWavBytes.Length != _rawMuteWavBytes.Length)
+            _scaledMuteWavBytes = (byte[])_rawMuteWavBytes.Clone();
+        if (_scaledUnmuteWavBytes == null || _scaledUnmuteWavBytes.Length != _rawUnmuteWavBytes.Length)
+            _scaledUnmuteWavBytes = (byte[])_rawUnmuteWavBytes.Clone();
+
         float factor = volumePercent / 100.0f;
-        byte[] muteBytes = ScaleWavVolume(_rawMuteWavBytes, factor);
-        byte[] unmuteBytes = ScaleWavVolume(_rawUnmuteWavBytes, factor);
-
-        // Pre-create and load players before swapping to minimize audio interruption
-        var newMuteStream = new MemoryStream(muteBytes);
-        var newUnmuteStream = new MemoryStream(unmuteBytes);
-        var newMutePlayer = new SoundPlayer(newMuteStream);
-        var newUnmutePlayer = new SoundPlayer(newUnmuteStream);
-
-        try { newMutePlayer.Load(); }
-        catch (Exception ex) { DiagnosticLogger.LogError("Failed to preload mute player", ex); }
-        try { newUnmutePlayer.Load(); }
-        catch (Exception ex) { DiagnosticLogger.LogError("Failed to preload unmute player", ex); }
-
         SoundPlayer? oldMute;
         SoundPlayer? oldUnmute;
         MemoryStream? oldMuteStream;
@@ -78,6 +82,20 @@ public static class AudioFeedback
 
         lock (_playLock)
         {
+            ScaleWavVolumeInPlace(_rawMuteWavBytes, _scaledMuteWavBytes, factor);
+            ScaleWavVolumeInPlace(_rawUnmuteWavBytes, _scaledUnmuteWavBytes, factor);
+
+            // Wrap reusable pre-allocated buffers in non-writable MemoryStreams to avoid LOH allocations
+            var newMuteStream = new MemoryStream(_scaledMuteWavBytes, writable: false);
+            var newUnmuteStream = new MemoryStream(_scaledUnmuteWavBytes, writable: false);
+            var newMutePlayer = new SoundPlayer(newMuteStream);
+            var newUnmutePlayer = new SoundPlayer(newUnmuteStream);
+
+            try { newMutePlayer.Load(); }
+            catch (Exception ex) { DiagnosticLogger.LogError("Failed to preload mute player", ex); }
+            try { newUnmutePlayer.Load(); }
+            catch (Exception ex) { DiagnosticLogger.LogError("Failed to preload unmute player", ex); }
+
             oldMute = _mutePlayer;
             oldUnmute = _unmutePlayer;
             oldMuteStream = _muteStream;
@@ -89,8 +107,7 @@ public static class AudioFeedback
             _unmuteStream = newUnmuteStream;
         }
 
-        // Explicitly dispose both the SoundPlayer AND the underlying MemoryStream
-        // to prevent unmanaged buffer/stream leaks on rapid volume adjustments
+        // Dispose replaced SoundPlayer and MemoryStream wrappers (underlying LOH byte arrays stay pooled)
         oldMute?.Dispose();
         oldUnmute?.Dispose();
         oldMuteStream?.Dispose();
@@ -99,8 +116,27 @@ public static class AudioFeedback
 
     public static void Play(bool isMuted)
     {
-        // Hot-path guard: avoid spawning thread pool tasks when audio feedback is silent
+        // Hot-path guard: avoid overhead when audio feedback is silent
         if (_volumePercent <= 0) return;
+
+        if (_isInitialized)
+        {
+            try
+            {
+                lock (_playLock)
+                {
+                    if (_volumePercent <= 0) return;
+                    (isMuted ? _mutePlayer : _unmutePlayer)?.Play();
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError("AudioFeedback Play error", ex);
+                try { SystemSounds.Beep.Play(); } catch { }
+            }
+            return;
+        }
+
         Task.Run(() =>
         {
             try
@@ -109,14 +145,7 @@ public static class AudioFeedback
                 if (_volumePercent <= 0) return;
                 lock (_playLock)
                 {
-                    if (isMuted)
-                    {
-                        _mutePlayer?.Play();
-                    }
-                    else
-                    {
-                        _unmutePlayer?.Play();
-                    }
+                    (isMuted ? _mutePlayer : _unmutePlayer)?.Play();
                 }
             }
             catch (Exception ex)
@@ -215,6 +244,48 @@ public static class AudioFeedback
             }
         }
         return scaled;
+    }
+
+    private static void ScaleWavVolumeInPlace(byte[]? sourceBytes, byte[]? targetBytes, float volume)
+    {
+        if (sourceBytes == null || targetBytes == null || sourceBytes.Length < 44 || targetBytes.Length != sourceBytes.Length) return;
+        float safeVolume = Math.Clamp(volume, 0.0f, 1.0f);
+        if (safeVolume >= 0.999f)
+        {
+            Buffer.BlockCopy(sourceBytes, 0, targetBytes, 0, sourceBytes.Length);
+            return;
+        }
+
+        int dIdx = FindDataChunkIndex(sourceBytes);
+        if (dIdx >= 0 && dIdx + 8 <= sourceBytes.Length)
+        {
+            int dataSize = BitConverter.ToInt32(sourceBytes, dIdx + 4);
+            int start = dIdx + 8;
+            int end = Math.Min(start + dataSize, sourceBytes.Length);
+            Buffer.BlockCopy(sourceBytes, 0, targetBytes, 0, start);
+            if (end < sourceBytes.Length)
+            {
+                Buffer.BlockCopy(sourceBytes, end, targetBytes, end, sourceBytes.Length - end);
+            }
+            if (safeVolume <= 0.001f)
+            {
+                Array.Clear(targetBytes, start, end - start);
+            }
+            else
+            {
+                for (int i = start; i + 1 < end; i += 2)
+                {
+                    short sample = BitConverter.ToInt16(sourceBytes, i);
+                    short newSample = (short)Math.Clamp((int)Math.Round(sample * safeVolume), short.MinValue, short.MaxValue);
+                    targetBytes[i] = (byte)(newSample & 0xFF);
+                    targetBytes[i + 1] = (byte)((newSample >> 8) & 0xFF);
+                }
+            }
+        }
+        else
+        {
+            Buffer.BlockCopy(sourceBytes, 0, targetBytes, 0, sourceBytes.Length);
+        }
     }
 
     private static int FindDataChunkIndex(byte[] bytes)

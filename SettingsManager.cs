@@ -6,23 +6,31 @@ namespace MicMute;
 /// <summary>Application-wide settings store; tests use independent SettingsStore instances.</summary>
 public static class SettingsManager
 {
-    private static readonly SettingsStore Store = new(
+    private static SettingsStore _store = new(
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MicMute"),
         AppContext.BaseDirectory);
 
-    public static event EventHandler<string>? SaveFailed
+    internal static SettingsStore ReplaceStoreForTesting(SettingsStore store)
     {
-        add => Store.SaveFailed += value;
-        remove => Store.SaveFailed -= value;
+        ArgumentNullException.ThrowIfNull(store);
+        SettingsStore previous = _store;
+        _store = store;
+        return previous;
     }
 
-    public static AppSettings Load() => Store.Load();
-    public static void Save(AppSettings settings) => Store.Save(settings);
-    public static void Flush() => Store.Flush();
-    public static string GetDataFolderPath() => Store.GetDataFolderPath();
-    public static string GetSettingsFilePath() => Store.GetSettingsFilePath();
-    public static void SetCustomDataFolder(string path) => Store.SetCustomDataFolder(path);
-    public static void SetPortableMode(bool enabled) => Store.SetPortableMode(enabled);
-    public static void ResetAllSettings() => Store.ResetAllSettings();
-    public static void OpenDataFolderInExplorer() => Store.OpenDataFolderInExplorer();
+    public static event EventHandler<string>? SaveFailed
+    {
+        add => _store.SaveFailed += value;
+        remove => _store.SaveFailed -= value;
+    }
+
+    public static AppSettings Load() => _store.Load();
+    public static void Save(AppSettings settings) => _store.Save(settings);
+    public static void Flush() => _store.Flush();
+    public static string GetDataFolderPath() => _store.GetDataFolderPath();
+    public static string GetSettingsFilePath() => _store.GetSettingsFilePath();
+    public static void SetCustomDataFolder(string path) => _store.SetCustomDataFolder(path);
+    public static void SetPortableMode(bool enabled) => _store.SetPortableMode(enabled);
+    public static void ResetAllSettings() => _store.ResetAllSettings();
+    public static void OpenDataFolderInExplorer() => _store.OpenDataFolderInExplorer();
 }

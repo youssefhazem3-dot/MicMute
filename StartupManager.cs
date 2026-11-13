@@ -27,7 +27,10 @@ public static class StartupManager
         if (!runOnStartup)
         {
             RemoveRegistryRun();
-            RemoveScheduledTask();
+            if (IsScheduledTaskConfigured())
+            {
+                RemoveScheduledTask();
+            }
             return;
         }
 
@@ -35,6 +38,12 @@ public static class StartupManager
         {
             // Windows Explorer automatically suppresses elevated HKCU\Run registry entries at logon.
             // When running elevated or configured for Admin, use Windows Task Scheduler with /rl highest.
+            if (IsScheduledTaskMatching(exePath))
+            {
+                RemoveRegistryRun();
+                return;
+            }
+
             bool taskCreated = CreateScheduledTask(exePath);
             if (taskCreated)
             {
@@ -51,7 +60,10 @@ public static class StartupManager
         else
         {
             // Standard non-admin startup uses the standard HKCU Run key
-            RemoveScheduledTask();
+            if (IsScheduledTaskConfigured())
+            {
+                RemoveScheduledTask();
+            }
             SetRegistryRun(exePath);
         }
     }
@@ -77,16 +89,16 @@ public static class StartupManager
     {
         try
         {
-            using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: true);
-            if (registryKey != null)
+            string value = "\"" + exePath + "\"";
+            using (RegistryKey? readKey = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: false))
             {
-                string value = "\"" + exePath + "\"";
-                string? existing = registryKey.GetValue(AppName) as string;
-                if (!string.Equals(existing, value, StringComparison.OrdinalIgnoreCase))
-                {
-                    registryKey.SetValue(AppName, value);
-                }
+                if (readKey == null) return;
+                string? existing = readKey.GetValue(AppName) as string;
+                if (string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)) return;
             }
+
+            using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: true);
+            registryKey?.SetValue(AppName, value);
         }
         catch (Exception ex)
         {
@@ -98,6 +110,11 @@ public static class StartupManager
     {
         try
         {
+            using (RegistryKey? readKey = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: false))
+            {
+                if (readKey == null || readKey.GetValue(AppName) == null) return;
+            }
+
             using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: true);
             if (registryKey != null && registryKey.GetValue(AppName) != null)
             {
@@ -110,9 +127,26 @@ public static class StartupManager
         }
     }
 
+    private static void ReleaseCom(object? comObj)
+    {
+        if (comObj != null && Marshal.IsComObject(comObj))
+        {
+            try { Marshal.FinalReleaseComObject(comObj); } catch { }
+        }
+    }
+
     public static bool CreateScheduledTask(string exePath)
     {
         object? scheduler = null;
+        object? folder = null;
+        object? taskDef = null;
+        object? regInfo = null;
+        object? principal = null;
+        object? triggers = null;
+        object? trigger = null;
+        object? actions = null;
+        object? action = null;
+        object? registeredTask = null;
         try
         {
             Type? schedulerType = Type.GetTypeFromProgID("Schedule.Service");
@@ -123,16 +157,22 @@ public static class StartupManager
                 {
                     dynamic sched = scheduler;
                     sched.Connect();
-                    dynamic folder = sched.GetFolder("\\");
-                    dynamic taskDef = sched.NewTask(0);
-                    taskDef.RegistrationInfo.Description = "MicMute Startup Task";
-                    taskDef.Principal.RunLevel = 1; // TASK_RUNLEVEL_HIGHEST
-                    taskDef.Principal.LogonType = 3; // TASK_LOGON_INTERACTIVE_TOKEN
-                    dynamic trigger = taskDef.Triggers.Create(9); // TASK_TRIGGER_LOGON
-                    trigger.Enabled = true;
-                    dynamic action = taskDef.Actions.Create(0); // TASK_ACTION_EXEC
-                    action.Path = exePath;
-                    folder.RegisterTaskDefinition(TaskName, taskDef, 6, null, null, 3, null); // TASK_CREATE_OR_UPDATE = 6
+                    folder = sched.GetFolder("\\");
+                    dynamic dynFolder = folder!;
+                    taskDef = sched.NewTask(0);
+                    dynamic dynTaskDef = taskDef!;
+                    regInfo = dynTaskDef.RegistrationInfo;
+                    ((dynamic)regInfo!).Description = "MicMute Startup Task";
+                    principal = dynTaskDef.Principal;
+                    ((dynamic)principal!).RunLevel = 1; // TASK_RUNLEVEL_HIGHEST
+                    ((dynamic)principal).LogonType = 3; // TASK_LOGON_INTERACTIVE_TOKEN
+                    triggers = dynTaskDef.Triggers;
+                    trigger = ((dynamic)triggers!).Create(9); // TASK_TRIGGER_LOGON
+                    ((dynamic)trigger!).Enabled = true;
+                    actions = dynTaskDef.Actions;
+                    action = ((dynamic)actions!).Create(0); // TASK_ACTION_EXEC
+                    ((dynamic)action!).Path = exePath;
+                    registeredTask = dynFolder.RegisterTaskDefinition(TaskName, dynTaskDef, 6, null, null, 3, null); // TASK_CREATE_OR_UPDATE = 6
                     return true;
                 }
             }
@@ -144,10 +184,16 @@ public static class StartupManager
         }
         finally
         {
-            if (scheduler != null && Marshal.IsComObject(scheduler))
-            {
-                try { Marshal.FinalReleaseComObject(scheduler); } catch { }
-            }
+            ReleaseCom(registeredTask);
+            ReleaseCom(action);
+            ReleaseCom(actions);
+            ReleaseCom(trigger);
+            ReleaseCom(triggers);
+            ReleaseCom(principal);
+            ReleaseCom(regInfo);
+            ReleaseCom(taskDef);
+            ReleaseCom(folder);
+            ReleaseCom(scheduler);
         }
 
         string schtasksPath = GetSchtasksPath();
@@ -176,6 +222,7 @@ public static class StartupManager
     public static bool RemoveScheduledTask()
     {
         object? scheduler = null;
+        object? folder = null;
         try
         {
             Type? schedulerType = Type.GetTypeFromProgID("Schedule.Service");
@@ -186,10 +233,10 @@ public static class StartupManager
                 {
                     dynamic sched = scheduler;
                     sched.Connect();
-                    dynamic folder = sched.GetFolder("\\");
+                    folder = sched.GetFolder("\\");
                     try
                     {
-                        folder.DeleteTask(TaskName, 0);
+                        ((dynamic)folder!).DeleteTask(TaskName, 0);
                         return true;
                     }
                     catch (FileNotFoundException)
@@ -211,10 +258,8 @@ public static class StartupManager
         }
         finally
         {
-            if (scheduler != null && Marshal.IsComObject(scheduler))
-            {
-                try { Marshal.FinalReleaseComObject(scheduler); } catch { }
-            }
+            ReleaseCom(folder);
+            ReleaseCom(scheduler);
         }
 
         string schtasksPath = GetSchtasksPath();
@@ -234,9 +279,17 @@ public static class StartupManager
         return RunSchtasks(psi);
     }
 
-    public static bool IsScheduledTaskConfigured()
+    public static bool IsScheduledTaskConfigured() => IsScheduledTaskMatching(null);
+
+    private static bool IsScheduledTaskMatching(string? expectedExePath)
     {
         object? scheduler = null;
+        object? folder = null;
+        object? task = null;
+        object? definition = null;
+        object? principal = null;
+        object? actions = null;
+        object? action = null;
         try
         {
             Type? schedulerType = Type.GetTypeFromProgID("Schedule.Service");
@@ -247,9 +300,24 @@ public static class StartupManager
                 {
                     dynamic sched = scheduler;
                     sched.Connect();
-                    dynamic folder = sched.GetFolder("\\");
-                    dynamic task = folder.GetTask(TaskName);
-                    return task != null;
+                    folder = sched.GetFolder("\\");
+                    task = ((dynamic)folder!).GetTask(TaskName);
+                    if (task == null) return false;
+                    if (expectedExePath == null) return true;
+
+                    dynamic dynTask = task;
+                    if (!(bool)dynTask.Enabled) return false;
+                    definition = dynTask.Definition;
+                    principal = ((dynamic)definition!).Principal;
+                    if ((int)((dynamic)principal!).RunLevel != 1) return false;
+                    actions = ((dynamic)definition).Actions;
+                    if ((int)((dynamic)actions!).Count < 1) return false;
+                    action = ((dynamic)actions)[1]; // 1-based COM collection
+                    string? configuredPath = ((dynamic)action!).Path as string;
+                    if (string.IsNullOrWhiteSpace(configuredPath)) return false;
+                    string cleanConfigured = configuredPath.Trim().Trim('"');
+                    string cleanExpected = expectedExePath.Trim().Trim('"');
+                    return string.Equals(cleanConfigured, cleanExpected, StringComparison.OrdinalIgnoreCase);
                 }
             }
         }
@@ -268,14 +336,18 @@ public static class StartupManager
         }
         finally
         {
-            if (scheduler != null && Marshal.IsComObject(scheduler))
-            {
-                try { Marshal.FinalReleaseComObject(scheduler); } catch { }
-            }
+            ReleaseCom(action);
+            ReleaseCom(actions);
+            ReleaseCom(principal);
+            ReleaseCom(definition);
+            ReleaseCom(task);
+            ReleaseCom(folder);
+            ReleaseCom(scheduler);
         }
 
         try
         {
+            if (expectedExePath != null) return false;
             string schtasksPath = GetSchtasksPath();
             var psi = new ProcessStartInfo
             {

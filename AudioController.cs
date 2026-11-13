@@ -247,7 +247,7 @@ public class AudioController : IMMNotificationClient, IDisposable
                 {
                     bool muted = _currentDevice.AudioEndpointVolume.Mute; // also detects invalidated audio-service objects
                     string name = candidate.FriendlyName;
-                    bool changed = _muteState.Current != muted || name != _currentName;
+                    bool changed = _muteState.Current != muted || name != _currentName || _isUsingFallback != fallback;
                     Volatile.Write(ref _currentName, name);
                     _isUsingFallback = fallback;
                     _muteState.RecordLocalChange(muted);
@@ -346,9 +346,17 @@ public class AudioController : IMMNotificationClient, IDisposable
         if (flow == DataFlow.Capture && (role == Role.Communications || role == Role.Console || role == Role.Multimedia))
             NotifyDevicesChanged();
     }
+    private static readonly Guid PkeyDeviceFriendlyNameFmtId = new(0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0);
+    private static readonly Guid PkeyDeviceInterfaceFriendlyNameFmtId = new(0x026e516e, 0xb814, 0x414b, 0x83, 0xcd, 0x85, 0x6d, 0x6f, 0xef, 0x48, 0x22);
+
     public void OnPropertyValueChanged(string deviceId, PropertyKey key)
     {
-        if (string.Equals(deviceId, CurrentDeviceId, StringComparison.OrdinalIgnoreCase)) NotifyDevicesChanged();
+        bool isFriendlyNameChange = (key.formatId == PkeyDeviceFriendlyNameFmtId && key.propertyId == 14)
+            || (key.formatId == PkeyDeviceInterfaceFriendlyNameFmtId && key.propertyId == 2);
+        if (isFriendlyNameChange && string.Equals(deviceId, CurrentDeviceId, StringComparison.OrdinalIgnoreCase))
+        {
+            NotifyDevicesChanged();
+        }
     }
 
     public void Dispose()

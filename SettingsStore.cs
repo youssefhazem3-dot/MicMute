@@ -59,8 +59,13 @@ public sealed class SettingsStore : IDisposable
         {
             ThrowIfDisposed();
             AppSettings normalized = SettingsCodec.Normalize(settings);
+            string settingsFile = GetSettingsFilePathNoLock();
+            if (_cachedSettings is not null && _cachedSettings == normalized && _pendingSave is null && _lastSaveFailure is null && File.Exists(settingsFile))
+            {
+                return;
+            }
             _cachedSettings = normalized;
-            _pendingSave = new PendingSave(GetSettingsFilePathNoLock(), normalized);
+            _pendingSave = new PendingSave(settingsFile, normalized);
             _lastSaveFailure = null;
             _saveTimer.Change(SaveDelayMilliseconds, Timeout.Infinite);
         }
