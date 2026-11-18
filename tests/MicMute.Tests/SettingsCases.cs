@@ -27,6 +27,7 @@ public static class SettingsCases
         test("pending saves cannot overwrite migrated or reset settings", PendingSavesRespectTransitions);
         test("sound volume serializes, deserializes, and normalizes within bounds", SoundVolumeSettingsCodecSerializationAndClamping);
         test("power mode settings serialize, deserialize, and normalize within bounds", PowerModeSettingsSerializeDeserializeAndNormalize);
+        test("OSD position serializes, deserializes, and normalizes to valid anchors", OsdPositionSettingsSerializeDeserializeAndNormalize);
     }
 
     private static void LoadsCompactEscapedJson()
@@ -288,6 +289,24 @@ public static class SettingsCases
         Check.Equal(0, SettingsCodec.Normalize(new AppSettings { StartupMuteMode = -1 }).StartupMuteMode);
         Check.Equal(0, SettingsCodec.Normalize(new AppSettings { StartupMuteMode = 9 }).StartupMuteMode);
         Check.Equal(1, SettingsCodec.Normalize(new AppSettings { StartupMuteMode = 1 }).StartupMuteMode);
+    }
+
+    private static void OsdPositionSettingsSerializeDeserializeAndNormalize()
+    {
+        AppSettings defaults = new();
+        Check.Equal("Center", defaults.OsdPosition);
+
+        foreach (string pos in new[] { "Center", "Bottom", "Top" })
+        {
+            string json = SettingsCodec.Serialize(new AppSettings { OsdPosition = pos });
+            AppSettings roundtrip = SettingsCodec.Deserialize(json);
+            Check.Equal(pos, roundtrip.OsdPosition);
+        }
+
+        Check.Equal("Bottom", SettingsCodec.Deserialize("{\"OsdPosition\":\"  bottom  \"}").OsdPosition);
+        Check.Equal("Top", SettingsCodec.Deserialize("{\"OsdPosition\":\"TOP\"}").OsdPosition);
+        Check.Equal("Center", SettingsCodec.Normalize(new AppSettings { OsdPosition = "Diagonal" }).OsdPosition);
+        Check.Equal("Center", SettingsCodec.Normalize(new AppSettings { OsdPosition = "" }).OsdPosition);
     }
 
     private sealed class SettingsScope : IDisposable

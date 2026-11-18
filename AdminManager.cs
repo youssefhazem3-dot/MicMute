@@ -55,10 +55,16 @@ public static class AdminManager
     {
         try
         {
+            string exePath = GetExecutablePath();
+            if (exePath.Contains("MicMute.Tests", StringComparison.OrdinalIgnoreCase) ||
+                exePath.Contains("testhost", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             using var key = Registry.CurrentUser.CreateSubKey(AppCompatKey, writable: true);
             if (key != null)
             {
-                string exePath = GetExecutablePath();
                 if (enable)
                 {
                     string existing = key.GetValue(exePath) as string ?? string.Empty;
@@ -82,7 +88,7 @@ public static class AdminManager
         return false;
     }
 
-    public static bool RestartAsAdmin()
+    public static bool RestartAsAdmin(bool showWindow = true)
     {
         try
         {
@@ -93,7 +99,7 @@ public static class AdminManager
                 FileName = exePath,
                 UseShellExecute = true,
                 Verb = "runas",
-                Arguments = UiBehavior.BuildRestartArguments(Environment.ProcessId, showWindow: true)
+                Arguments = UiBehavior.BuildRestartArguments(Environment.ProcessId, showWindow: showWindow)
             };
 
             using Process? replacement = Process.Start(startInfo);

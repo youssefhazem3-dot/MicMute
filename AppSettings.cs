@@ -18,6 +18,8 @@ public sealed record AppSettings
 
     public double OsdDuration { get; init; } = 1.5;
 
+    public string OsdPosition { get; init; } = "Center";
+
     public bool LightMode { get; init; }
 
     public string CustomDataPath { get; init; } = string.Empty;

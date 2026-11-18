@@ -61,20 +61,11 @@ public partial class App : System.Windows.Application
     [DllImport("shell32.dll", SetLastError = true)]
     private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
-    [DllImport("psapi.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EmptyWorkingSet(IntPtr hProcess);
-
     internal static void TrimWorkingSet()
     {
-        try
-        {
-            using var proc = System.Diagnostics.Process.GetCurrentProcess();
-            EmptyWorkingSet(proc.Handle);
-        }
-        catch
-        {
-        }
+        // Intentionally left as a no-op: calling EmptyWorkingSet forces the process's
+        // WH_KEYBOARD_LL hook callback and UI dispatcher pages out to the pagefile,
+        // which can cause Windows LowLevelHooksTimeout silent hook drops under heavy game RAM pressure.
     }
 
     internal class LiquidGlassContextMenu : ContextMenuStrip
@@ -99,7 +90,7 @@ public partial class App : System.Windows.Application
             ShowImageMargin = false;
             ShowCheckMargin = false;
             CanOverflow = false;
-            Padding = new Padding(4, 4, 4, 4);
+            Padding = new Padding(0, 4, 0, 4);
             DropShadowEnabled = true;
             RefreshTheme();
         }
@@ -107,8 +98,8 @@ public partial class App : System.Windows.Application
         public override System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
         {
             System.Drawing.Size size = base.GetPreferredSize(proposedSize);
-            // Compact wide rectangle (20% smaller) matching modern Windows 11 system tray menus
-            return new System.Drawing.Size(Math.Max(size.Width, 164), Math.Max(size.Height, 98));
+            // Clean 192px rectangle with breathing room for shortcut hints and divider gap above Quit
+            return new System.Drawing.Size(Math.Max(size.Width, 192), Math.Max(size.Height, 104));
         }
 
         protected override CreateParams CreateParams
@@ -182,6 +173,24 @@ public partial class App : System.Windows.Application
             RectangleF rect = new RectangleF(0.5f, 0.5f, e.ToolStrip.Width - 1f, e.ToolStrip.Height - 1f);
             using GraphicsPath path = CreateRoundedRectanglePath(rect, 8f);
             e.Graphics.FillPath(brush, path);
+
+            // Clean divider line centered in the margin gap above Quit so hover pills never touch it
+            for (int i = 1; i < e.ToolStrip.Items.Count; i++)
+            {
+                if (string.Equals(e.ToolStrip.Items[i].Text, "Quit", StringComparison.Ordinal))
+                {
+                    ToolStripItem prevItem = e.ToolStrip.Items[i - 1];
+                    ToolStripItem quitItem = e.ToolStrip.Items[i];
+                    if (prevItem.Bounds.Bottom > 0 && quitItem.Bounds.Top > prevItem.Bounds.Bottom)
+                    {
+                        float dividerY = (prevItem.Bounds.Bottom + quitItem.Bounds.Top) / 2f;
+                        Color dividerColor = lightMode ? Color.FromArgb(26, 0, 0, 0) : Color.FromArgb(28, 255, 255, 255);
+                        using Pen dividerPen = new Pen(dividerColor, 1f);
+                        e.Graphics.DrawLine(dividerPen, 12f, dividerY, Math.Max(12f, e.ToolStrip.Width - 12f), dividerY);
+                    }
+                    break;
+                }
+            }
         }
 
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
@@ -207,11 +216,14 @@ public partial class App : System.Windows.Application
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 bool lightMode = GetLightMode(e.ToolStrip);
-                Color hoverColor = lightMode ? Color.FromArgb(20, 0, 0, 0) : Color.FromArgb(32, 255, 255, 255);
+                bool isQuit = string.Equals(e.Item.Text, "Quit", StringComparison.Ordinal);
+                Color hoverColor = isQuit
+                    ? (lightMode ? Color.FromArgb(26, 220, 38, 38) : Color.FromArgb(41, 239, 68, 68))
+                    : (lightMode ? Color.FromArgb(20, 0, 0, 0) : Color.FromArgb(32, 255, 255, 255));
                 using SolidBrush brush = new SolidBrush(hoverColor);
 
                 // Smooth rounded pill across the full width of the item section
-                const float marginX = 3.5f;
+                const float marginX = 4.5f;
                 const float marginY = 1.2f;
                 float width = e.Item.Width - (marginX * 2f);
                 float height = e.Item.Height - (marginY * 2f);
@@ -228,8 +240,13 @@ public partial class App : System.Windows.Application
         {
             if (e.Item == null) return;
             bool lightMode = GetLightMode(e.ToolStrip);
-            // White in Dark Mode, dark gray in Light Mode
-            Color textColor = lightMode ? Color.FromArgb(55, 65, 81) : Color.FromArgb(255, 255, 255);
+            bool isQuit = string.Equals(e.Item.Text, "Quit", StringComparison.Ordinal);
+            bool isQuitHover = isQuit && e.Item.Selected && e.Item.Enabled;
+
+            // White in Dark Mode, dark gray in Light Mode; coral red on Quit hover
+            Color textColor = isQuitHover
+                ? (lightMode ? Color.FromArgb(220, 38, 38) : Color.FromArgb(248, 113, 113))
+                : (lightMode ? Color.FromArgb(55, 65, 81) : Color.FromArgb(255, 255, 255));
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -237,25 +254,47 @@ public partial class App : System.Windows.Application
             Font font = e.TextFont ?? e.Item.Font;
             int fontHeight = font?.Height ?? 15;
 
-            // Render vector outline icon (bold, crisp, perfectly proportioned for 20% smaller layout)
+            // Render vector outline icon (coral-red slashed mic when muted)
             int iconX = 14;
             int iconY = (e.Item.Height - 15) / 2;
-            RenderMenuIcon(e.Graphics, e.Item.Text, iconX, iconY, textColor);
+            Color iconColor = string.Equals(e.Item.Text, "Unmute Mic", StringComparison.Ordinal)
+                ? (lightMode ? Color.FromArgb(220, 38, 38) : Color.FromArgb(248, 113, 113))
+                : textColor;
+            Color bgColor = lightMode ? Color.FromArgb(255, 255, 255) : Color.FromArgb(18, 18, 20);
+            RenderMenuIcon(e.Graphics, e.Item.Text, iconX, iconY, iconColor, bgColor);
 
-            // Render text
+            // Render label and optional right-aligned shortcut hint
             int leftOnMenu = 38;
-            int x = leftOnMenu;
+            int rightMargin = 14;
             int y = (e.Item.Height - fontHeight) / 2;
+            string mainText = e.Text ?? string.Empty;
+            int hintReserved = 0;
 
-            Rectangle textRect = new Rectangle(x, y, Math.Max(0, e.Item.Width - leftOnMenu - 6), fontHeight);
+            if (font != null && e.Item.Tag is string hint && !string.IsNullOrEmpty(hint) && !string.Equals(hint, "None", StringComparison.Ordinal))
+            {
+                using Font hintFont = new Font(font.FontFamily, Math.Max(7.5f, font.Size - 1.2f), System.Drawing.FontStyle.Regular, GraphicsUnit.Point);
+                System.Drawing.Size mainSize = TextRenderer.MeasureText(e.Graphics, mainText, font, new System.Drawing.Size(int.MaxValue, fontHeight), TextFormatFlags.NoPadding);
+                System.Drawing.Size hintSize = TextRenderer.MeasureText(e.Graphics, hint, hintFont, new System.Drawing.Size(int.MaxValue, hintFont.Height), TextFormatFlags.NoPadding);
+                if (leftOnMenu + mainSize.Width + 8 + hintSize.Width <= e.Item.Width - rightMargin)
+                {
+                    hintReserved = hintSize.Width + 8;
+                    int hintY = ((e.Item.Height - hintFont.Height) / 2) + 1;
+                    Rectangle hintRect = new Rectangle(leftOnMenu + mainSize.Width + 6, hintY, Math.Max(0, e.Item.Width - (leftOnMenu + mainSize.Width + 6) - rightMargin), hintFont.Height);
+                    Color hintColor = lightMode ? Color.FromArgb(148, 163, 184) : Color.FromArgb(136, 136, 146);
+                    TextRenderer.DrawText(e.Graphics, hint, hintFont, hintRect, hintColor,
+                        TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                }
+            }
+
+            Rectangle textRect = new Rectangle(leftOnMenu, y, Math.Max(0, e.Item.Width - leftOnMenu - rightMargin - hintReserved), fontHeight);
             if (font != null)
             {
-                TextRenderer.DrawText(e.Graphics, e.Text ?? string.Empty, font, textRect, textColor,
+                TextRenderer.DrawText(e.Graphics, mainText, font, textRect, textColor,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
         }
 
-        private static void RenderMenuIcon(Graphics g, string? text, int iconX, int iconY, Color color)
+        private static void RenderMenuIcon(Graphics g, string? text, int iconX, int iconY, Color color, Color bgColor)
         {
             if (string.IsNullOrEmpty(text)) return;
 
@@ -268,7 +307,7 @@ public partial class App : System.Windows.Application
                 LineJoin = LineJoin.Round
             };
 
-            if (text == "Toggle Mute")
+            if (text is "Toggle Mute" or "Mute Mic" or "Unmute Mic")
             {
                 // Microphone outline: condenser body, U-cradle, stem, foot (15x15 box)
                 RectangleF capRect = new RectangleF(iconX + 4.5f, iconY + 1f, 5f, 8.5f);
@@ -280,6 +319,23 @@ public partial class App : System.Windows.Application
 
                 g.DrawLine(pen, iconX + 7f, iconY + 11.5f, iconX + 7f, iconY + 14f);
                 g.DrawLine(pen, iconX + 4.5f, iconY + 14f, iconX + 9.5f, iconY + 14f);
+
+                if (text == "Unmute Mic")
+                {
+                    using Pen maskPen = new Pen(bgColor, 3.2f)
+                    {
+                        StartCap = LineCap.Round,
+                        EndCap = LineCap.Round
+                    };
+                    g.DrawLine(maskPen, iconX + 2f, iconY + 1.5f, iconX + 12f, iconY + 12f);
+
+                    using Pen slashPen = new Pen(color, 1.6f)
+                    {
+                        StartCap = LineCap.Round,
+                        EndCap = LineCap.Round
+                    };
+                    g.DrawLine(slashPen, iconX + 2f, iconY + 1.5f, iconX + 12f, iconY + 12f);
+                }
             }
             else if (text == "Open App")
             {
@@ -354,6 +410,7 @@ public partial class App : System.Windows.Application
     private static AppInstanceMutex? _mutex;
     private const string MutexName = "Global\\MicMuteAppMutex_7FA5D9E0-9E11-40EA-B368-C8E649F56A49";
     private NotifyIcon? _notifyIcon;
+    private ToolStripMenuItem? _trayMuteMenuItem;
     private AudioController? _audioController;
     private MainWindow? _mainWindow;
 
@@ -616,6 +673,23 @@ public partial class App : System.Windows.Application
         OsdWindow.WarmUp();
 
         AppSettings appSettings = SettingsManager.Load();
+        AdminManager.SetRunAsAdmin(appSettings.RunAsAdmin);
+        if (appSettings.RunAsAdmin && !AdminManager.IsRunningAsAdmin() && !UiBehavior.TryGetParentProcessId(e.Args, out _))
+        {
+            _mutex.Dispose();
+            _mutex = null;
+            if (AdminManager.RestartAsAdmin(showWindow: !UiBehavior.ShouldStartMinimized(appSettings.StartMinimized, e.Args)))
+            {
+                Environment.Exit(0);
+                return;
+            }
+            _mutex = AppInstanceMutex.TryAcquire(MutexName);
+            if (_mutex == null)
+            {
+                Environment.Exit(0);
+                return;
+            }
+        }
         StartupManager.SetStartup(appSettings.RunOnStartup, appSettings.RunAsAdmin);
         _audioController = new AudioController
         {
@@ -678,9 +752,12 @@ public partial class App : System.Windows.Application
             Text = "Mic Mute",
             Visible = true
         };
-        _notifyIcon.DoubleClick += delegate
+        _notifyIcon.MouseClick += (_, e) =>
         {
-            ShowWindow();
+            if (e.Button == System.Windows.Forms.MouseButtons.Left)
+            {
+                ShowWindow();
+            }
         };
         LiquidGlassContextMenu contextMenuStrip = new LiquidGlassContextMenu();
         contextMenuStrip.Renderer = new LiquidGlassMenuRenderer(contextMenuStrip);
@@ -700,17 +777,18 @@ public partial class App : System.Windows.Application
             }
         }
 
-        ToolStripMenuItem value = new ToolStripMenuItem("Toggle Mute", null, delegate
+        ToolStripMenuItem value = new ToolStripMenuItem("Mute Mic", null, delegate
         {
             _mainWindow?.ClearHoldToggleState();
             _audioController?.ToggleMute();
         })
         {
             AutoSize = false,
-            Size = new System.Drawing.Size(164, 29),
+            Size = new System.Drawing.Size(192, 29),
             Margin = new Padding(0, 1, 0, 1),
             Padding = new Padding(0)
         };
+        _trayMuteMenuItem = value;
 
         ToolStripMenuItem value2 = new ToolStripMenuItem("Open App", null, delegate
         {
@@ -718,7 +796,7 @@ public partial class App : System.Windows.Application
         })
         {
             AutoSize = false,
-            Size = new System.Drawing.Size(164, 29),
+            Size = new System.Drawing.Size(192, 29),
             Margin = new Padding(0, 1, 0, 1),
             Padding = new Padding(0)
         };
@@ -729,20 +807,36 @@ public partial class App : System.Windows.Application
         })
         {
             AutoSize = false,
-            Size = new System.Drawing.Size(164, 29),
-            Margin = new Padding(0, 1, 0, 1),
+            Size = new System.Drawing.Size(192, 29),
+            Margin = new Padding(0, 7, 0, 1),
             Padding = new Padding(0)
         };
 
         contextMenuStrip.Items.Add(value);
         contextMenuStrip.Items.Add(value2);
         contextMenuStrip.Items.Add(value3);
+        contextMenuStrip.Opening += delegate
+        {
+            SyncTrayMuteMenuItem(_audioController?.IsMuted ?? false);
+        };
         _notifyIcon.ContextMenuStrip = contextMenuStrip;
         UpdateTrayIcon(_audioController?.IsMuted ?? false);
     }
 
+    private void SyncTrayMuteMenuItem(bool isMuted)
+    {
+        if (_trayMuteMenuItem == null)
+        {
+            return;
+        }
+        _trayMuteMenuItem.Text = isMuted ? "Unmute Mic" : "Mute Mic";
+        AppSettings settings = SettingsManager.Load();
+        _trayMuteMenuItem.Tag = UiBehavior.FormatHotkeyText(settings.Hotkey, settings.HotkeyModifiers, compact: true);
+    }
+
     private void UpdateTrayIcon(bool isMuted)
     {
+        SyncTrayMuteMenuItem(isMuted);
         if (_notifyIcon == null)
         {
             return;

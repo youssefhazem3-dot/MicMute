@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
+using System.Windows.Input;
 using System.Windows.Threading;
 
 namespace MicMute;
@@ -134,6 +136,59 @@ public static class UiBehavior
             screenBounds.Top + (screenBounds.Height - height) / 2,
             width,
             height);
+    }
+
+    /// <summary>Computes OSD pixel bounds for Center, Top, or Bottom placement.</summary>
+    public static PixelRect CalculateOsdPositionInPixels(PixelRect screenBounds, PixelSize windowSize, string? osdPosition)
+    {
+        int width = Math.Max(0, windowSize.Width);
+        int height = Math.Max(0, windowSize.Height);
+        int left = screenBounds.Left + (screenBounds.Width - width) / 2;
+
+        string normalized = SettingsCodec.NormalizeOsdPosition(osdPosition);
+        int maxTop = screenBounds.Top + Math.Max(0, screenBounds.Height - height);
+        int margin = Math.Clamp(screenBounds.Height / 16, 16, 80);
+
+        int top = normalized switch
+        {
+            "Top" => Math.Clamp(screenBounds.Top + margin, screenBounds.Top, maxTop),
+            "Bottom" => Math.Clamp(screenBounds.Top + screenBounds.Height - height - margin, screenBounds.Top, maxTop),
+            _ => screenBounds.Top + (screenBounds.Height - height) / 2
+        };
+
+        return new PixelRect(left, top, width, height);
+    }
+
+    /// <summary>Formats a hotkey and modifiers using full or compact display labels.</summary>
+    public static string FormatHotkeyText(Key key, ModifierKeys modifiers, bool compact = false)
+    {
+        List<string> parts = new(5);
+        if (modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
+        if (modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
+        if (modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
+        if (modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
+
+        if (key != Key.None)
+        {
+            string keyLabel = key switch
+            {
+                HotkeyManager.MouseMiddleKey => compact ? "M-Mid" : "Mouse Middle",
+                HotkeyManager.MouseXButton1Key => compact ? "M4" : "Mouse 4",
+                HotkeyManager.MouseXButton2Key => compact ? "M5" : "Mouse 5",
+                _ => key.ToString()
+            };
+            parts.Add(keyLabel);
+        }
+        else if (parts.Count > 0)
+        {
+            parts.Add("...");
+        }
+        else
+        {
+            parts.Add("None");
+        }
+
+        return string.Join(compact ? "+" : " + ", parts);
     }
 
     public static double CalculateAdaptiveMaxHeight(double workAreaHeight, double verticalMargin = DefaultAdaptiveVerticalMargin, double minimumHeight = MinimumWindowHeight)

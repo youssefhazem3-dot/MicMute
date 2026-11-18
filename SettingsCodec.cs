@@ -52,6 +52,7 @@ public static class SettingsCodec
                 StartMinimized = GetBoolean(root, "StartMinimized", defaults.StartMinimized),
                 EnableOsd = GetBoolean(root, "EnableOsd", defaults.EnableOsd),
                 OsdDuration = GetDouble(root, "OsdDuration", defaults.OsdDuration),
+                OsdPosition = GetString(root, "OsdPosition", defaults.OsdPosition),
                 LightMode = GetBoolean(root, "LightMode", defaults.LightMode),
                 CustomDataPath = GetString(root, "CustomDataPath", defaults.CustomDataPath),
                 UsePortableMode = GetBoolean(root, "UsePortableMode", defaults.UsePortableMode),
@@ -77,6 +78,7 @@ public static class SettingsCodec
         duration = !double.IsFinite(duration) ? 1.5 : Math.Clamp(duration, 0.1, 30.0);
         int volume = Math.Clamp(settings.SoundVolume, 0, 100);
         int startupMuteMode = settings.StartupMuteMode is >= 0 and <= 2 ? settings.StartupMuteMode : 0;
+        string osdPosition = NormalizeOsdPosition(settings.OsdPosition);
         return settings with
         {
             SelectedDeviceId = RepairEndpointId(settings.SelectedDeviceId ?? string.Empty),
@@ -87,8 +89,20 @@ public static class SettingsCodec
                 ? settings.Hotkey : Key.F1,
             HotkeyModifiers = ((int)settings.HotkeyModifiers & ~15) == 0 ? settings.HotkeyModifiers : ModifierKeys.None,
             OsdDuration = duration,
+            OsdPosition = osdPosition,
             SoundVolume = volume,
             StartupMuteMode = startupMuteMode
+        };
+    }
+
+    /// <summary>Canonicalizes OSD screen placement to Center, Bottom, or Top.</summary>
+    public static string NormalizeOsdPosition(string? osdPosition)
+    {
+        return osdPosition?.Trim() switch
+        {
+            string s when string.Equals(s, "Bottom", StringComparison.OrdinalIgnoreCase) => "Bottom",
+            string s when string.Equals(s, "Top", StringComparison.OrdinalIgnoreCase) => "Top",
+            _ => "Center"
         };
     }
 

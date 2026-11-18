@@ -70,6 +70,7 @@ static class UiCases
         test(nameof(OsdWindowHideAndAudioFeedbackStreamManagement), OsdWindowHideAndAudioFeedbackStreamManagement);
         test(nameof(MenuOutsideClickDismissalAndOsdSpamResilience), MenuOutsideClickDismissalAndOsdSpamResilience);
         test(nameof(PowerModesAndMouseShortcutAndMenuActions), PowerModesAndMouseShortcutAndMenuActions);
+        test(nameof(UiUxRefinementsTrayOsdMenuChipsModalAndToast), UiUxRefinementsTrayOsdMenuChipsModalAndToast);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -625,9 +626,9 @@ static class UiCases
             menu.Font = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
         }
 
-        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = false, Size = new System.Drawing.Size(164, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
-        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = false, Size = new System.Drawing.Size(164, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
-        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = false, Size = new System.Drawing.Size(164, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item1 = new System.Windows.Forms.ToolStripMenuItem("Toggle Mute") { AutoSize = false, Size = new System.Drawing.Size(184, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item2 = new System.Windows.Forms.ToolStripMenuItem("Open App") { AutoSize = false, Size = new System.Drawing.Size(184, 29), Margin = new System.Windows.Forms.Padding(0, 1, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
+        var item3 = new System.Windows.Forms.ToolStripMenuItem("Quit") { AutoSize = false, Size = new System.Drawing.Size(184, 29), Margin = new System.Windows.Forms.Padding(0, 7, 0, 1), Padding = new System.Windows.Forms.Padding(0) };
 
         menu.Items.Add(item1);
         menu.Items.Add(item2);
@@ -642,11 +643,11 @@ static class UiCases
         Check.Equal("Quit", menu.Items[2].Text);
         var preferredSize = menu.GetPreferredSize(System.Drawing.Size.Empty);
         
-        Check.True(preferredSize.Width >= 150 && preferredSize.Width <= 180, $"Menu preferred width {preferredSize.Width} must be a compact wide rectangle (20% smaller)");
+        Check.True(preferredSize.Width >= 180 && preferredSize.Width <= 204, $"Menu preferred width {preferredSize.Width} must be a clean 192px wide rectangle");
         Check.True(preferredSize.Height >= 85 && preferredSize.Height <= 115, $"Menu preferred height {preferredSize.Height} must be comfortably sized");
 
         // Validate that OnRenderMenuItemBackground and OnRenderItemText render cleanly for all items
-        using var bmp = new System.Drawing.Bitmap(170, 29);
+        using var bmp = new System.Drawing.Bitmap(192, 29);
         using var g = System.Drawing.Graphics.FromImage(bmp);
         var renderArgs = new System.Windows.Forms.ToolStripItemRenderEventArgs(g, item2);
         item2.Select();
@@ -656,7 +657,7 @@ static class UiCases
 
         var textRenderMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderItemText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         Check.True(textRenderMethod != null, "OnRenderItemText must exist on LiquidGlassMenuRenderer");
-        var rect = new System.Drawing.Rectangle(0, 0, 164, 29);
+        var rect = new System.Drawing.Rectangle(0, 0, 184, 29);
         var flags = System.Windows.Forms.TextFormatFlags.Left | System.Windows.Forms.TextFormatFlags.VerticalCenter;
 
         // Validate menu rendering in both dark and light modes without leaving scratch artifacts or dirty settings
@@ -668,7 +669,7 @@ static class UiCases
                 var settings = SettingsManager.Load();
                 SettingsManager.Save(settings with { LightMode = light });
 
-                using var fullBmp = new System.Drawing.Bitmap(170, 100);
+                using var fullBmp = new System.Drawing.Bitmap(196, 112);
                 using var fullG = System.Drawing.Graphics.FromImage(fullBmp);
                 
                 // Background & Border
@@ -679,7 +680,7 @@ static class UiCases
 
                 // Item 1 (Hovered / Selected)
                 item1.Select();
-                using var item1Bmp = new System.Drawing.Bitmap(164, 29);
+                using var item1Bmp = new System.Drawing.Bitmap(184, 29);
                 using (var item1G = System.Drawing.Graphics.FromImage(item1Bmp))
                 {
                     renderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemRenderEventArgs(item1G, item1) });
@@ -688,20 +689,20 @@ static class UiCases
                 fullG.DrawImage(item1Bmp, 4, 4);
 
                 // Item 2 (Open App)
-                using var item2Bmp = new System.Drawing.Bitmap(164, 29);
+                using var item2Bmp = new System.Drawing.Bitmap(184, 29);
                 using (var item2G = System.Drawing.Graphics.FromImage(item2Bmp))
                 {
                     textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item2G, item2, item2.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
                 }
-                fullG.DrawImage(item2Bmp, 4, 34);
+                fullG.DrawImage(item2Bmp, 4, 35);
 
                 // Item 3 (Quit)
-                using var item3Bmp = new System.Drawing.Bitmap(164, 29);
+                using var item3Bmp = new System.Drawing.Bitmap(184, 29);
                 using (var item3G = System.Drawing.Graphics.FromImage(item3Bmp))
                 {
                     textRenderMethod!.Invoke(menu.Renderer, new object[] { new System.Windows.Forms.ToolStripItemTextRenderEventArgs(item3G, item3, item3.Text, rect, System.Drawing.Color.White, menu.Font, flags) });
                 }
-                fullG.DrawImage(item3Bmp, 4, 64);
+                fullG.DrawImage(item3Bmp, 4, 72);
 
                 // Verify item3 has drawn glyphs
                 int item3Pixels = 0;
@@ -2134,6 +2135,253 @@ static class UiCases
             window.BtnMenuAbout_Click(window.btnMenuAbout!, new System.Windows.RoutedEventArgs());
             string aboutText = new System.Windows.Documents.TextRange(window.tbWarningMessage.ContentStart, window.tbWarningMessage.ContentEnd).Text;
             Check.True(aboutText.Contains("github.com/youssefhazem3-dot/MicMute", StringComparison.Ordinal), "About status should include project URL");
+        }
+        finally
+        {
+            SettingsManager.Save(originalSettings);
+            SettingsManager.Flush();
+            window.Close();
+        }
+    }
+
+    private static void UiUxRefinementsTrayOsdMenuChipsModalAndToast()
+    {
+        // 1. OSD Screen Positioning math across Top, Center, Bottom
+        var screen = new PixelRect(0, 0, 1920, 1080);
+        var size = new PixelSize(180, 180);
+        PixelRect topRect = UiBehavior.CalculateOsdPositionInPixels(screen, size, "Top");
+        PixelRect centerRect = UiBehavior.CalculateOsdPositionInPixels(screen, size, "Center");
+        PixelRect bottomRect = UiBehavior.CalculateOsdPositionInPixels(screen, size, "Bottom");
+        Check.Equal(UiBehavior.CenterInPixels(screen, size), centerRect, "Center placement must match CenterInPixels");
+        Check.Equal(centerRect.Left, topRect.Left, "Top OSD must stay horizontally centered");
+        Check.Equal(centerRect.Left, bottomRect.Left, "Bottom OSD must stay horizontally centered");
+        Check.True(topRect.Top < centerRect.Top && centerRect.Top < bottomRect.Top,
+            $"OSD vertical anchors must be ordered Top ({topRect.Top}) < Center ({centerRect.Top}) < Bottom ({bottomRect.Top})");
+
+        // 2. 192px Tray menu renders dynamic labels ("Unmute Mic"), hotkey hint ("Insert"), and Quit danger hover
+        using (var trayMenu = new App.LiquidGlassContextMenu())
+        using (var muteBmp = new System.Drawing.Bitmap(192, 29))
+        using (var quitBmp = new System.Drawing.Bitmap(192, 29))
+        {
+            var renderer = new App.LiquidGlassMenuRenderer(trayMenu);
+            trayMenu.Renderer = renderer;
+            var muteItem = new System.Windows.Forms.ToolStripMenuItem("Unmute Mic")
+            {
+                AutoSize = false,
+                Size = new System.Drawing.Size(192, 29),
+                Tag = "Insert"
+            };
+            var openItem = new System.Windows.Forms.ToolStripMenuItem("Open App")
+            {
+                AutoSize = false,
+                Size = new System.Drawing.Size(192, 29)
+            };
+            var quitItem = new System.Windows.Forms.ToolStripMenuItem("Quit")
+            {
+                AutoSize = false,
+                Size = new System.Drawing.Size(192, 29),
+                Margin = new System.Windows.Forms.Padding(0, 7, 0, 1)
+            };
+            trayMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { muteItem, openItem, quitItem });
+
+            var bgMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderMenuItemBackground",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var textMethod = typeof(App.LiquidGlassMenuRenderer).GetMethod("OnRenderItemText",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var rect = new System.Drawing.Rectangle(0, 0, 192, 29);
+            var flags = System.Windows.Forms.TextFormatFlags.Left | System.Windows.Forms.TextFormatFlags.VerticalCenter;
+
+            using (var gMute = System.Drawing.Graphics.FromImage(muteBmp))
+            {
+                gMute.Clear(System.Drawing.Color.FromArgb(18, 18, 20));
+                textMethod!.Invoke(renderer, new object[]
+                {
+                    new System.Windows.Forms.ToolStripItemTextRenderEventArgs(
+                        gMute, muteItem, muteItem.Text, rect, System.Drawing.Color.White, trayMenu.Font, flags)
+                });
+            }
+
+            quitItem.Select();
+            using (var gQuit = System.Drawing.Graphics.FromImage(quitBmp))
+            {
+                gQuit.Clear(System.Drawing.Color.FromArgb(18, 18, 20));
+                bgMethod!.Invoke(renderer, new object[] { new System.Windows.Forms.ToolStripItemRenderEventArgs(gQuit, quitItem) });
+                textMethod!.Invoke(renderer, new object[]
+                {
+                    new System.Windows.Forms.ToolStripItemTextRenderEventArgs(
+                        gQuit, quitItem, quitItem.Text, rect, System.Drawing.Color.White, trayMenu.Font, flags)
+                });
+            }
+
+            int coralMutePixels = 0;
+            int rightHintPixels = 0;
+            int quitHoverPixels = 0;
+            for (int y = 0; y < 29; y++)
+            {
+                for (int x = 0; x < 192; x++)
+                {
+                    var mp = muteBmp.GetPixel(x, y);
+                    if (mp.R > 180 && mp.B < 150) coralMutePixels++;
+                    if (x > 136 && (mp.R > 45 || mp.G > 45 || mp.B > 45)) rightHintPixels++;
+                    var qp = quitBmp.GetPixel(x, y);
+                    if (qp.R > qp.B + 8) quitHoverPixels++;
+                }
+            }
+            Check.True(coralMutePixels > 10, "Unmute Mic tray icon must render coral-red muted mic/slash");
+            Check.True(rightHintPixels > 10, "192px tray menu must render right-aligned shortcut hint with breathing room");
+            Check.True(quitHoverPixels > 50, "Quit tray hover must render coral danger highlight");
+        }
+
+        // 3. OsdWindow stays crisp minimalist (no glossy white glare ellipses) with Light Mode slash mask support
+        var osd = new OsdWindow();
+        try
+        {
+            Check.True(osd.panelScaleTransform != null, "OsdWindow must bind panelScaleTransform");
+            Check.True(osd.muteSlashBg != null, "OsdWindow must bind muteSlashBg");
+            Check.True(osd.borderPanel.Background is System.Windows.Media.SolidColorBrush,
+                "borderPanel.Background must stay a SolidColorBrush");
+
+            using var osdStream = typeof(OsdWindow).Assembly.GetManifestResourceStream("MicMute.OsdWindow.xaml");
+            using var osdReader = new System.IO.StreamReader(osdStream!);
+            string osdXaml = osdReader.ReadToEnd();
+            Check.True(!osdXaml.Contains("osdSpecularArc") && !osdXaml.Contains("osdGlassSheen"),
+                "OsdWindow must not include glossy oval glare overlays");
+
+            osd.ApplyTheme(true);
+            var lightMask = (System.Windows.Media.SolidColorBrush)osd.muteSlashBg!.Stroke;
+            Check.True(lightMask.Color.R > 220, "Light mode mute slash mask must be white-tinted");
+            osd.ApplyTheme(false);
+            var darkMask = (System.Windows.Media.SolidColorBrush)osd.muteSlashBg.Stroke;
+            Check.True(darkMask.Color.R < 30, "Dark mode mute slash mask must be dark-tinted");
+        }
+        finally
+        {
+            osd.Close();
+        }
+
+        // 4. MainWindow refinements (no voice metering, clean segmented OSD position, monochrome pills & chips, theme-aware modal)
+        AppSettings originalSettings = SettingsManager.Load();
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            Check.True(window.appMenuChevronRot != null, "MainWindow must expose appMenuChevronRot");
+            Check.True(window.panelHeroModeChips != null && window.chipMuteLock != null && window.chipSyncAllMics != null,
+                "MainWindow must expose hero active mode chips");
+            Check.True(window.btnOsdPosCenter != null && window.btnOsdPosBottom != null && window.btnOsdPosTop != null,
+                "MainWindow must expose segmented OSD position buttons");
+            Check.True(window.warningTranslate != null, "MainWindow must expose warningTranslate for animated bottom toast");
+            Check.True(window.borderModalOverlay != null && window.btnModalCancel != null && window.btnModalConfirm != null,
+                "MainWindow must expose theme-aware modal controls");
+
+            using var mwStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+            using var mwReader = new System.IO.StreamReader(mwStream!);
+            string mwXaml = mwReader.ReadToEnd();
+            Check.True(!mwXaml.Contains("voiceHalo"), "Voice metering ring must not exist in MainWindow.xaml");
+
+            // Hero mode chips stay hidden when both power modes are off, appear cleanly when toggled on
+            SettingsManager.Save(originalSettings with { SyncAllMicrophones = false, LockMuteState = false, StartupMuteMode = 0, OsdPosition = "Center" });
+            window.BtnMenuSyncAllMics_Click(window.btnMenuSyncAllMics!, new System.Windows.RoutedEventArgs()); // On
+            window.BtnMenuSyncAllMics_Click(window.btnMenuSyncAllMics!, new System.Windows.RoutedEventArgs()); // Off
+            Check.Equal(System.Windows.Visibility.Collapsed, window.panelHeroModeChips!.Visibility, "Mode chips must stay collapsed when both modes are off");
+
+            // Keep App Menu open when toggling power-user options inside it
+            window.popupAppMenu!.IsOpen = true;
+            window.BtnMenuStartupState_Click(window.btnMenuStartupState!, new System.Windows.RoutedEventArgs());
+            Check.True(window.popupAppMenu.IsOpen, "Startup State toggle must keep App Menu open");
+            Check.Equal("Muted", window.tbMenuStartupBadge?.Text);
+
+            window.BtnMenuSyncAllMics_Click(window.btnMenuSyncAllMics!, new System.Windows.RoutedEventArgs());
+            Check.True(window.popupAppMenu.IsOpen, "Sync All Mics toggle must keep App Menu open");
+            Check.Equal("ON", window.tbMenuSyncBadge?.Text);
+            Check.Equal(System.Windows.Visibility.Visible, window.panelHeroModeChips.Visibility);
+            Check.Equal(System.Windows.Visibility.Visible, window.chipSyncAllMics!.Visibility);
+
+            window.BtnMenuLockMute_Click(window.btnMenuLockMute!, new System.Windows.RoutedEventArgs());
+            Check.True(window.popupAppMenu.IsOpen, "Mute Lock toggle must keep App Menu open");
+            Check.Equal("ON", window.tbMenuLockBadge?.Text);
+            Check.Equal(System.Windows.Visibility.Visible, window.chipMuteLock!.Visibility);
+
+            // Action items still close the menu
+            window.BtnMenuAbout_Click(window.btnMenuAbout!, new System.Windows.RoutedEventArgs());
+            Check.True(!window.popupAppMenu.IsOpen, "About menu item must close App Menu");
+
+            // Segmented OSD Position buttons update settings & selected Tag
+            window.BtnOsdPosBottom_Click(window.btnOsdPosBottom!, new System.Windows.RoutedEventArgs());
+            Check.Equal("Bottom", SettingsManager.Load().OsdPosition);
+            Check.Equal("Selected", window.btnOsdPosBottom!.Tag as string);
+            Check.True(window.btnOsdPosCenter!.Tag == null, "Center segment must be deselected");
+
+            window.BtnOsdPosTop_Click(window.btnOsdPosTop!, new System.Windows.RoutedEventArgs());
+            Check.Equal("Top", SettingsManager.Load().OsdPosition);
+            Check.Equal("Selected", window.btnOsdPosTop!.Tag as string);
+
+            window.BtnOsdPosCenter_Click(window.btnOsdPosCenter!, new System.Windows.RoutedEventArgs());
+            Check.Equal("Center", SettingsManager.Load().OsdPosition);
+            Check.Equal("Selected", window.btnOsdPosCenter!.Tag as string);
+
+            // Recording hotkey pulses monochrome Accent border without thickening border
+            window.SetLightMode(false);
+            window.StartRecordingHotkey();
+            Check.Equal("Press keys...", window.tbHotkey.Text);
+            Check.Equal(1.0, window.borderHotkey.BorderThickness.Left, "Recording border must keep 1px thickness to avoid layout shift");
+            var pulseBrush = window.borderHotkey.BorderBrush as System.Windows.Media.SolidColorBrush;
+            Check.True(pulseBrush != null && pulseBrush.Color.R == pulseBrush.Color.G && pulseBrush.Color.G == pulseBrush.Color.B,
+                "Dark mode recording border must pulse monochrome white (not coral-red)");
+
+            var esc = new System.Windows.Input.KeyEventArgs(
+                System.Windows.Input.Keyboard.PrimaryDevice,
+                new System.Windows.Interop.HwndSource(0, 0, 0, 0, 0, "test", IntPtr.Zero),
+                0,
+                System.Windows.Input.Key.Escape)
+            {
+                RoutedEvent = System.Windows.UIElement.PreviewKeyDownEvent
+            };
+            window.RaiseEvent(esc);
+            Check.Equal("Record", window.btnRecordHotkey.Content as string);
+
+            // Theme-aware modal scrim, opaque modal card & DangerActionButtonStyle (no local Background override breaking triggers)
+            window.SetLightMode(true);
+            var lightScrim = (System.Windows.Media.SolidColorBrush)window.Resources["ModalScrimBrush"];
+            var lightCard = (System.Windows.Media.SolidColorBrush)window.Resources["ModalCardBgBrush"];
+            Check.Equal((byte)255, lightCard.Color.A, "Light mode modal card must be 100% opaque to prevent background bleed-through");
+            window.SetLightMode(false);
+            var darkScrim = (System.Windows.Media.SolidColorBrush)window.Resources["ModalScrimBrush"];
+            var darkCard = (System.Windows.Media.SolidColorBrush)window.Resources["ModalCardBgBrush"];
+            Check.Equal((byte)255, darkCard.Color.A, "Dark mode modal card must be 100% opaque to prevent background bleed-through");
+            Check.True(lightScrim.Color != darkScrim.Color, "ModalScrimBrush must adapt between Light and Dark mode");
+
+            window.BtnOsdPosBottom_Click(window.btnOsdPosBottom!, new System.Windows.RoutedEventArgs());
+            window.BtnResetSettings_Click(window.btnModalConfirm!, new System.Windows.RoutedEventArgs());
+            Check.Equal(System.Windows.Visibility.Visible, window.borderModalOverlay!.Visibility);
+            Check.Equal("Reset Settings", window.tbModalTitle?.Text);
+            Check.Equal("Reset", window.btnModalConfirm!.Content as string);
+            Check.True(ReferenceEquals(window.btnModalConfirm.Style, window.FindResource("DangerActionButtonStyle")),
+                "Destructive Reset button must use DangerActionButtonStyle so hover/press triggers remain active");
+            Check.True(window.btnModalConfirm.ReadLocalValue(System.Windows.Controls.Control.BackgroundProperty) == System.Windows.DependencyProperty.UnsetValue,
+                "Modal confirm button must not override Background locally");
+
+            window.BtnModalCancel_Click(window.btnModalCancel!, new System.Windows.RoutedEventArgs());
+            var deadline = DateTime.UtcNow.AddMilliseconds(400);
+            while (window.borderModalOverlay.Visibility == System.Windows.Visibility.Visible && DateTime.UtcNow < deadline)
+            {
+                window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
+                System.Threading.Thread.Sleep(20);
+            }
+            Check.Equal(System.Windows.Visibility.Collapsed, window.borderModalOverlay.Visibility);
+            Check.Equal("Bottom", SettingsManager.Load().OsdPosition, "Cancelling modal must preserve settings");
+
+            bool confirmed = false;
+            window.ShowConfirmationModal("Test Title", "Test Message", "Apply", () => confirmed = true);
+            Check.Equal(System.Windows.Visibility.Visible, window.borderModalOverlay.Visibility);
+            Check.True(ReferenceEquals(window.btnModalConfirm.Style, window.FindResource("SecondaryActionButtonStyle")),
+                "Non-destructive modal confirm button must use SecondaryActionButtonStyle");
+            window.BtnModalConfirm_Click(window.btnModalConfirm!, new System.Windows.RoutedEventArgs());
+            Check.True(confirmed, "Confirm button must execute modal callback");
+            Check.Equal(System.Windows.Visibility.Collapsed, window.borderModalOverlay.Visibility);
         }
         finally
         {

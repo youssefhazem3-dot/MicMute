@@ -107,6 +107,20 @@
         <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#45FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbDragBrush" Color="#70FFFFFF" />
 
+        <!-- Active Pill Badge & Segmented Control Brushes (Monochrome Liquid Glass) -->
+        <SolidColorBrush x:Key="MenuBadgeActiveBgBrush" Color="#E4E4E7" />
+        <SolidColorBrush x:Key="MenuBadgeActiveTextBrush" Color="#18181B" />
+
+        <!-- In-Window Modal & Destructive Action Brushes -->
+        <SolidColorBrush x:Key="ModalScrimBrush" Color="#B8060609" />
+        <SolidColorBrush x:Key="ModalCardBgBrush" Color="#FF1C1C20" />
+        <SolidColorBrush x:Key="ModalTopHighlightBrush" Color="#26FFFFFF" />
+        <SolidColorBrush x:Key="DangerBtnBgBrush" Color="#22EF4444" />
+        <SolidColorBrush x:Key="DangerBtnHoverBgBrush" Color="#38EF4444" />
+        <SolidColorBrush x:Key="DangerBtnPressedBgBrush" Color="#4CEF4444" />
+        <SolidColorBrush x:Key="DangerBtnBorderBrush" Color="#78F87171" />
+        <SolidColorBrush x:Key="DangerBtnTextBrush" Color="#F87171" />
+
         <!-- ========================================== -->
         <!-- Windows 11 Native Caption Buttons          -->
         <!-- ========================================== -->
@@ -1066,6 +1080,79 @@
             </Setter>
         </Style>
 
+        <!-- Monochrome Segmented Pill Button Style (OSD Position Selector) -->
+        <Style x:Key="SegmentedPillButtonStyle" TargetType="Button">
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextGrayBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ClickMode" Value="Press" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="segBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="False"
+                                RenderOptions.EdgeMode="Unspecified">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="segBorder" Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
+                            </Trigger>
+                            <Trigger Property="Tag" Value="Selected">
+                                <Setter TargetName="segBorder" Property="Background" Value="{DynamicResource MenuBadgeActiveBgBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource MenuBadgeActiveTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Destructive Modal Action Button Style (Working Hover & Press States) -->
+        <Style x:Key="DangerActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Foreground" Value="{DynamicResource DangerBtnTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DangerBtnBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DangerBtnBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="False"
+                                RenderOptions.EdgeMode="Unspecified">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource DangerBtnHoverBgBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource DangerBtnPressedBgBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Sleek Modern ScrollViewer & ScrollBar -->
         <Style x:Key="ModernScrollThumbStyle" TargetType="Thumb">
             <Setter Property="OverridesDefaultStyle" Value="True" />
@@ -1155,6 +1242,7 @@
             <!-- Theme Transition Snapshot Crossfade Overlay -->
             <Rectangle x:Name="themeTransitionOverlay"
                        Grid.RowSpan="2"
+                       Panel.ZIndex="90"
                        IsHitTestVisible="False"
                        Opacity="0.0"
                        Visibility="Collapsed"
@@ -1195,6 +1283,22 @@
                                        FontWeight="Bold"
                                        FontSize="12"
                                        VerticalAlignment="Center" />
+                            <Path x:Name="pathAppMenuChevron"
+                                  Data="M 0,0 L 3.5,3.5 L 7,0"
+                                  Stroke="{DynamicResource TextGrayBrush}"
+                                  StrokeThickness="1.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  VerticalAlignment="Center"
+                                  Margin="5,1.5,0,0"
+                                  SnapsToDevicePixels="False"
+                                  RenderOptions.EdgeMode="Unspecified"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform x:Name="appMenuChevronRot" Angle="0" />
+                                </Path.RenderTransform>
+                            </Path>
                         </StackPanel>
                     </Button>
 
@@ -1202,11 +1306,11 @@
                     <Popup x:Name="popupAppMenu"
                            PlacementTarget="{Binding ElementName=btnAppMenu}"
                            Placement="Bottom"
-                           HorizontalOffset="0"
-                           VerticalOffset="4"
+                           HorizontalOffset="-10"
+                           VerticalOffset="-2"
                            AllowsTransparency="True"
                            StaysOpen="False"
-                           PopupAnimation="Fade"
+                           PopupAnimation="None"
                            TextOptions.TextFormattingMode="Display"
                            TextOptions.TextRenderingMode="ClearType"
                            RenderOptions.ClearTypeHint="Enabled"
@@ -1218,9 +1322,16 @@
                                 BorderThickness="1"
                                 CornerRadius="10"
                                 Padding="4,6"
-                                MinWidth="190"
-                                Margin="8,4,8,8"
+                                MinWidth="226"
+                                Margin="18,10,18,22"
+                                RenderTransformOrigin="0.5,0.0"
                                 TextElement.FontFamily="Segoe UI Variable Text, Segoe UI Variable Display, Segoe UI, sans-serif">
+                            <Border.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="appMenuScale" ScaleX="1" ScaleY="1" />
+                                    <TranslateTransform x:Name="appMenuTranslate" Y="0" />
+                                </TransformGroup>
+                            </Border.RenderTransform>
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#000000" />
                             </Border.Effect>
@@ -1234,6 +1345,7 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="20" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <Path Data="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"
                                               Fill="{DynamicResource TextGrayBrush}"
@@ -1241,14 +1353,32 @@
                                               Width="12" Height="12"
                                               HorizontalAlignment="Left"
                                               VerticalAlignment="Center" />
-                                        <TextBlock x:Name="tbMenuStartupState"
-                                                   Grid.Column="1"
-                                                   Text="Startup: Keep Last"
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Startup State"
                                                    FontSize="12"
                                                    FontWeight="Normal"
                                                    Foreground="{DynamicResource TextWhiteBrush}"
                                                    VerticalAlignment="Center"
                                                    Margin="4,0,0,0" />
+                                        <TextBlock x:Name="tbMenuStartupState" Text="Startup: Keep Last" Visibility="Collapsed" />
+                                        <Border x:Name="borderMenuStartupBadge"
+                                                Grid.Column="2"
+                                                MinWidth="64"
+                                                Background="{DynamicResource KeycapBgBrush}"
+                                                BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="5"
+                                                Padding="7,2"
+                                                Margin="10,0,0,0"
+                                                VerticalAlignment="Center">
+                                            <TextBlock x:Name="tbMenuStartupBadge"
+                                                       Text="Keep Last"
+                                                       FontSize="10"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextGrayBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                 </Button>
 
@@ -1261,6 +1391,7 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="20" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <Path Data="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
                                               Fill="{DynamicResource TextGrayBrush}"
@@ -1268,14 +1399,32 @@
                                               Width="12" Height="12"
                                               HorizontalAlignment="Left"
                                               VerticalAlignment="Center" />
-                                        <TextBlock x:Name="tbMenuSyncAllMics"
-                                                   Grid.Column="1"
-                                                   Text="Sync All Mics: Off"
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Sync All Mics"
                                                    FontSize="12"
                                                    FontWeight="Normal"
                                                    Foreground="{DynamicResource TextWhiteBrush}"
                                                    VerticalAlignment="Center"
                                                    Margin="4,0,0,0" />
+                                        <TextBlock x:Name="tbMenuSyncAllMics" Text="Sync All Mics: Off" Visibility="Collapsed" />
+                                        <Border x:Name="borderMenuSyncBadge"
+                                                Grid.Column="2"
+                                                MinWidth="40"
+                                                Background="{DynamicResource KeycapBgBrush}"
+                                                BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="5"
+                                                Padding="7,2"
+                                                Margin="10,0,0,0"
+                                                VerticalAlignment="Center">
+                                            <TextBlock x:Name="tbMenuSyncBadge"
+                                                       Text="OFF"
+                                                       FontSize="10"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextGrayBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                 </Button>
 
@@ -1288,6 +1437,7 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="20" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <Path Data="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"
                                               Fill="{DynamicResource TextGrayBrush}"
@@ -1295,14 +1445,32 @@
                                               Width="12" Height="12"
                                               HorizontalAlignment="Left"
                                               VerticalAlignment="Center" />
-                                        <TextBlock x:Name="tbMenuLockMute"
-                                                   Grid.Column="1"
-                                                   Text="Mute Lock: Off"
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Mute Lock"
                                                    FontSize="12"
                                                    FontWeight="Normal"
                                                    Foreground="{DynamicResource TextWhiteBrush}"
                                                    VerticalAlignment="Center"
                                                    Margin="4,0,0,0" />
+                                        <TextBlock x:Name="tbMenuLockMute" Text="Mute Lock: Off" Visibility="Collapsed" />
+                                        <Border x:Name="borderMenuLockBadge"
+                                                Grid.Column="2"
+                                                MinWidth="40"
+                                                Background="{DynamicResource KeycapBgBrush}"
+                                                BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="5"
+                                                Padding="7,2"
+                                                Margin="10,0,0,0"
+                                                VerticalAlignment="Center">
+                                            <TextBlock x:Name="tbMenuLockBadge"
+                                                       Text="OFF"
+                                                       FontSize="10"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextGrayBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                 </Button>
 
@@ -1503,6 +1671,68 @@
                             </Border>
                             <TextBlock x:Name="tbHeroHotkeySuffix" Text=" to toggle" FontWeight="Bold" Foreground="{DynamicResource TextGrayBrush}" FontSize="10.5" VerticalAlignment="Center" />
                         </StackPanel>
+
+                        <!-- Active Power-Mode Chips (Shown only when Mute Lock or Sync All Mics is enabled) -->
+                        <StackPanel x:Name="panelHeroModeChips"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,6,0,0"
+                                    Visibility="Collapsed">
+                            <Border x:Name="chipMuteLock"
+                                    Background="{DynamicResource KeycapBgBrush}"
+                                    BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="7,2"
+                                    Margin="3,0"
+                                    Visibility="Collapsed"
+                                    ToolTip="Mute Lock is active — prevents other apps from changing your mic state"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Data="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"
+                                          Fill="{DynamicResource TextGrayBrush}"
+                                          Stretch="Uniform"
+                                          Width="8.5" Height="9"
+                                          Margin="0,0,4,0"
+                                          VerticalAlignment="Center"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified" />
+                                    <TextBlock Text="Mute Lock"
+                                               Foreground="{DynamicResource TextGrayBrush}"
+                                               FontSize="9.5"
+                                               FontWeight="Bold"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="chipSyncAllMics"
+                                    Background="{DynamicResource KeycapBgBrush}"
+                                    BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="7,2"
+                                    Margin="3,0"
+                                    Visibility="Collapsed"
+                                    ToolTip="Sync All Mics is active — all microphones toggle together"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Data="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
+                                          Fill="{DynamicResource TextGrayBrush}"
+                                          Stretch="Uniform"
+                                          Width="10" Height="9"
+                                          Margin="0,0,4,0"
+                                          VerticalAlignment="Center"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified" />
+                                    <TextBlock Text="All Mics"
+                                               Foreground="{DynamicResource TextGrayBrush}"
+                                               FontSize="9.5"
+                                               FontWeight="Bold"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- GROUP 1: Audio Input & Hotkey (iOS Inset Squircle Group) -->
@@ -1699,15 +1929,20 @@
                                           Unchecked="CbEnableOsd_Unchecked" />
                             </Grid>
 
-                            <!-- High-Contrast OSD Duration Slider -->
+                            <!-- High-Contrast OSD Duration Slider & Placement Sub-Rows -->
                             <Grid x:Name="panelOsdDuration" Margin="37,0,0,8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Duration" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Duration" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                 <Slider x:Name="sliderOsdDuration"
+                                        Grid.Row="0"
                                         Grid.Column="1"
                                         Style="{StaticResource ModernSliderStyle}"
                                         Minimum="0.1" Maximum="30.0"
@@ -1716,6 +1951,7 @@
                                         VerticalAlignment="Center"
                                         ValueChanged="SliderOsdDuration_ValueChanged" />
                                 <Border x:Name="borderOsdDurationKeycap"
+                                        Grid.Row="0"
                                         Grid.Column="2"
                                         Width="58" Height="24"
                                         Background="{DynamicResource KeycapBgBrush}"
@@ -1756,6 +1992,49 @@
                                                    FontWeight="SemiBold"
                                                    VerticalAlignment="Center"
                                                    Margin="2,0,0,0" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- Row 1: OSD Screen Position Segmented Pill Selector -->
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Position" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,6,8,0" />
+                                <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                        Height="26"
+                                        Margin="0,6,0,0"
+                                        Padding="2"
+                                        Background="{DynamicResource KeycapBgBrush}"
+                                        BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
+                                        VerticalAlignment="Center">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="2" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="2" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="btnOsdPosCenter"
+                                                Grid.Column="0"
+                                                Content="Center"
+                                                Tag="Selected"
+                                                Style="{StaticResource SegmentedPillButtonStyle}"
+                                                ToolTip="Show OSD at the center of the active display"
+                                                Click="BtnOsdPosCenter_Click" />
+                                        <Button x:Name="btnOsdPosBottom"
+                                                Grid.Column="2"
+                                                Content="Bottom"
+                                                Style="{StaticResource SegmentedPillButtonStyle}"
+                                                ToolTip="Show OSD above the taskbar (clears game crosshairs)"
+                                                Click="BtnOsdPosBottom_Click" />
+                                        <Button x:Name="btnOsdPosTop"
+                                                Grid.Column="4"
+                                                Content="Top"
+                                                Style="{StaticResource SegmentedPillButtonStyle}"
+                                                ToolTip="Show OSD near the top of the active display"
+                                                Click="BtnOsdPosTop_Click" />
                                     </Grid>
                                 </Border>
                             </Grid>
@@ -2118,6 +2397,9 @@
                             RenderOptions.EdgeMode="Unspecified"
                             Padding="10,7"
                             Margin="0,4,0,0">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="warningTranslate" Y="0" />
+                        </Border.RenderTransform>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -2159,6 +2441,83 @@
 
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- Theme-Aware In-Window Confirmation Modal Overlay -->
+            <Border x:Name="borderModalOverlay"
+                    Grid.RowSpan="2"
+                    Background="{DynamicResource ModalScrimBrush}"
+                    CornerRadius="19"
+                    Visibility="Collapsed"
+                    Opacity="0.0"
+                    Panel.ZIndex="100"
+                    KeyboardNavigation.TabNavigation="Cycle"
+                    KeyboardNavigation.DirectionalNavigation="Cycle"
+                    SnapsToDevicePixels="False"
+                    RenderOptions.EdgeMode="Unspecified">
+                <Border x:Name="borderModalCard"
+                        Background="{DynamicResource ModalCardBgBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Width="324"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        RenderTransformOrigin="0.5,0.5"
+                        SnapsToDevicePixels="False"
+                        RenderOptions.EdgeMode="Unspecified">
+                    <Border.RenderTransform>
+                        <ScaleTransform x:Name="modalCardScale" ScaleX="0.96" ScaleY="0.96" />
+                    </Border.RenderTransform>
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="22" ShadowDepth="6" Direction="270" Opacity="0.40" Color="#000000" />
+                    </Border.Effect>
+                    <Grid>
+                        <!-- Subtle Top Specular Hairline -->
+                        <Border Height="1"
+                                VerticalAlignment="Top"
+                                Margin="14,0,14,0"
+                                Background="{DynamicResource ModalTopHighlightBrush}"
+                                IsHitTestVisible="False" />
+                        <StackPanel Margin="18,16">
+                            <TextBlock x:Name="tbModalTitle"
+                                       Text="Confirm Action"
+                                       Foreground="{DynamicResource TextWhiteBrush}"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Margin="0,0,0,6" />
+                            <TextBlock x:Name="tbModalMessage"
+                                       Text="Are you sure?"
+                                       Foreground="{DynamicResource TextGrayBrush}"
+                                       FontSize="11.5"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"
+                                       LineHeight="17"
+                                       Margin="0,0,0,16" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="btnModalCancel"
+                                        Grid.Column="0"
+                                        Height="32"
+                                        Content="Cancel"
+                                        FontSize="11.5"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Click="BtnModalCancel_Click" />
+                                <Button x:Name="btnModalConfirm"
+                                        Grid.Column="2"
+                                        Height="32"
+                                        Content="Confirm"
+                                        FontSize="11.5"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Click="BtnModalConfirm_Click" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Border>
         </Grid>
     </Border>
 </Window>

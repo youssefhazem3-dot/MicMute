@@ -47,6 +47,7 @@ public partial class OsdWindow : Window
     }
 
     internal Border borderPanel = null!;
+    internal ScaleTransform? panelScaleTransform;
     internal Grid pathActive = null!;
     internal Grid pathMuted = null!;
     internal TextBlock tbStatus = null!;
@@ -54,6 +55,7 @@ public partial class OsdWindow : Window
     internal System.Windows.Shapes.Path activeGlyph = null!;
     internal System.Windows.Shapes.Path mutedGlyph = null!;
     internal System.Windows.Shapes.Line muteSlash = null!;
+    internal System.Windows.Shapes.Line? muteSlashBg;
     private bool _contentLoaded;
     private bool _lightMode;
     private bool _isMuted;
@@ -143,12 +145,14 @@ public partial class OsdWindow : Window
                     RenderOptions.SetEdgeMode(this, RenderOptions.GetEdgeMode(root));
 
                     borderPanel = (Border)root.FindName("borderPanel");
+                    panelScaleTransform = root.FindName("panelScaleTransform") as ScaleTransform;
                     pathActive = (Grid)root.FindName("pathActive");
                     pathMuted = (Grid)root.FindName("pathMuted");
                     tbStatus = (TextBlock)root.FindName("tbStatus");
                     activeGlyph = (System.Windows.Shapes.Path)root.FindName("activeGlyph");
                     mutedGlyph = (System.Windows.Shapes.Path)root.FindName("mutedGlyph");
                     muteSlash = (System.Windows.Shapes.Line)root.FindName("muteSlash");
+                    muteSlashBg = root.FindName("muteSlashBg") as System.Windows.Shapes.Line;
                     if (borderPanel != null)
                     {
                         osdShadow = borderPanel.Effect as DropShadowEffect;
@@ -237,20 +241,53 @@ public partial class OsdWindow : Window
             _instance = new OsdWindow();
         }
 
-        // Cancel any pending opacity animation and restore full visibility immediately
+        bool wasVisible = _instance.IsVisible && _instance.Opacity > 0.05;
+        bool wasMuted = _instance._isMuted;
+
+        // Cancel any pending opacity animation and restore full window visibility immediately
         _instance.BeginAnimation(OpacityProperty, null);
         _instance.Opacity = 0.95;
 
-        _instance.ApplyTheme(SettingsManager.Load().LightMode);
+        AppSettings settings = SettingsManager.Load();
+        _instance.ApplyTheme(settings.LightMode);
         _instance.UpdateState(isMuted);
+
+        if (!wasVisible)
+        {
+            if (_instance.borderPanel != null)
+            {
+                _instance.borderPanel.BeginAnimation(UIElement.OpacityProperty, null);
+                _instance.borderPanel.Opacity = 0.0;
+            }
+            if (_instance.panelScaleTransform != null)
+            {
+                _instance.panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                _instance.panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                _instance.panelScaleTransform.ScaleX = 0.94;
+                _instance.panelScaleTransform.ScaleY = 0.94;
+            }
+        }
+        else
+        {
+            _instance.ResetOverlayAnimations();
+        }
 
         IntPtr handle = new WindowInteropHelper(_instance).EnsureHandle();
 
-        _instance.PositionOnActiveScreen(handle);
+        _instance.PositionOnActiveScreenCore(handle, settings.OsdPosition);
 
         if (!_instance.IsVisible)
         {
             _instance.Show();
+        }
+
+        if (!wasVisible)
+        {
+            _instance.AnimatePanelEntrance();
+        }
+        else if (wasMuted != isMuted)
+        {
+            _instance.AnimatePanelScale(1.03, 1.0, 90, new CubicEase { EasingMode = EasingMode.EaseOut });
         }
 
         double safeDuration = double.IsFinite(durationSeconds)
@@ -283,6 +320,7 @@ public partial class OsdWindow : Window
             if (_instance != null)
             {
                 _instance.BeginAnimation(OpacityProperty, null);
+                _instance.ResetOverlayAnimations();
                 _instance.Opacity = 0.0;
                 _instance.Hide();
             }
@@ -321,6 +359,9 @@ public partial class OsdWindow : Window
     }
 
     private void PositionOnActiveScreen(IntPtr handle)
+        => PositionOnActiveScreenCore(handle, SettingsManager.Load().OsdPosition);
+
+    private void PositionOnActiveScreenCore(IntPtr handle, string? osdPosition)
     {
         try
         {
@@ -352,7 +393,8 @@ public partial class OsdWindow : Window
 
             screen ??= System.Windows.Forms.Screen.PrimaryScreen;
             if (screen == null) return;
-            var bounds = screen.Bounds;
+            string normalizedPosition = SettingsCodec.NormalizeOsdPosition(osdPosition);
+            var bounds = normalizedPosition == "Center" ? screen.Bounds : screen.WorkingArea;
             DpiScale dpi = VisualTreeHelper.GetDpi(this);
             double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
             double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
@@ -369,7 +411,7 @@ public partial class OsdWindow : Window
                 }
             }
             var size = new PixelSize(width, height);
-            PixelRect target = UiBehavior.CenterInPixels(new PixelRect(bounds.Left, bounds.Top, bounds.Width, bounds.Height), size);
+            PixelRect target = UiBehavior.CalculateOsdPositionInPixels(new PixelRect(bounds.Left, bounds.Top, bounds.Width, bounds.Height), size, normalizedPosition);
 
             this.Left = target.Left / scaleX;
             this.Top = target.Top / scaleY;
@@ -401,6 +443,8 @@ public partial class OsdWindow : Window
     private static readonly SolidColorBrush BrushLightMutedBorder = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26));
     private static readonly SolidColorBrush BrushLightMutedText = CreateFrozenBrush(Color.FromRgb(0xDC, 0x26, 0x26));
     private static readonly SolidColorBrush BrushLightMuted = BrushLightMutedText;
+    private static readonly SolidColorBrush BrushDarkSlashMask = CreateFrozenBrush(Color.FromArgb(0x90, 0x00, 0x00, 0x00));
+    private static readonly SolidColorBrush BrushLightSlashMask = CreateFrozenBrush(Color.FromArgb(0xD8, 0xFF, 0xFF, 0xFF));
 
     private static SolidColorBrush CreateFrozenBrush(Color color)
     {
@@ -426,7 +470,59 @@ public partial class OsdWindow : Window
         activeGlyph.Fill = isLight ? BrushLightActiveText : BrushActiveText;
         mutedGlyph.Fill = isLight ? BrushLightMutedText : BrushMutedText;
         muteSlash.Stroke = isLight ? BrushLightMutedText : BrushMutedText;
+        if (muteSlashBg != null)
+        {
+            muteSlashBg.Stroke = isLight ? BrushLightSlashMask : BrushDarkSlashMask;
+        }
         UpdateState(_isMuted);
+    }
+
+    private void AnimatePanelEntrance()
+    {
+        if (borderPanel != null)
+        {
+            borderPanel.BeginAnimation(UIElement.OpacityProperty, null);
+            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(70))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            borderPanel.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+        }
+        AnimatePanelScale(0.94, 1.0, 85, new CubicEase { EasingMode = EasingMode.EaseOut });
+    }
+
+    private void SnapPanelOpacity()
+    {
+        if (borderPanel != null)
+        {
+            borderPanel.BeginAnimation(UIElement.OpacityProperty, null);
+            borderPanel.Opacity = 1.0;
+        }
+    }
+
+    private void AnimatePanelScale(double fromScale, double toScale, double durationMs, IEasingFunction easing)
+    {
+        if (panelScaleTransform == null) return;
+        panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+
+        Duration duration = TimeSpan.FromMilliseconds(durationMs);
+        DoubleAnimation animX = new DoubleAnimation(fromScale, toScale, duration) { EasingFunction = easing };
+        DoubleAnimation animY = new DoubleAnimation(fromScale, toScale, duration) { EasingFunction = easing };
+        panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animX);
+        panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animY);
+    }
+
+    private void ResetOverlayAnimations()
+    {
+        SnapPanelOpacity();
+        if (panelScaleTransform != null)
+        {
+            panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            panelScaleTransform.ScaleX = 1.0;
+            panelScaleTransform.ScaleY = 1.0;
+        }
     }
 
     private void UpdateState(bool isMuted)
@@ -470,17 +566,6 @@ public partial class OsdWindow : Window
             IntPtr handle = new WindowInteropHelper(this).Handle;
             SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 
-            double startOpacity = Math.Clamp(this.Opacity, 0.0, 0.95);
-            if (startOpacity < 0.95)
-            {
-                DoubleAnimation fadeIn = new DoubleAnimation(startOpacity, 0.95, TimeSpan.FromSeconds(0.06));
-                BeginAnimation(OpacityProperty, fadeIn);
-            }
-            else
-            {
-                this.Opacity = 0.95;
-            }
-
             DateTime endTime = DateTime.UtcNow.AddSeconds(durationSeconds);
             while (DateTime.UtcNow < endTime)
             {
@@ -509,10 +594,12 @@ public partial class OsdWindow : Window
                 if (!token.IsCancellationRequested && sequenceId == _activeSequenceId)
                 {
                     BeginAnimation(OpacityProperty, null);
+                    ResetOverlayAnimations();
                     this.Opacity = 0.0;
                     Hide();
                 }
             };
+            AnimatePanelScale(panelScaleTransform?.ScaleX ?? 1.0, 0.96, 200, new CubicEase { EasingMode = EasingMode.EaseIn });
             BeginAnimation(OpacityProperty, fadeOut);
         }
         catch (OperationCanceledException)

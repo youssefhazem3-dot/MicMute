@@ -85,7 +85,7 @@ internal sealed class HotkeyState
             _pollConfirmedDown = false;
             // A mismatching first down consumes this hold too. Releasing a modifier while
             // V remains down must never turn Ctrl+V into a plain-V activation.
-            if (modifiers == _modifiers)
+            if (ModifiersMatch(modifiers))
             {
                 _activeHold = true;
                 _releasedPending = false;
@@ -134,7 +134,7 @@ internal sealed class HotkeyState
             _held = _pollConfirmedDown = true;
             _lastEventTime = timestamp;
             _lastSource = null;
-            if (modifiers == _modifiers)
+            if (ModifiersMatch(modifiers))
             {
                 _activeHold = true;
                 _releasedPending = false;
@@ -143,6 +143,27 @@ internal sealed class HotkeyState
             return false;
         }
     }
+
+    private bool ModifiersMatch(ModifierKeys actual)
+    {
+        if (actual == _modifiers) return true;
+        // When a dedicated non-typing key (e.g. Insert, F1..F24, Mouse 4/5, Pause, Home/End/PgUp/PgDn)
+        // is bound without modifiers, allow it to trigger even while Shift/Ctrl/Alt are held in-game
+        // (such as sprinting with Shift or crouching with Ctrl in Fortnite).
+        return _modifiers == ModifierKeys.None && IsDedicatedNonTypingKey(_vk);
+    }
+
+    internal static bool IsDedicatedNonTypingKey(int vk) => vk switch
+    {
+        >= 0x04 and <= 0x06 => true, // MouseMiddle, MouseXButton1, MouseXButton2
+        0x13 or 0x14 => true,        // Pause, CapsLock
+        >= 0x21 and <= 0x2E => true, // PageUp, PageDown, End, Home, Arrow keys, Select, Print, Execute, PrintScreen, Insert, Delete
+        0x5D => true,                // Apps / ContextMenu key
+        >= 0x60 and <= 0x87 => true, // NumPad 0-9, Multiply/Add/Separator/Subtract/Decimal/Divide, F1-F24
+        0x90 or 0x91 => true,        // NumLock, ScrollLock
+        >= 0xA6 and <= 0xB7 => true, // Browser / Media / Launch keys
+        _ => false
+    };
 }
 
 /// <summary>Tracks modifiers in each ordered native stream, including both sides.</summary>

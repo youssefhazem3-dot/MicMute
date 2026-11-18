@@ -68,6 +68,7 @@ public class HotkeyManager : IDisposable
     private readonly LowLevelKeyboardProc _proc;
     private readonly Thread _pollingThread;
     private IntPtr _hookId;
+    private long _lastHookEventTick = Environment.TickCount64;
     private IntPtr _rawInputBuffer;
     private int _currentVk;
     private Key _currentKey;
@@ -114,7 +115,7 @@ public class HotkeyManager : IDisposable
             RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_INPUTSINK, hwndTarget = hWnd } },
                 1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
             InstallHook();
-            _pollingThread = new Thread(PollLoop) { IsBackground = true, Priority = ThreadPriority.Normal, Name = "MicMute_InputPoller" };
+            _pollingThread = new Thread(PollLoop) { IsBackground = true, Priority = ThreadPriority.AboveNormal, Name = "MicMute_InputPoller" };
             _pollingThread.Start();
         }
         catch
@@ -203,10 +204,16 @@ public class HotkeyManager : IDisposable
                 }
 
                 long now = Environment.TickCount64;
-                if (!IsMouseKey(_currentKey) && Volatile.Read(ref _hookId) == IntPtr.Zero && now - lastHookRecoveryCheck > 5000)
+                if (!IsMouseKey(_currentKey))
                 {
-                    lastHookRecoveryCheck = now;
-                    ScheduleHookRefresh();
+                    bool hookMissing = Volatile.Read(ref _hookId) == IntPtr.Zero;
+                    bool hookSilent = now - Volatile.Read(ref _lastHookEventTick) > 10000;
+                    if ((hookMissing && now - lastHookRecoveryCheck > 2000) ||
+                        (hookSilent && now - lastHookRecoveryCheck > 10000))
+                    {
+                        lastHookRecoveryCheck = now;
+                        ScheduleHookRefresh();
+                    }
                 }
 
                 int waitMs = vk == 0 ? Timeout.Infinite : (IsMouseKey(_currentKey) ? 4 : 16);
@@ -263,7 +270,11 @@ public class HotkeyManager : IDisposable
         if (_disposed || Volatile.Read(ref _hookId) != IntPtr.Zero) return;
         IntPtr installed = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
         Volatile.Write(ref _hookId, installed);
-        if (installed == IntPtr.Zero)
+        if (installed != IntPtr.Zero)
+        {
+            Volatile.Write(ref _lastHookEventTick, Environment.TickCount64);
+        }
+        else
         {
             int err = Marshal.GetLastWin32Error();
             DiagnosticLogger.LogWarning($"SetWindowsHookEx failed with Win32 error {err}");
@@ -274,14 +285,15 @@ public class HotkeyManager : IDisposable
     {
         if (!_disposed && nCode >= 0 && lParam != IntPtr.Zero)
         {
+            Volatile.Write(ref _lastHookEventTick, Environment.TickCount64);
             int message = wParam.ToInt32();
             bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
             if (down || message == 0x101 || message == 0x105)
             {
                 int vk = Marshal.ReadInt32(lParam);
                 uint timestamp = unchecked((uint)Marshal.ReadInt32(lParam, 12));
-                _hookModifiers.Observe(vk, down);
                 _hookModifiers.Synchronize(IsKeyDown);
+                _hookModifiers.Observe(vk, down);
                 int version = Volatile.Read(ref _bindingVersion);
                 if (_state.Observe(HotkeySource.Hook, vk, down, _hookModifiers.Current, timestamp))
                     QueueActivation(version);
@@ -302,12 +314,16 @@ public class HotkeyManager : IDisposable
             uint bytes = GetRawInputData(lParam, RID_INPUT, _rawInputBuffer, ref size, (uint)RawKeyboardPacket.HeaderSize);
             if (RawKeyboardPacket.TryRead(_rawInputBuffer, bytes, size, 128, out int vk, out bool down))
             {
-                _rawModifiers.Observe(vk, down);
                 _rawModifiers.Synchronize(IsKeyDown);
+                _rawModifiers.Observe(vk, down);
                 if (_state.Observe(HotkeySource.RawInput, vk, down, _rawModifiers.Current, unchecked((uint)GetMessageTime())))
                     QueueActivation(version);
                 if (!down && _state.ConsumeRelease())
                     QueueRelease(version);
+                if (!IsMouseKey(_currentKey) && Environment.TickCount64 - Volatile.Read(ref _lastHookEventTick) > 250)
+                {
+                    RefreshHook();
+                }
             }
         }
         return IntPtr.Zero;

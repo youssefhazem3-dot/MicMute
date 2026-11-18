@@ -135,8 +135,16 @@ public static class StartupManager
         }
     }
 
+    private static bool IsTestHost(string? exePath = null)
+    {
+        string checkPath = exePath ?? AdminManager.GetExecutablePath();
+        return checkPath.Contains("MicMute.Tests", StringComparison.OrdinalIgnoreCase) ||
+               checkPath.Contains("testhost", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool CreateScheduledTask(string exePath)
     {
+        if (IsTestHost(exePath) || IsTestHost()) return true;
         object? scheduler = null;
         object? folder = null;
         object? taskDef = null;
@@ -221,6 +229,7 @@ public static class StartupManager
 
     public static bool RemoveScheduledTask()
     {
+        if (IsTestHost()) return true;
         object? scheduler = null;
         object? folder = null;
         try

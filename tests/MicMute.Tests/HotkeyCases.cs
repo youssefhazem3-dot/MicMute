@@ -222,6 +222,40 @@ static class HotkeyCases
             mods.Synchronize(vk => vk == 0x11);
             Check.Equal(ModifierKeys.Control, mods.Current, "Synchronize must retain physically held modifiers");
         });
+        test("hotkeys: dedicated non-typing keys bound without modifiers trigger while sprinting or crouching in-game", () =>
+        {
+            const int vkInsert = 0x2D;
+            const int vkF1 = 0x70;
+            const int vkMouse4 = 0x05;
+
+            foreach (int dedicatedVk in new[] { vkInsert, vkF1, vkMouse4 })
+            {
+                var state = new HotkeyState();
+                state.Register(dedicatedVk, ModifierKeys.None, false, 0);
+
+                // Trigger while holding Shift (sprint)
+                Check.True(state.Observe(HotkeySource.Hook, dedicatedVk, true, ModifierKeys.Shift, 10), $"vk 0x{dedicatedVk:X2} should trigger with Shift held");
+                state.Observe(HotkeySource.Hook, dedicatedVk, false, ModifierKeys.Shift, 20);
+                Check.True(state.ConsumeRelease(), $"vk 0x{dedicatedVk:X2} release should fire");
+
+                // Trigger while holding Ctrl (crouch) via RawInput
+                Check.True(state.Observe(HotkeySource.RawInput, dedicatedVk, true, ModifierKeys.Control, 30), $"vk 0x{dedicatedVk:X2} should trigger with Ctrl held");
+                state.Observe(HotkeySource.RawInput, dedicatedVk, false, ModifierKeys.Control, 40);
+                Check.True(state.ConsumeRelease(), $"vk 0x{dedicatedVk:X2} raw release should fire");
+
+                // Trigger while holding Shift+Ctrl via Poll
+                state.Poll(dedicatedVk, false, ModifierKeys.None, 45);
+                Check.True(state.Poll(dedicatedVk, true, ModifierKeys.Shift | ModifierKeys.Control, 50), $"vk 0x{dedicatedVk:X2} should poll-trigger with Shift+Ctrl held");
+                state.Poll(dedicatedVk, false, ModifierKeys.None, 60);
+                Check.True(state.ConsumeRelease(), $"vk 0x{dedicatedVk:X2} poll release should fire");
+
+                // Explicit modifier binding (e.g. Ctrl+Insert) must still require exact modifier match
+                state.Register(dedicatedVk, ModifierKeys.Control, false, 100);
+                Check.True(!state.Observe(HotkeySource.Hook, dedicatedVk, true, ModifierKeys.None, 110), "Ctrl+Insert must not trigger on plain Insert");
+                state.Observe(HotkeySource.Hook, dedicatedVk, false, ModifierKeys.None, 120);
+                Check.True(state.Observe(HotkeySource.Hook, dedicatedVk, true, ModifierKeys.Control, 130), "Ctrl+Insert triggers when Ctrl is held");
+            }
+        });
     }
 
     private static HotkeyState Bound(ModifierKeys modifiers = ModifierKeys.None)
