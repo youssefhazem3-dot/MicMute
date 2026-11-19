@@ -46,11 +46,12 @@ foreach ($directory in @($coreDir,$desktopDir,$projectRoot)) {
         try { $null = [Reflection.AssemblyName]::GetAssemblyName($file.FullName); $references[$file.Name] = $file.FullName } catch { }
     }
 }
+$srcRoot = Join-Path $projectRoot 'src/MicMute'
 $sources = @(Join-Path $projectRoot 'tests/MicMute.Tests/Program.cs')
-if ($Area -eq 'all') { $sources += @(Get-ChildItem -LiteralPath $projectRoot -Filter '*.cs' -File | ForEach-Object FullName) }
+if ($Area -eq 'all') { $sources += @(Get-ChildItem -LiteralPath $srcRoot -Filter '*.cs' -File -Recurse | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } | ForEach-Object FullName) }
 else {
     $patterns = switch ($Area) { 'settings' { @('Settings*.cs','AppSettings.cs') }; 'hotkey' { @('Hotkey*.cs','RawKeyboard*.cs') }; 'ui' { @('UiBehavior.cs','RefreshGeneration.cs') } }
-    foreach ($pattern in $patterns) { $sources += @(Get-ChildItem -LiteralPath $projectRoot -Filter $pattern -File | ForEach-Object FullName) }
+    foreach ($pattern in $patterns) { $sources += @(Get-ChildItem -LiteralPath $srcRoot -Filter $pattern -File -Recurse | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } | ForEach-Object FullName) }
 }
 $casePattern = if ($Area -eq 'all') { '*Cases.cs' } else { "$($Area)Cases.cs" }
 $sources += @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'tests/MicMute.Tests') -Filter $casePattern -File | ForEach-Object FullName)
@@ -59,12 +60,12 @@ $response = @('/nologo','/target:exe','/nostdlib+','/langversion:12','/nullable:
 foreach ($reference in $references.Values) { $response += '/r:"' + $reference + '"' }
 foreach ($source in ($sources | Select-Object -Unique)) { $response += '"' + $source + '"' }
 $resources = @(
-    @{ Path = (Join-Path $projectRoot 'App.xaml'); Name = 'MicMute.App.xaml' },
-    @{ Path = (Join-Path $projectRoot 'MainWindow.xaml'); Name = 'MicMute.MainWindow.xaml' },
-    @{ Path = (Join-Path $projectRoot 'OsdWindow.xaml'); Name = 'MicMute.OsdWindow.xaml' },
-    @{ Path = (Join-Path $projectRoot 'app.ico'); Name = 'MicMute.app.ico' },
-    @{ Path = (Join-Path $projectRoot 'sounds/mute.wav'); Name = 'MicMute.sounds.mute.wav' },
-    @{ Path = (Join-Path $projectRoot 'sounds/unmute.wav'); Name = 'MicMute.sounds.unmute.wav' }
+    @{ Path = (Join-Path $srcRoot 'UI/App.xaml'); Name = 'MicMute.App.xaml' },
+    @{ Path = (Join-Path $srcRoot 'UI/MainWindow.xaml'); Name = 'MicMute.MainWindow.xaml' },
+    @{ Path = (Join-Path $srcRoot 'UI/OsdWindow.xaml'); Name = 'MicMute.OsdWindow.xaml' },
+    @{ Path = (Join-Path $srcRoot 'Assets/app.ico'); Name = 'MicMute.app.ico' },
+    @{ Path = (Join-Path $srcRoot 'Assets/sounds/mute.wav'); Name = 'MicMute.sounds.mute.wav' },
+    @{ Path = (Join-Path $srcRoot 'Assets/sounds/unmute.wav'); Name = 'MicMute.sounds.unmute.wav' }
 )
 foreach ($res in $resources) {
     if (Test-Path -LiteralPath $res.Path) {

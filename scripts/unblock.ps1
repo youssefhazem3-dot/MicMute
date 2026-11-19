@@ -1,5 +1,5 @@
 param(
-    [string]$Target = "$PSScriptRoot\..\MicMute.exe"
+    [string]$Target = "$PSScriptRoot\..\publish\MicMute.exe"
 )
 
 $resolved = Resolve-Path $Target -ErrorAction SilentlyContinue

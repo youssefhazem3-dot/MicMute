@@ -12,7 +12,7 @@ if(!$SkipTests){
 }
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $stage=Join-Path $projectRoot ".artifacts/publish-$stamp"
-$arguments=@('publish',(Join-Path $projectRoot 'MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained',$(if($SelfContained){'true'}else{'false'}),'-p:PublishSingleFile=true','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
+$arguments=@('publish',(Join-Path $projectRoot 'src/MicMute/MicMute.csproj'),'-c','Release','-r','win-x64','--self-contained',$(if($SelfContained){'true'}else{'false'}),'-p:PublishSingleFile=true','-o',$stage,'-p:DebugType=None','-p:DebugSymbols=false')
 if($SelfContained){$arguments+=@('-p:IncludeNativeLibrariesForSelfExtract=true','-p:EnableCompressionInSingleFile=true')}
 if($NoRestore){$arguments+='--no-restore'}
 & $DotnetPath @arguments
@@ -48,9 +48,10 @@ function Copy-Release([string]$destination){
     return $true
 }
 
-$zipPath=Join-Path $projectRoot 'MicMute.zip'
-Compress-Archive -LiteralPath $files.FullName -DestinationPath $zipPath -CompressionLevel Optimal -Force
+$zipName=if($SelfContained){'MicMute-win-x64-standalone.zip'}else{'MicMute-win-x64.zip'}
+$zipPath=Join-Path (Join-Path $projectRoot 'publish') $zipName
 $publishUpdated=Copy-Release (Join-Path $projectRoot 'publish')
+Compress-Archive -LiteralPath $files.FullName -DestinationPath $zipPath -CompressionLevel Optimal -Force
 $rootUpdated=if($UpdateRoot){
     $r = Copy-Release $projectRoot
     $parentDir = Split-Path -Parent $projectRoot

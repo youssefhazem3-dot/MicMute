@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build & Run All Tests
+        run: |
+          dotnet build MicMute.sln -c Release --nologo
+          dotnet run --project tests/MicMute.Tests/MicMute.Tests.csproj -c Release --no-build
+
+      - name: Publish Lightweight & Standalone Packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release-out -Force | Out-Null
+
+          # 1. Lightweight build (~1.35 MB single-file, requires .NET 8 Desktop Runtime x64)
+          dotnet publish src/MicMute/MicMute.csproj -c Release -r win-x64 `
+            --self-contained false `
+            -p:PublishSingleFile=true `
+            -p:DebugType=None -p:DebugSymbols=false `
+            -o stage-light
+          Compress-Archive -Path stage-light/MicMute.exe -DestinationPath release-out/MicMute-win-x64.zip -CompressionLevel Optimal -Force
+
+          # 2. Standalone build (self-contained single-file, zero prerequisites)
+          dotnet publish src/MicMute/MicMute.csproj -c Release -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=None -p:DebugSymbols=false `
+            -o stage-standalone
+          Compress-Archive -Path stage-standalone/MicMute.exe -DestinationPath release-out/MicMute-win-x64-standalone.zip -CompressionLevel Optimal -Force
+
+          # 3. Generate SHA-256 checksums
+          $checksums = Get-ChildItem release-out/*.zip | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          }
+          $checksums | Set-Content -Path release-out/SHA256SUMS.txt -Encoding ascii
+
+      - name: Determine Release Tag
+        id: meta
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "tag=${{ inputs.tag }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "tag=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: MicMute ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            ### Downloads (Windows 10 / 11 `x64`)
+
+            | Package | Best For | Requirements |
+            | :--- | :--- | :--- |
+            | **`MicMute-win-x64.zip`** *(Lightweight, ~0.6 MB)* | Fastest download & smallest footprint (~1.35 MB `.exe`) | [.NET 8 Desktop Runtime (x64)](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) |
+            | **`MicMute-win-x64-standalone.zip`** *(Standalone)* | Plug-and-play on any Windows PC | None (self-contained) |
+
+            Verify downloads with `SHA256SUMS.txt`.
+          files: |
+            release-out/MicMute-win-x64.zip
+            release-out/MicMute-win-x64-standalone.zip
+            release-out/SHA256SUMS.txt

@@ -12,6 +12,6 @@
     <StartupObject>MicMute.Tests.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../MicMute.csproj" />
+    <ProjectReference Include="../../src/MicMute/MicMute.csproj" />
   </ItemGroup>
 </Project>

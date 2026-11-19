@@ -2,7 +2,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MicMute", "MicMute.csproj", "{7FA5D9E0-9E11-40EA-B368-C8E649F56A49}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MicMute", "src\MicMute\MicMute.csproj", "{7FA5D9E0-9E11-40EA-B368-C8E649F56A49}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MicMute.Tests", "tests\MicMute.Tests\MicMute.Tests.csproj", "{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,6 +22,14 @@ Global
 		{7FA5D9E0-9E11-40EA-B368-C8E649F56A49}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7FA5D9E0-9E11-40EA-B368-C8E649F56A49}.Release|x64.ActiveCfg = Release|x64
 		{7FA5D9E0-9E11-40EA-B368-C8E649F56A49}.Release|x64.Build.0 = Release|x64
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Debug|x64.ActiveCfg = Debug|x64
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|x64
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|x64
+		{4C3A2B1D-8E7F-4D5A-9B6C-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

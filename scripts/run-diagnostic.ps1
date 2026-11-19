@@ -29,7 +29,7 @@ $env:NUGET_PACKAGES = Join-Path $projectRoot '.tools/nuget-packages'
 
 if (!$NoBuild) {
     Write-Host "[*] Compiling MicMute (Debug)..." -ForegroundColor Gray
-    $csproj = Join-Path $projectRoot "MicMute.csproj"
+    $csproj = Join-Path $projectRoot "src/MicMute/MicMute.csproj"
     & $DotnetPath build $csproj -c Debug --nologo
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Build failed with exit code $LASTEXITCODE"
@@ -37,7 +37,7 @@ if (!$NoBuild) {
     }
 }
 
-$exePath = Join-Path $projectRoot "bin/Debug/net8.0-windows/win-x64/MicMute.exe"
+$exePath = Join-Path $projectRoot "src/MicMute/bin/Debug/net8.0-windows/win-x64/MicMute.exe"
 if (!(Test-Path -LiteralPath $exePath)) {
     Write-Error "Could not locate binary at: $exePath"
     exit 1
