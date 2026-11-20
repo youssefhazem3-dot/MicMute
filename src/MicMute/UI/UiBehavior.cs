@@ -23,7 +23,7 @@ public static class UiBehavior
     public const double DefaultAdaptiveHorizontalMargin = 24.0;
     public const double MinimumWindowHeight = 260.0;
     public const double MinimumUiScale = 0.55;
-    public const double DynamicContentHeightHeadroom = 44.0;
+    public const double DynamicContentHeightHeadroom = 52.0;
 
     public static bool TryParseOsdDuration(string? text, CultureInfo culture, out double duration)
     {

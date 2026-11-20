@@ -2433,9 +2433,6 @@ static class UiCases
             window.cbDevices.SelectedItem = longDevice;
             window.borderWarning.Visibility = System.Windows.Visibility.Collapsed;
 
-            window.Show();
-            window.UpdateLayout();
-
             var scenarios = new (string Label, DipRect WorkArea, bool ExpectFullScale)[]
             {
                 ("1366x768 @ 100%", new DipRect(0, 0, 1366, 720), false),
@@ -2446,22 +2443,28 @@ static class UiCases
                 ("1920x1080 @ 100%", new DipRect(0, 0, 1920, 1032), true),
             };
 
+            // Measure and arrange windowScaleHost directly so scenarios taller than a headless CI monitor
+            // (e.g. 1920x1080 tested on a 1024x768 runner) are not artificially clamped by Win32 SM_CYMAXTRACK.
+            var host = window.windowScaleHost!;
             foreach (var (label, workArea, expectFullScale) in scenarios)
             {
                 window.borderWarning.Visibility = System.Windows.Visibility.Collapsed;
                 window.ApplyAdaptiveBounds(workArea, isInitialPlacement: true);
-                window.UpdateLayout();
+                host.Measure(new System.Windows.Size(window.Width, window.MaxHeight));
+                double arrangedHeight = Math.Min(window.MaxHeight, host.DesiredSize.Height);
+                host.Arrange(new System.Windows.Rect(0, 0, window.Width, arrangedHeight));
+                host.UpdateLayout();
 
                 Check.Equal(System.Windows.Controls.ScrollBarVisibility.Disabled,
                     window.contentScrollViewer.HorizontalScrollBarVisibility);
                 Check.True(window.contentScrollViewer.ScrollableWidth <= 0.5,
                     $"{label}: must have zero horizontal scrolling with long mic name (ScrollableWidth={window.contentScrollViewer.ScrollableWidth:F2})");
                 Check.True(window.contentScrollViewer.ScrollableHeight <= 0.5,
-                    $"{label}: must fit vertically without scrolling (ScrollableHeight={window.contentScrollViewer.ScrollableHeight:F2}, ActualHeight={window.ActualHeight:F1}, MaxHeight={window.MaxHeight:F1}, Scale={window.CurrentUiScale:F3})");
-                Check.True(window.ActualWidth <= workArea.Width + 0.5,
-                    $"{label}: window width ({window.ActualWidth:F1}) must fit inside workArea width ({workArea.Width:F1})");
-                Check.True(window.ActualHeight <= window.MaxHeight + 0.5,
-                    $"{label}: window height ({window.ActualHeight:F1}) must stay within MaxHeight ({window.MaxHeight:F1})");
+                    $"{label}: must fit vertically without scrolling (ScrollableHeight={window.contentScrollViewer.ScrollableHeight:F2}, DesiredH={host.DesiredSize.Height:F1}, MaxHeight={window.MaxHeight:F1}, Scale={window.CurrentUiScale:F3})");
+                Check.True(window.Width <= workArea.Width + 0.5,
+                    $"{label}: window width ({window.Width:F1}) must fit inside workArea width ({workArea.Width:F1})");
+                Check.True(host.DesiredSize.Height <= window.MaxHeight + 0.5,
+                    $"{label}: content height ({host.DesiredSize.Height:F1}) must stay within MaxHeight ({window.MaxHeight:F1})");
                 Check.True(Math.Abs(window.rootLayoutScaleTransform!.ScaleX - window.CurrentUiScale) < 0.001,
                     $"{label}: ScaleTransform must match CurrentUiScale");
 
@@ -2478,11 +2481,21 @@ static class UiCases
                     // Verify showing the temporary status toast still fits without triggering vertical scroll
                     window.tbWarningMessage.Text = "Shortcut changed successfully.";
                     window.borderWarning.Visibility = System.Windows.Visibility.Visible;
-                    window.UpdateLayout();
+                    host.Measure(new System.Windows.Size(window.Width, window.MaxHeight));
+                    host.Arrange(new System.Windows.Rect(0, 0, window.Width, Math.Min(window.MaxHeight, host.DesiredSize.Height)));
+                    host.UpdateLayout();
                     Check.True(window.contentScrollViewer.ScrollableHeight <= 0.5,
                         $"{label}: showing status toast must not trigger vertical scrolling (ScrollableHeight={window.contentScrollViewer.ScrollableHeight:F2})");
                 }
             }
+
+            // Also verify a live shown window at laptop 1080p @ 150% (fits inside even 1024x768 CI displays)
+            window.borderWarning.Visibility = System.Windows.Visibility.Collapsed;
+            window.Show();
+            window.ApplyAdaptiveBounds(new DipRect(0, 0, 1280, 672), isInitialPlacement: true);
+            window.UpdateLayout();
+            Check.True(window.contentScrollViewer.ScrollableWidth <= 0.5, "live shown laptop window must have zero horizontal scroll");
+            Check.True(window.contentScrollViewer.ScrollableHeight <= 0.5, "live shown laptop window must have zero vertical scroll");
         }
         finally
         {
