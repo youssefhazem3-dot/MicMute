@@ -61,7 +61,29 @@ public class AudioController : IMMNotificationClient, IDisposable
     public bool LockMuteState
     {
         get => _lockMuteState;
-        set => _lockMuteState = value;
+        set
+        {
+            _lockMuteState = value;
+            if (value)
+            {
+                Queue(() =>
+                {
+                    if (_currentDevice != null)
+                    {
+                        try
+                        {
+                            bool current = _muteState.Current ?? _currentDevice.AudioEndpointVolume.Mute;
+                            _lockedTargetMute = current;
+                            _muteState.RecordLocalChange(current);
+                            Volatile.Write(ref _cachedMuteState, current ? 1 : 0);
+                        }
+                        catch
+                        {
+                        }
+                    }
+                });
+            }
+        }
     }
     public string CurrentDeviceName => Volatile.Read(ref _currentName);
     public string CurrentDeviceId => Volatile.Read(ref _currentId);
@@ -355,15 +377,17 @@ public class AudioController : IMMNotificationClient, IDisposable
             if (!ReferenceEquals(expected, _currentDevice)) return;
             try
             {
-                if (_lockMuteState && _muteState.Current is bool lockedMuted && muted != lockedMuted)
+                if (_lockMuteState && (_lockedTargetMute ?? _muteState.Current) is bool lockedMuted && muted != lockedMuted)
                 {
                     expected.AudioEndpointVolume.Mute = lockedMuted;
+                    if (_syncAllMicrophones) ApplySyncToAllEndpoints(lockedMuted, expected.ID);
                     _muteState.RecordLocalChange(lockedMuted);
                     Volatile.Write(ref _cachedMuteState, lockedMuted ? 1 : 0);
                     return;
                 }
                 if (!_muteState.TryApplyNotification(muted, () => expected.AudioEndpointVolume.Mute, out bool current)) return;
                 _lockedTargetMute = current;
+                if (_syncAllMicrophones) ApplySyncToAllEndpoints(current, expected.ID);
                 Volatile.Write(ref _cachedMuteState, current ? 1 : 0);
                 MuteStateChanged?.Invoke(this, new MuteStateChangedEventArgs(current, true));
             }

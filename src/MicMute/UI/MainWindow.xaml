@@ -1334,7 +1334,7 @@
                            HorizontalOffset="-10"
                            VerticalOffset="-2"
                            AllowsTransparency="True"
-                           StaysOpen="False"
+                           StaysOpen="True"
                            PopupAnimation="None"
                            TextOptions.TextFormattingMode="Display"
                            TextOptions.TextRenderingMode="ClearType"

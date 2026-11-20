@@ -53,6 +53,8 @@ public partial class MainWindow : Window
     private static Dictionary<string, object>? _cachedLightTheme;
     private static Dictionary<string, object>? _cachedDarkTheme;
     private int _updateCheckInFlight;
+    private volatile bool _manualCheckRequested;
+    private bool _isProgrammaticBoundsUpdate;
     private UpdatePhase _updatePhase = UpdatePhase.Idle;
     internal UpdatePhase CurrentUpdatePhase => _updatePhase;
     private UpdateInfo? _pendingUpdateInfo;
@@ -998,8 +1000,16 @@ public partial class MainWindow : Window
                     this.ActualWidth > 0 ? this.ActualWidth : fallbackWidth,
                     this.ActualHeight,
                     UiBehavior.DefaultAdaptiveVerticalMargin);
-                this.Left = centered.Left;
-                this.Top = centered.Top;
+                _isProgrammaticBoundsUpdate = true;
+                try
+                {
+                    this.Left = centered.Left;
+                    this.Top = centered.Top;
+                }
+                finally
+                {
+                    _isProgrammaticBoundsUpdate = false;
+                }
                 return;
             }
 
@@ -1007,7 +1017,15 @@ public partial class MainWindow : Window
             double maxTop = workArea.Top + workArea.Height - this.ActualHeight - halfMargin;
             if (this.Top > maxTop)
             {
-                this.Top = Math.Max(workArea.Top + halfMargin, maxTop);
+                _isProgrammaticBoundsUpdate = true;
+                try
+                {
+                    this.Top = Math.Max(workArea.Top + halfMargin, maxTop);
+                }
+                finally
+                {
+                    _isProgrammaticBoundsUpdate = false;
+                }
             }
         }
         catch (Exception ex)
@@ -1685,6 +1703,21 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private static bool IsDescendantOf(DependencyObject? child, DependencyObject? ancestor)
+    {
+        if (child == null || ancestor == null) return false;
+        DependencyObject? current = child;
+        while (current != null)
+        {
+            if (ReferenceEquals(current, ancestor)) return true;
+            if (current is Visual || current is System.Windows.Media.Media3D.Visual3D)
+                current = VisualTreeHelper.GetParent(current);
+            else
+                current = LogicalTreeHelper.GetParent(current);
+        }
+        return false;
+    }
+
     private void MainWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (_isRecordingHotkey)
@@ -1711,6 +1744,12 @@ public partial class MainWindow : Window
 
         if (popupAppMenu != null && popupAppMenu.IsOpen)
         {
+            if (e.OriginalSource is DependencyObject src && IsDescendantOf(src, borderAppMenu))
+            {
+                // Click was inside the open app menu popup; let the menu item handle it
+                return;
+            }
+
             if (btnAppMenu != null)
             {
                 Point p = e.GetPosition(btnAppMenu);
@@ -1736,6 +1775,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_LocationChanged(object? sender, EventArgs e)
     {
+        if (_isProgrammaticBoundsUpdate) return;
         if (popupAppMenu != null && popupAppMenu.IsOpen)
         {
             popupAppMenu.IsOpen = false;
@@ -1935,6 +1975,7 @@ public partial class MainWindow : Window
         }
 
         ShowTemporaryStatus("Checking GitHub for updates...");
+        _manualCheckRequested = true;
         ApplyUpdateVisualState(
             UpdatePhase.Checking,
             "Checking for updates...",
@@ -2102,6 +2143,10 @@ public partial class MainWindow : Window
 
     private async Task CheckAndAutoUpdateAsync(bool isAutomatic, CancellationToken cancellationToken)
     {
+        if (!isAutomatic)
+        {
+            _manualCheckRequested = true;
+        }
         if (Interlocked.CompareExchange(ref _updateCheckInFlight, 1, 0) != 0)
         {
             return;
@@ -2162,6 +2207,9 @@ public partial class MainWindow : Window
             _ = Dispatcher.BeginInvoke(() =>
             {
                 if (_isDisposed) return;
+                bool showManualFeedback = !isAutomatic || _manualCheckRequested;
+                _manualCheckRequested = false;
+
                 if (result.Status is UpdateCheckStatus.UpToDate or UpdateCheckStatus.NoReleases)
                 {
                     string currentVer = UpdateManager.GetCurrentVersionDisplay();
@@ -2173,7 +2221,7 @@ public partial class MainWindow : Window
                         badgeText: "Up to date",
                         badgeActive: false,
                         showBanner: false);
-                    if (!isAutomatic)
+                    if (showManualFeedback)
                     {
                         ShowTemporaryStatus(result.Message);
                         ShowInfoModal(
@@ -2189,10 +2237,10 @@ public partial class MainWindow : Window
                         "Update check failed",
                         result.Message,
                         percent: -1,
-                        badgeText: isAutomatic ? null : "Retry",
+                        badgeText: showManualFeedback ? "Retry" : null,
                         badgeActive: false,
                         showBanner: false);
-                    if (!isAutomatic)
+                    if (showManualFeedback)
                     {
                         ShowTemporaryStatus(result.Message);
                     }
@@ -2326,9 +2374,13 @@ public partial class MainWindow : Window
             popupAppMenu.IsOpen = false;
         }
 
-        var ver = typeof(MainWindow).Assembly.GetName().Version;
-        string versionText = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.0.0";
-        ShowTemporaryStatus($"MicMute v{versionText} — Ultra-light Windows 11 Mic Controller (github.com/youssefhazem3-dot/MicMute)");
+        string versionText = UpdateManager.GetCurrentVersionDisplay();
+        ShowInfoModal(
+            "About MicMute",
+            $"MicMute v{versionText}\n\n" +
+            "An ultra-light Windows 11 utility for instant global microphone mute control — featuring customizable keyboard and mouse hotkeys, a crisp on-screen HUD, acoustic audio chimes, multi-mic sync, and mute lock.\n\n" +
+            "github.com/youssefhazem3-dot/MicMute",
+            "OK");
     }
 
     public void MinimizeButton_Click(object sender, RoutedEventArgs e)
@@ -3866,6 +3918,13 @@ public partial class MainWindow : Window
 
     private void MainWindow_ModalPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        if (e.Key == Key.Escape && popupAppMenu != null && popupAppMenu.IsOpen)
+        {
+            popupAppMenu.IsOpen = false;
+            e.Handled = true;
+            return;
+        }
+
         if (borderModalOverlay != null && borderModalOverlay.Visibility == Visibility.Visible)
         {
             if (e.Key == Key.Escape)

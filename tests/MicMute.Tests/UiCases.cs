@@ -2029,13 +2029,28 @@ static class UiCases
             window.Show();
             window.UpdateLayout();
 
-            // 1. Menu outside-click dismissal
+            // 1. Menu inside-click preservation & outside-click dismissal
             Check.True(window.popupAppMenu != null, "popupAppMenu must not be null");
-            window.popupAppMenu!.IsOpen = true;
+            Check.True(window.popupAppMenu!.StaysOpen, "popupAppMenu must use StaysOpen=True so button mouse capture does not prematurely close the menu");
+            window.popupAppMenu.IsOpen = true;
             Check.True(window.popupAppMenu.IsOpen, "Menu should be open");
 
-            // Click outside the menu button (e.g. on window body)
+            // Clicking any button inside borderAppMenu must NOT close popupAppMenu on PreviewMouseDown
             var mouseDevice = System.Windows.Input.Mouse.PrimaryDevice;
+            foreach (var menuButton in new[] { window.btnMenuStartupState, window.btnMenuSyncAllMics, window.btnMenuLockMute, window.btnMenuCheckUpdates, window.btnMenuAbout })
+            {
+                Check.True(menuButton != null, "menu button must be bound");
+                var insideClick = new System.Windows.Input.MouseButtonEventArgs(
+                    mouseDevice, 0, System.Windows.Input.MouseButton.Left)
+                {
+                    RoutedEvent = System.Windows.UIElement.PreviewMouseDownEvent
+                };
+                menuButton!.RaiseEvent(insideClick);
+                Check.True(window.popupAppMenu.IsOpen,
+                    $"PreviewMouseDown on {menuButton.Name} must keep popupAppMenu open so Click fires");
+            }
+
+            // Click outside the menu button (e.g. on window body)
             var outsideClick = new System.Windows.Input.MouseButtonEventArgs(
                 mouseDevice, 0, System.Windows.Input.MouseButton.Left)
             {
@@ -2141,8 +2156,14 @@ static class UiCases
             Check.Equal("Checking GitHub for updates...", new System.Windows.Documents.TextRange(window.tbWarningMessage.ContentStart, window.tbWarningMessage.ContentEnd).Text);
 
             window.BtnMenuAbout_Click(window.btnMenuAbout!, new System.Windows.RoutedEventArgs());
-            string aboutText = new System.Windows.Documents.TextRange(window.tbWarningMessage.ContentStart, window.tbWarningMessage.ContentEnd).Text;
-            Check.True(aboutText.Contains("github.com/youssefhazem3-dot/MicMute", StringComparison.Ordinal), "About status should include project URL");
+            Check.Equal(System.Windows.Visibility.Visible, window.borderModalOverlay!.Visibility, "About MicMute must open the theme-aware modal popup");
+            Check.Equal("About MicMute", window.tbModalTitle?.Text);
+            Check.Equal("OK", window.btnModalConfirm?.Content as string);
+            Check.Equal(System.Windows.Visibility.Collapsed, window.btnModalCancel?.Visibility);
+            string aboutModalText = window.tbModalMessage?.Text ?? string.Empty;
+            Check.True(aboutModalText.Contains("github.com/youssefhazem3-dot/MicMute", StringComparison.Ordinal), "About popup should include project URL");
+            Check.True(aboutModalText.Contains("microphone mute", StringComparison.OrdinalIgnoreCase), "About popup should explain what MicMute is");
+            window.CloseConfirmationModal(immediate: true);
         }
         finally
         {
@@ -2313,9 +2334,11 @@ static class UiCases
             Check.Equal("ON", window.tbMenuLockBadge?.Text);
             Check.Equal(System.Windows.Visibility.Visible, window.chipMuteLock!.Visibility);
 
-            // Action items still close the menu
+            // Action items still close the menu and About opens the theme-aware modal
             window.BtnMenuAbout_Click(window.btnMenuAbout!, new System.Windows.RoutedEventArgs());
             Check.True(!window.popupAppMenu.IsOpen, "About menu item must close App Menu");
+            Check.Equal(System.Windows.Visibility.Visible, window.borderModalOverlay!.Visibility, "About menu item must open the About popup");
+            window.CloseConfirmationModal(immediate: true);
 
             // Segmented OSD Position buttons update settings & selected Tag
             window.BtnOsdPosBottom_Click(window.btnOsdPosBottom!, new System.Windows.RoutedEventArgs());
