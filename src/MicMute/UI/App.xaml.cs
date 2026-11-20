@@ -424,10 +424,26 @@ public partial class App : System.Windows.Application
     private IntPtr _hIconActiveDark = IntPtr.Zero;
     private Icon? _trayIconActiveLight;
     private IntPtr _hIconActiveLight = IntPtr.Zero;
+    internal static string? UpdatedFromVersion { get; private set; }
 
     [STAThread]
     public static void Main(string[] args)
     {
+        if (UpdateManager.TryHandleUpdaterArguments(args))
+        {
+            return;
+        }
+
+        if (UpdateManager.TryGetCleanupDirectory(args, out string cleanupDir))
+        {
+            UpdateManager.ScheduleCleanupDirectory(cleanupDir);
+        }
+
+        if (UpdateManager.TryGetUpdatedFromVersion(args, out string updatedFrom))
+        {
+            UpdatedFromVersion = updatedFrom;
+        }
+
         if (UiBehavior.TryGetParentProcessId(args, out int parentId))
         {
             try
@@ -1126,6 +1142,11 @@ public partial class App : System.Windows.Application
             _mutex = null;
         }
         catch (Exception ex) { DiagnosticLogger.LogError("Mutex disposal failed during teardown", ex); }
+    }
+
+    internal void RequestExitForUpdate()
+    {
+        ExitApp();
     }
 
     private void ExitApp()

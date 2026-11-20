@@ -71,6 +71,8 @@ static class UiCases
         test(nameof(MenuOutsideClickDismissalAndOsdSpamResilience), MenuOutsideClickDismissalAndOsdSpamResilience);
         test(nameof(PowerModesAndMouseShortcutAndMenuActions), PowerModesAndMouseShortcutAndMenuActions);
         test(nameof(UiUxRefinementsTrayOsdMenuChipsModalAndToast), UiUxRefinementsTrayOsdMenuChipsModalAndToast);
+        test(nameof(ResponsiveScalingFitsAllCommonLaptopResolutionsWithoutScrolling), ResponsiveScalingFitsAllCommonLaptopResolutionsWithoutScrolling);
+        test(nameof(AutoUpdaterParsesReleasesVerifiesSha256ReplacesBinaryAndUpdatesVisualIndicators), AutoUpdaterParsesReleasesVerifiesSha256ReplacesBinaryAndUpdatesVisualIndicators);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -110,10 +112,12 @@ static class UiCases
         try
         {
             window.ApplyAdaptiveBounds(new DipRect(0, 0, 400, 720), isInitialPlacement: true);
-            Check.Equal(400.0, window.Width);
-            Check.Equal(System.Windows.Controls.ScrollBarVisibility.Auto,
+            Check.True(window.Width <= 400.0 && window.CurrentUiScale < 1.0,
+                $"Window must proportionally scale to fit narrow/short work area (Width={window.Width}, Scale={window.CurrentUiScale})");
+            Check.Equal(System.Windows.Controls.ScrollBarVisibility.Disabled,
                 window.contentScrollViewer.HorizontalScrollBarVisibility);
-            window.ApplyAdaptiveBounds(new DipRect(0, 0, 1200, 900), isInitialPlacement: false);
+            window.ApplyAdaptiveBounds(new DipRect(0, 0, 1920, 1032), isInitialPlacement: false);
+            Check.Equal(1.0, window.CurrentUiScale, "scale must return to 1.0 on a full-size monitor");
             Check.Equal(412.0, window.Width, "the preferred width must return on a larger monitor");
         }
         finally { window.Close(); }
@@ -557,16 +561,20 @@ static class UiCases
             Check.True(window.contentScrollViewer != null, "contentScrollViewer must be bound");
             Check.Equal(System.Windows.Controls.ScrollBarVisibility.Auto, window.contentScrollViewer!.VerticalScrollBarVisibility);
 
+            Check.Equal(System.Windows.Controls.ScrollBarVisibility.Disabled, window.contentScrollViewer!.HorizontalScrollBarVisibility);
+
             var primary = System.Windows.Forms.Screen.PrimaryScreen;
-            double workHeight = primary != null ? primary.WorkingArea.Height : 720.0;
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(window);
+            double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+            double workHeight = primary != null ? primary.WorkingArea.Height / scaleY : 720.0;
             double expectedMax = UiBehavior.CalculateAdaptiveMaxHeight(workHeight);
             Check.Equal(expectedMax, window.MaxHeight);
 
             if (workHeight == 720.0)
             {
                 Check.Equal(696.0, window.MaxHeight);
-                Check.Equal(12.0, window.Top);
-                Check.True(window.Top + window.MaxHeight < 720.0, "Window must fit cleanly above the taskbar");
+                Check.True(window.Top >= 12.0, "Window must remain below top margin");
+                Check.True(window.Top + window.ActualHeight < 720.0, "Window must fit cleanly above the taskbar");
             }
         }
         finally { window.Close(); }
@@ -2387,6 +2395,245 @@ static class UiCases
         {
             SettingsManager.Save(originalSettings);
             SettingsManager.Flush();
+            window.Close();
+        }
+    }
+
+    private static void ResponsiveScalingFitsAllCommonLaptopResolutionsWithoutScrolling()
+    {
+        // 1. Verify pure adaptive scale math across standard desktop and laptop work areas
+        Check.Equal(1.0, UiBehavior.CalculateAdaptiveScale(new DipRect(0, 0, 1920, 1032), 412, 922),
+            "1080p @ 100% must stay at native 1.0 scale");
+        Check.Equal(1.0, UiBehavior.CalculateAdaptiveScale(new DipRect(0, 0, 2560, 1392), 412, 922),
+            "1440p @ 100% must stay at native 1.0 scale");
+        double scale768 = UiBehavior.CalculateAdaptiveScale(new DipRect(0, 0, 1366, 720), 412, 922);
+        Check.True(scale768 > 0.70 && scale768 < 0.80, $"1366x768 @ 100% scale expected ~0.75, got {scale768:F3}");
+        double scale1080At150 = UiBehavior.CalculateAdaptiveScale(new DipRect(0, 0, 1280, 672), 412, 922);
+        Check.True(scale1080At150 > 0.65 && scale1080At150 < 0.75, $"1080p @ 150% scale expected ~0.70, got {scale1080At150:F3}");
+        double scaleTiny = UiBehavior.CalculateAdaptiveScale(new DipRect(0, 0, 640, 320), 412, 922);
+        Check.Equal(UiBehavior.MinimumUiScale, scaleTiny, "ultra-tiny displays must clamp to MinimumUiScale");
+        Check.Equal(1.0, UiBehavior.CalculateAdaptiveScale(new DipRect(0, 0, double.NaN, 720), 412, 922),
+            "non-finite work area must fall back to 1.0");
+
+        // 2. Real MainWindow layout verification with a long laptop microphone name across laptop/desktop resolutions
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.True(window.windowScaleHost != null, "windowScaleHost must be bound");
+            Check.True(window.rootLayoutScaleTransform != null, "rootLayoutScaleTransform must be bound");
+            Check.True(ReferenceEquals(window.windowScaleHost!.LayoutTransform, window.rootLayoutScaleTransform),
+                "windowScaleHost must share rootLayoutScaleTransform");
+            Check.True(ReferenceEquals(window.borderAppMenu?.LayoutTransform, window.rootLayoutScaleTransform),
+                "borderAppMenu must share rootLayoutScaleTransform");
+
+            // Populate a long Intel laptop microphone name that previously caused horizontal overflow
+            var longDevice = new AudioDevice("id-intel-sst", "Microphone Array (Intel® Smart Sound Technology (Intel® SST))");
+            window.cbDevices.ItemsSource = new System.Collections.Generic.List<AudioDevice> { longDevice };
+            window.cbDevices.SelectedItem = longDevice;
+            window.borderWarning.Visibility = System.Windows.Visibility.Collapsed;
+
+            window.Show();
+            window.UpdateLayout();
+
+            var scenarios = new (string Label, DipRect WorkArea, bool ExpectFullScale)[]
+            {
+                ("1366x768 @ 100%", new DipRect(0, 0, 1366, 720), false),
+                ("1920x1080 @ 150%", new DipRect(0, 0, 1280, 672), false),
+                ("1920x1080 @ 125%", new DipRect(0, 0, 1536, 816), false),
+                ("1920x1080 @ 175%", new DipRect(0, 0, 1097, 576), false),
+                ("1600x900 @ 100%", new DipRect(0, 0, 1600, 852), false),
+                ("1920x1080 @ 100%", new DipRect(0, 0, 1920, 1032), true),
+            };
+
+            foreach (var (label, workArea, expectFullScale) in scenarios)
+            {
+                window.borderWarning.Visibility = System.Windows.Visibility.Collapsed;
+                window.ApplyAdaptiveBounds(workArea, isInitialPlacement: true);
+                window.UpdateLayout();
+
+                Check.Equal(System.Windows.Controls.ScrollBarVisibility.Disabled,
+                    window.contentScrollViewer.HorizontalScrollBarVisibility);
+                Check.True(window.contentScrollViewer.ScrollableWidth <= 0.5,
+                    $"{label}: must have zero horizontal scrolling with long mic name (ScrollableWidth={window.contentScrollViewer.ScrollableWidth:F2})");
+                Check.True(window.contentScrollViewer.ScrollableHeight <= 0.5,
+                    $"{label}: must fit vertically without scrolling (ScrollableHeight={window.contentScrollViewer.ScrollableHeight:F2}, ActualHeight={window.ActualHeight:F1}, MaxHeight={window.MaxHeight:F1}, Scale={window.CurrentUiScale:F3})");
+                Check.True(window.ActualWidth <= workArea.Width + 0.5,
+                    $"{label}: window width ({window.ActualWidth:F1}) must fit inside workArea width ({workArea.Width:F1})");
+                Check.True(window.ActualHeight <= window.MaxHeight + 0.5,
+                    $"{label}: window height ({window.ActualHeight:F1}) must stay within MaxHeight ({window.MaxHeight:F1})");
+                Check.True(Math.Abs(window.rootLayoutScaleTransform!.ScaleX - window.CurrentUiScale) < 0.001,
+                    $"{label}: ScaleTransform must match CurrentUiScale");
+
+                if (expectFullScale)
+                {
+                    Check.Equal(1.0, window.CurrentUiScale, $"{label}: must run at native 1.0 scale");
+                    Check.Equal(412.0, window.Width, $"{label}: must preserve native 412 DIP width");
+                }
+                else
+                {
+                    Check.True(window.CurrentUiScale < 1.0 && window.CurrentUiScale >= UiBehavior.MinimumUiScale,
+                        $"{label}: must scale proportionally below 1.0 (Scale={window.CurrentUiScale:F3})");
+
+                    // Verify showing the temporary status toast still fits without triggering vertical scroll
+                    window.tbWarningMessage.Text = "Shortcut changed successfully.";
+                    window.borderWarning.Visibility = System.Windows.Visibility.Visible;
+                    window.UpdateLayout();
+                    Check.True(window.contentScrollViewer.ScrollableHeight <= 0.5,
+                        $"{label}: showing status toast must not trigger vertical scrolling (ScrollableHeight={window.contentScrollViewer.ScrollableHeight:F2})");
+                }
+            }
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void AutoUpdaterParsesReleasesVerifiesSha256ReplacesBinaryAndUpdatesVisualIndicators()
+    {
+        // 1. Version parsing
+        Check.True(UpdateManager.TryParseReleaseVersion("v1.2.3", out Version v123) && v123 == new Version(1, 2, 3), "v1.2.3 must parse");
+        Check.True(UpdateManager.TryParseReleaseVersion("V2.0.1-beta.1", out Version v201) && v201 == new Version(2, 0, 1), "prerelease tag must parse base version");
+        Check.True(!UpdateManager.TryParseReleaseVersion("not-a-version", out _), "invalid tag must be rejected");
+
+        // 2. GitHub release JSON parsing & lightweight vs standalone asset selection
+        const string sampleReleaseJson = """
+            {
+              "tag_name": "v1.2.0",
+              "html_url": "https://github.com/youssefhazem3-dot/MicMute/releases/tag/v1.2.0",
+              "assets": [
+                {
+                  "name": "MicMute-win-x64.zip",
+                  "size": 610000,
+                  "browser_download_url": "https://example.invalid/MicMute-win-x64.zip"
+                },
+                {
+                  "name": "MicMute-win-x64-standalone.zip",
+                  "size": 65000000,
+                  "browser_download_url": "https://example.invalid/MicMute-win-x64-standalone.zip"
+                },
+                {
+                  "name": "SHA256SUMS.txt",
+                  "size": 200,
+                  "browser_download_url": "https://example.invalid/SHA256SUMS.txt"
+                }
+              ]
+            }
+            """;
+
+        var lightResult = UpdateManager.ParseReleaseJson(sampleReleaseJson, new Version(1, 0, 0), preferStandalone: false);
+        Check.Equal(UpdateCheckStatus.UpdateAvailable, lightResult.Status);
+        Check.True(lightResult.Update != null, "UpdateInfo must be populated");
+        Check.Equal("MicMute-win-x64.zip", lightResult.Update!.AssetName);
+        Check.Equal("https://example.invalid/SHA256SUMS.txt", lightResult.Update.ChecksumsUrl);
+        Check.Equal(new Version(1, 2, 0), lightResult.Update.LatestVersion);
+
+        var standaloneResult = UpdateManager.ParseReleaseJson(sampleReleaseJson, new Version(1, 0, 0), preferStandalone: true);
+        Check.Equal(UpdateCheckStatus.UpdateAvailable, standaloneResult.Status);
+        Check.Equal("MicMute-win-x64-standalone.zip", standaloneResult.Update!.AssetName);
+
+        var upToDateResult = UpdateManager.ParseReleaseJson(sampleReleaseJson, new Version(1, 2, 0), preferStandalone: false);
+        Check.Equal(UpdateCheckStatus.UpToDate, upToDateResult.Status);
+        Check.True(upToDateResult.Update == null, "Up-to-date check must not return an update payload");
+
+        // 3. SHA-256 checksum parsing, ZIP staging, and atomic executable replacement
+        string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MicMute-UpdateTest-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(tempDir);
+        try
+        {
+            byte[] payload = System.Text.Encoding.UTF8.GetBytes("MicMute staged binary fixture v1.2.0");
+
+            string zipPath = System.IO.Path.Combine(tempDir, "MicMute-win-x64.zip");
+            using (var zip = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                var entry = zip.CreateEntry("MicMute.exe");
+                using var es = entry.Open();
+                es.Write(payload, 0, payload.Length);
+            }
+
+            string actualZipHash = UpdateManager.ComputeFileSha256(zipPath);
+            string sumsFile = $"{actualZipHash}  MicMute-win-x64.zip\n{new string('a', 64)}  MicMute-win-x64-standalone.zip\n";
+            Check.Equal(actualZipHash, UpdateManager.ParseSha256Sum(sumsFile, "MicMute-win-x64.zip"));
+            Check.True(UpdateManager.ParseSha256Sum("invalid-line", "MicMute-win-x64.zip") == null, "malformed checksum line must return null");
+
+            string extractDir = System.IO.Path.Combine(tempDir, "stage");
+            string stagedExe = UpdateManager.StageFromZipFile(zipPath, extractDir);
+            Check.True(System.IO.File.Exists(stagedExe), "StageFromZipFile must extract MicMute.exe");
+
+            string targetExe = System.IO.Path.Combine(tempDir, "installed", "MicMute.bin");
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(targetExe)!);
+            System.IO.File.WriteAllText(targetExe, "MicMute previous fixture v1.0.0");
+
+            Check.True(UpdateManager.ReplaceExecutableWithRetry(stagedExe, targetExe), "ReplaceExecutableWithRetry must succeed");
+            string replacedText = System.IO.File.ReadAllText(targetExe);
+            Check.Equal("MicMute staged binary fixture v1.2.0", replacedText);
+            Check.True(!System.IO.File.Exists(targetExe + ".update.bak"), "backup file must be cleaned up after swap");
+
+            // 4. Updater CLI argument formatting & parsing
+            string builtArgs = UpdateManager.BuildApplyUpdateArguments(targetExe, 4242, showWindow: true, previousVersion: "1.0.0");
+            Check.True(builtArgs.Contains("--apply-update", StringComparison.Ordinal) && builtArgs.Contains("--wait-for-parent 4242", StringComparison.Ordinal),
+                "apply-update arguments must include target path and parent PID");
+            Check.True(UpdateManager.TryGetCleanupDirectory(new[] { "--cleanup-update", extractDir }, out string parsedCleanup) && parsedCleanup == extractDir,
+                "cleanup directory argument must parse");
+            Check.True(UpdateManager.TryGetUpdatedFromVersion(new[] { "--updated-from", "1.0.0" }, out string parsedFrom) && parsedFrom == "1.0.0",
+                "updated-from argument must parse");
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+
+        // 5. Visual indicators on MainWindow (title version, dot, menu badge, inline progress banner)
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            string verDisplay = UpdateManager.GetCurrentVersionDisplay();
+            Check.True(window.tbTitleVersion != null, "tbTitleVersion must be bound");
+            Check.Equal($"v{verDisplay}", window.tbTitleVersion!.Text, "title bar must display current app version");
+            Check.Equal($"Version {verDisplay}", window.tbMenuVersion?.Text, "app menu must display current app version");
+            Check.True(window.dotTitleUpdate != null && window.borderUpdateBanner != null && window.borderUpdateProgressFill != null,
+                "update visual indicator elements must be bound");
+            Check.Equal(System.Windows.Visibility.Collapsed, window.dotTitleUpdate!.Visibility, "update dot must be hidden when idle");
+            Check.Equal(System.Windows.Visibility.Collapsed, window.borderUpdateBanner!.Visibility, "update banner must be hidden when idle");
+
+            // Transition: Checking
+            window.ApplyUpdateVisualState(UpdatePhase.Checking, "Checking for updates...", "Connecting to GitHub Releases", -1, "...", badgeActive: false, showBanner: true);
+            Check.Equal(UpdatePhase.Checking, window.CurrentUpdatePhase);
+            Check.Equal(System.Windows.Visibility.Visible, window.dotTitleUpdate.Visibility, "update dot must show while checking");
+            Check.Equal(System.Windows.Visibility.Visible, window.borderUpdateBanner.Visibility, "update banner must show while checking");
+            Check.Equal("...", window.tbMenuUpdateBadge?.Text);
+
+            // Transition: Downloading 65%
+            window.ApplyUpdateVisualState(UpdatePhase.Downloading, "Downloading v1.2.0 (65%)", "Updating v1.0.0 → v1.2.0", 65.0, "65%", badgeActive: true, showBanner: true);
+            Check.Equal(UpdatePhase.Downloading, window.CurrentUpdatePhase);
+            Check.Equal("65%", window.tbUpdateBannerPercent?.Text);
+            Check.Equal("65%", window.tbMenuUpdateBadge?.Text);
+            Check.True(window.borderUpdateProgressFill!.Width > 0, "progress bar fill width must grow during download");
+
+            // Transition: Up to date
+            window.ApplyUpdateVisualState(UpdatePhase.UpToDate, $"Up to date (v{verDisplay})", "Latest version installed", 100, "Up to date", badgeActive: false, showBanner: false);
+            Check.Equal(UpdatePhase.UpToDate, window.CurrentUpdatePhase);
+            Check.Equal(System.Windows.Visibility.Collapsed, window.dotTitleUpdate.Visibility, "update dot must hide when up to date");
+            Check.Equal(System.Windows.Visibility.Collapsed, window.borderUpdateBanner.Visibility, "update banner must hide when up to date");
+            Check.Equal("Up to date", window.tbMenuUpdateBadge?.Text);
+
+            // Verify "You're up to date!" info modal popup displays single OK button and restores Cancel for confirmation modals
+            window.ShowInfoModal("You're up to date!", $"MicMute v{verDisplay} is already the latest version.", "OK");
+            Check.Equal(System.Windows.Visibility.Visible, window.borderModalOverlay!.Visibility);
+            Check.Equal("You're up to date!", window.tbModalTitle?.Text);
+            Check.Equal("OK", window.btnModalConfirm?.Content as string);
+            Check.Equal(System.Windows.Visibility.Collapsed, window.btnModalCancel?.Visibility);
+            Check.Equal(3, System.Windows.Controls.Grid.GetColumnSpan(window.btnModalConfirm!));
+            window.BtnModalConfirm_Click(window.btnModalConfirm!, new System.Windows.RoutedEventArgs());
+            Check.Equal(System.Windows.Visibility.Collapsed, window.borderModalOverlay.Visibility);
+        }
+        finally
+        {
             window.Close();
         }
     }

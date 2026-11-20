@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +39,8 @@ public partial class MainWindow : Window
     private readonly DispatcherDebouncer _volumeAudioDebouncer;
     private readonly LatestRefreshCoordinator<List<AudioDevice>> _deviceRefreshCoordinator;
     private readonly double _preferredWidth;
+    private double _currentUiScale = 1.0;
+    internal double CurrentUiScale => _currentUiScale;
     private bool _hasInitialCentered;
     private double? _osdDurationBeforeEdit;
     private int? _soundVolumeBeforeEdit;
@@ -50,17 +50,14 @@ public partial class MainWindow : Window
     private static readonly Regex EventAttrRegex = new(
         @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""",
         RegexOptions.Compiled);
-    private static readonly HttpClient UpdateHttpClient = CreateUpdateHttpClient();
     private static Dictionary<string, object>? _cachedLightTheme;
     private static Dictionary<string, object>? _cachedDarkTheme;
-
-    private static HttpClient CreateUpdateHttpClient()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("MicMute/1.0");
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-        return client;
-    }
+    private int _updateCheckInFlight;
+    private UpdatePhase _updatePhase = UpdatePhase.Idle;
+    internal UpdatePhase CurrentUpdatePhase => _updatePhase;
+    private UpdateInfo? _pendingUpdateInfo;
+    private CancellationTokenSource? _updateCts;
+    private DispatcherTimer? _periodicUpdateTimer;
 
     public event EventHandler? TaskbarCreated;
 
@@ -92,6 +89,20 @@ public partial class MainWindow : Window
     internal Border? borderMenuLockBadge;
     internal TextBlock? tbMenuLockBadge;
     internal System.Windows.Controls.Button? btnMenuCheckUpdates;
+    internal TextBlock? tbMenuCheckUpdates;
+    internal Border? borderMenuUpdateBadge;
+    internal TextBlock? tbMenuUpdateBadge;
+    internal RotateTransform? menuUpdateIconRot;
+    internal TextBlock? tbTitleVersion;
+    internal System.Windows.Shapes.Ellipse? dotTitleUpdate;
+    internal Border? borderUpdateBanner;
+    internal TextBlock? tbUpdateBannerTitle;
+    internal TextBlock? tbUpdateBannerDetail;
+    internal TextBlock? tbUpdateBannerPercent;
+    internal Border? borderUpdateProgressTrack;
+    internal Border? borderUpdateProgressFill;
+    internal TranslateTransform? updateProgressIndeterminateTrans;
+    internal RotateTransform? updateBannerIconRot;
     internal System.Windows.Controls.Button? btnMenuAbout;
     internal TextBlock? tbMenuVersion;
     private long _lastMenuClosedTicks;
@@ -132,6 +143,8 @@ public partial class MainWindow : Window
     internal System.Windows.Shapes.Path pathWarningIcon = null!;
     internal System.Windows.Controls.Image imgAppIcon = null!;
     internal ScrollViewer contentScrollViewer = null!;
+    internal Grid? windowScaleHost;
+    internal ScaleTransform? rootLayoutScaleTransform;
     internal Border? rootBorder;
     internal ScaleTransform? rootScaleTransform;
     internal TranslateTransform? rootTranslateTransform;
@@ -230,6 +243,25 @@ public partial class MainWindow : Window
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool ChangeWindowMessageFilter(uint msg, uint action);
 
+    private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+    private const int MDT_EFFECTIVE_DPI = 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    [DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
     private static T Freeze<T>(T freezable) where T : Freezable
     {
         if (freezable.CanFreeze)
@@ -268,6 +300,17 @@ public partial class MainWindow : Window
         LoadSettingsIntoUI();
         UpdateMuteStateUI(_audioController.IsMuted);
         _isInitialized = true;
+
+        if (System.Windows.Application.Current != null)
+        {
+            if (!string.IsNullOrWhiteSpace(App.UpdatedFromVersion))
+            {
+                string currentVer = UpdateManager.GetCurrentVersionDisplay();
+                ApplyUpdateVisualState(UpdatePhase.UpToDate, $"Up to date (v{currentVer})", "Latest version installed", 100, "Up to date", badgeActive: false, showBanner: false);
+                ShowTemporaryStatus($"Updated to MicMute v{currentVer}!");
+            }
+            ScheduleAutomaticUpdateChecks();
+        }
     }
 
     public void InitializeComponent()
@@ -327,6 +370,20 @@ public partial class MainWindow : Window
             borderMenuLockBadge = root.FindName("borderMenuLockBadge") as Border;
             tbMenuLockBadge = root.FindName("tbMenuLockBadge") as TextBlock;
             btnMenuCheckUpdates = root.FindName("btnMenuCheckUpdates") as System.Windows.Controls.Button;
+            tbMenuCheckUpdates = root.FindName("tbMenuCheckUpdates") as TextBlock;
+            borderMenuUpdateBadge = root.FindName("borderMenuUpdateBadge") as Border;
+            tbMenuUpdateBadge = root.FindName("tbMenuUpdateBadge") as TextBlock;
+            menuUpdateIconRot = root.FindName("menuUpdateIconRot") as RotateTransform;
+            tbTitleVersion = root.FindName("tbTitleVersion") as TextBlock;
+            dotTitleUpdate = root.FindName("dotTitleUpdate") as System.Windows.Shapes.Ellipse;
+            borderUpdateBanner = root.FindName("borderUpdateBanner") as Border;
+            tbUpdateBannerTitle = root.FindName("tbUpdateBannerTitle") as TextBlock;
+            tbUpdateBannerDetail = root.FindName("tbUpdateBannerDetail") as TextBlock;
+            tbUpdateBannerPercent = root.FindName("tbUpdateBannerPercent") as TextBlock;
+            borderUpdateProgressTrack = root.FindName("borderUpdateProgressTrack") as Border;
+            borderUpdateProgressFill = root.FindName("borderUpdateProgressFill") as Border;
+            updateProgressIndeterminateTrans = root.FindName("updateProgressIndeterminateTrans") as TranslateTransform;
+            updateBannerIconRot = root.FindName("updateBannerIconRot") as RotateTransform;
             btnMenuAbout = root.FindName("btnMenuAbout") as System.Windows.Controls.Button;
             tbMenuVersion = root.FindName("tbMenuVersion") as TextBlock;
 
@@ -380,10 +437,18 @@ public partial class MainWindow : Window
                 btnMenuAbout.Click += BtnMenuAbout_Click;
             }
 
+            string currentVersionDisplay = UpdateManager.GetCurrentVersionDisplay();
+            if (tbTitleVersion != null)
+            {
+                tbTitleVersion.Text = $"v{currentVersionDisplay}";
+            }
             if (tbMenuVersion != null)
             {
-                var ver = typeof(MainWindow).Assembly.GetName().Version;
-                tbMenuVersion.Text = ver != null ? $"Version {ver.Major}.{ver.Minor}.{ver.Build}" : "Version 1.0.0";
+                tbMenuVersion.Text = $"Version {currentVersionDisplay}";
+            }
+            if (btnAppMenu != null)
+            {
+                btnAppMenu.ToolTip = $"MicMute v{currentVersionDisplay} Menu";
             }
 
             cbDevices = (System.Windows.Controls.ComboBox)root.FindName("cbDevices");
@@ -425,6 +490,13 @@ public partial class MainWindow : Window
             borderWarningIcon = (Border)root.FindName("borderWarningIcon");
             pathWarningIcon = (System.Windows.Shapes.Path)root.FindName("pathWarningIcon");
             contentScrollViewer = (ScrollViewer)root.FindName("contentScrollViewer");
+            windowScaleHost = root.FindName("windowScaleHost") as Grid;
+            rootLayoutScaleTransform = this.Resources["WindowContentScaleTransform"] as ScaleTransform;
+            if (rootLayoutScaleTransform == null && windowScaleHost != null)
+            {
+                rootLayoutScaleTransform = new ScaleTransform(1.0, 1.0);
+                windowScaleHost.LayoutTransform = rootLayoutScaleTransform;
+            }
             rootBorder = root.FindName("rootBorder") as Border;
             rootScaleTransform = root.FindName("rootScaleTransform") as ScaleTransform;
             rootTranslateTransform = root.FindName("rootTranslateTransform") as TranslateTransform;
@@ -826,32 +898,79 @@ public partial class MainWindow : Window
         ApplyAdaptiveScreenConstraints(isInitialPlacement: true);
     }
 
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        if (_isInitialized && !_isDisposed)
+        {
+            ApplyAdaptiveScreenConstraints(isInitialPlacement: false);
+        }
+    }
+
+    private (double ScaleX, double ScaleY) GetMonitorDpiScale(Screen screen, IntPtr hwnd, bool useWindowMonitor)
+    {
+        try
+        {
+            IntPtr hMonitor = IntPtr.Zero;
+            if (useWindowMonitor && hwnd != IntPtr.Zero)
+            {
+                hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            }
+            if (hMonitor == IntPtr.Zero)
+            {
+                var center = new POINT
+                {
+                    X = screen.Bounds.Left + screen.Bounds.Width / 2,
+                    Y = screen.Bounds.Top + screen.Bounds.Height / 2
+                };
+                hMonitor = MonitorFromPoint(center, MONITOR_DEFAULTTONEAREST);
+            }
+            if (hMonitor != IntPtr.Zero
+                && GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, out uint dpiX, out uint dpiY) == 0
+                && dpiX > 0 && dpiY > 0)
+            {
+                return (dpiX / 96.0, dpiY / 96.0);
+            }
+        }
+        catch
+        {
+        }
+
+        DpiScale dpi = VisualTreeHelper.GetDpi(this);
+        return (dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0, dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0);
+    }
+
+    private DipRect? GetTargetWorkAreaDip(bool preferCursorScreen)
+    {
+        IntPtr hwnd = new WindowInteropHelper(this).Handle;
+        Screen? screen = null;
+        bool useWindowMonitor = false;
+        if (hwnd != IntPtr.Zero && !preferCursorScreen)
+        {
+            screen = Screen.FromHandle(hwnd);
+            useWindowMonitor = screen != null;
+        }
+        if (screen == null)
+        {
+            screen = Screen.FromPoint(System.Windows.Forms.Cursor.Position) ?? Screen.PrimaryScreen;
+        }
+        if (screen == null) return null;
+
+        var (scaleX, scaleY) = GetMonitorDpiScale(screen, hwnd, useWindowMonitor);
+        return new DipRect(
+            screen.WorkingArea.Left / scaleX,
+            screen.WorkingArea.Top / scaleY,
+            screen.WorkingArea.Width / scaleX,
+            screen.WorkingArea.Height / scaleY);
+    }
+
     public void ApplyAdaptiveScreenConstraints(bool isInitialPlacement)
     {
         try
         {
-            IntPtr hwnd = new WindowInteropHelper(this).Handle;
-            Screen? screen = null;
-            if (hwnd != IntPtr.Zero && !isInitialPlacement)
-            {
-                screen = Screen.FromHandle(hwnd);
-            }
-            if (screen == null)
-            {
-                screen = Screen.FromPoint(System.Windows.Forms.Cursor.Position) ?? Screen.PrimaryScreen;
-            }
-            if (screen == null) return;
-
-            DpiScale dpi = VisualTreeHelper.GetDpi(this);
-            double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
-            double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
-
-            double workLeft = screen.WorkingArea.Left / scaleX;
-            double workTop = screen.WorkingArea.Top / scaleY;
-            double workWidth = screen.WorkingArea.Width / scaleX;
-            double workHeight = screen.WorkingArea.Height / scaleY;
-
-            ApplyAdaptiveBounds(new DipRect(workLeft, workTop, workWidth, workHeight), isInitialPlacement);
+            DipRect? workArea = GetTargetWorkAreaDip(preferCursorScreen: isInitialPlacement);
+            if (!workArea.HasValue) return;
+            ApplyAdaptiveBounds(workArea.Value, isInitialPlacement);
         }
         catch
         {
@@ -866,23 +985,17 @@ public partial class MainWindow : Window
         {
             IntPtr hwnd = new WindowInteropHelper(this).Handle;
             if (hwnd == IntPtr.Zero) return;
-            Screen? screen = Screen.FromHandle(hwnd) ?? Screen.PrimaryScreen;
-            if (screen == null) return;
-
-            DpiScale dpi = VisualTreeHelper.GetDpi(this);
-            double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
-            double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
-            double workLeft = screen.WorkingArea.Left / scaleX;
-            double workTop = screen.WorkingArea.Top / scaleY;
-            double workWidth = screen.WorkingArea.Width / scaleX;
-            double workHeight = screen.WorkingArea.Height / scaleY;
+            DipRect? workAreaOpt = GetTargetWorkAreaDip(preferCursorScreen: false);
+            if (!workAreaOpt.HasValue) return;
+            DipRect workArea = workAreaOpt.Value;
 
             if (!_hasInitialCentered && this.ActualHeight > 0)
             {
                 _hasInitialCentered = true;
+                double fallbackWidth = Math.Ceiling(_preferredWidth * _currentUiScale);
                 var centered = UiBehavior.CalculateCenteredWindowBounds(
-                    new DipRect(workLeft, workTop, workWidth, workHeight),
-                    this.ActualWidth > 0 ? this.ActualWidth : _preferredWidth,
+                    workArea,
+                    this.ActualWidth > 0 ? this.ActualWidth : fallbackWidth,
                     this.ActualHeight,
                     UiBehavior.DefaultAdaptiveVerticalMargin);
                 this.Left = centered.Left;
@@ -891,10 +1004,10 @@ public partial class MainWindow : Window
             }
 
             double halfMargin = UiBehavior.DefaultAdaptiveVerticalMargin / 2.0;
-            double maxTop = workTop + workHeight - this.ActualHeight - halfMargin;
+            double maxTop = workArea.Top + workArea.Height - this.ActualHeight - halfMargin;
             if (this.Top > maxTop)
             {
-                this.Top = Math.Max(workTop + halfMargin, maxTop);
+                this.Top = Math.Max(workArea.Top + halfMargin, maxTop);
             }
         }
         catch (Exception ex)
@@ -1192,31 +1305,84 @@ public partial class MainWindow : Window
         if (!_isDisposed) _deviceRefreshCoordinator.Request();
     }
 
+    private double MeasureUnscaledContentHeight()
+    {
+        if (rootBorder != null)
+        {
+            rootBorder.Measure(new System.Windows.Size(_preferredWidth, double.PositiveInfinity));
+            if (double.IsFinite(rootBorder.DesiredSize.Height) && rootBorder.DesiredSize.Height > 0)
+            {
+                return rootBorder.DesiredSize.Height;
+            }
+        }
+
+        if (Content is UIElement contentElement)
+        {
+            contentElement.Measure(new System.Windows.Size(_preferredWidth, double.PositiveInfinity));
+            if (double.IsFinite(contentElement.DesiredSize.Height) && contentElement.DesiredSize.Height > 0)
+            {
+                double safeScale = _currentUiScale > 0 ? _currentUiScale : 1.0;
+                return contentElement.DesiredSize.Height / safeScale;
+            }
+        }
+
+        return 880.0;
+    }
+
+    private bool ApplyUiScale(double scale)
+    {
+        double clampedScale = Math.Clamp(scale, UiBehavior.MinimumUiScale, 1.0);
+        bool changed = Math.Abs(_currentUiScale - clampedScale) > 0.0005;
+        _currentUiScale = clampedScale;
+        if (rootLayoutScaleTransform != null)
+        {
+            if (Math.Abs(rootLayoutScaleTransform.ScaleX - clampedScale) > 0.0005)
+                rootLayoutScaleTransform.ScaleX = clampedScale;
+            if (Math.Abs(rootLayoutScaleTransform.ScaleY - clampedScale) > 0.0005)
+                rootLayoutScaleTransform.ScaleY = clampedScale;
+        }
+        if (changed)
+        {
+            windowScaleHost?.InvalidateMeasure();
+            InvalidateMeasure();
+        }
+        return changed;
+    }
+
     internal void ApplyAdaptiveBounds(DipRect workArea, bool isInitialPlacement)
     {
         double maxAllowedHeight = UiBehavior.CalculateAdaptiveMaxHeight(workArea.Height, UiBehavior.DefaultAdaptiveVerticalMargin);
         if (Math.Abs(MaxHeight - maxAllowedHeight) > 0.5) MaxHeight = maxAllowedHeight;
 
-        double currentWidth = _preferredWidth;
+        double naturalHeight = MeasureUnscaledContentHeight();
+        double headroom = (borderWarning == null || borderWarning.Visibility != Visibility.Visible)
+            ? UiBehavior.DynamicContentHeightHeadroom
+            : 0.0;
+        double scale = UiBehavior.CalculateAdaptiveScale(
+            workArea,
+            _preferredWidth,
+            naturalHeight + headroom,
+            UiBehavior.DefaultAdaptiveVerticalMargin,
+            UiBehavior.DefaultAdaptiveHorizontalMargin,
+            UiBehavior.MinimumUiScale);
+        bool scaleChanged = ApplyUiScale(scale);
+
+        double scaledWidth = Math.Min(workArea.Width, Math.Ceiling(_preferredWidth * scale));
+        double scaledHeight = Math.Min(maxAllowedHeight, Math.Ceiling(naturalHeight * scale));
+
         if (isInitialPlacement)
         {
-            var contentElement = Content as UIElement;
-            contentElement?.Measure(new System.Windows.Size(Math.Min(currentWidth, workArea.Width), maxAllowedHeight));
-            double desiredHeight = contentElement != null && contentElement.DesiredSize.Height > 0
-                ? contentElement.DesiredSize.Height
-                : (ActualHeight > 0 ? ActualHeight : maxAllowedHeight);
             var centered = UiBehavior.CalculateCenteredWindowBounds(
-                workArea, currentWidth, Math.Min(desiredHeight, maxAllowedHeight), UiBehavior.DefaultAdaptiveVerticalMargin);
+                workArea, scaledWidth, scaledHeight, UiBehavior.DefaultAdaptiveVerticalMargin);
             Width = centered.Width;
             Left = centered.Left;
             Top = centered.Top;
-            _hasInitialCentered = ActualHeight > 0;
+            _hasInitialCentered = !scaleChanged && ActualHeight > 0;
         }
         else
         {
-            double currentHeight = ActualHeight > 0 ? ActualHeight : MaxHeight;
             var clamped = UiBehavior.ClampWindowBoundsToWorkArea(
-                workArea, new DipRect(Left, Top, currentWidth, currentHeight), UiBehavior.DefaultAdaptiveVerticalMargin);
+                workArea, new DipRect(Left, Top, scaledWidth, scaledHeight), UiBehavior.DefaultAdaptiveVerticalMargin);
             Width = clamped.Width;
             Left = clamped.Left;
             Top = clamped.Top;
@@ -1720,6 +1886,41 @@ public partial class MainWindow : Window
             : "Mute Lock disabled.");
     }
 
+    private void ScheduleAutomaticUpdateChecks()
+    {
+        _updateCts?.Dispose();
+        _updateCts = new CancellationTokenSource();
+        CancellationToken ct = _updateCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
+                if (!_isDisposed && !ct.IsCancellationRequested)
+                {
+                    await CheckAndAutoUpdateAsync(isAutomatic: true, ct).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
+
+        _periodicUpdateTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+        {
+            Interval = TimeSpan.FromHours(6)
+        };
+        _periodicUpdateTimer.Tick += (_, _) =>
+        {
+            if (!_isDisposed && _updateCts != null && !_updateCts.IsCancellationRequested)
+            {
+                _ = CheckAndAutoUpdateAsync(isAutomatic: true, _updateCts.Token);
+            }
+        };
+        _periodicUpdateTimer.Start();
+    }
+
     public void BtnMenuCheckUpdates_Click(object sender, RoutedEventArgs e)
     {
         if (popupAppMenu != null)
@@ -1727,53 +1928,395 @@ public partial class MainWindow : Window
             popupAppMenu.IsOpen = false;
         }
 
+        if (_updatePhase is UpdatePhase.Downloading or UpdatePhase.Verifying or UpdatePhase.Extracting or UpdatePhase.Installing)
+        {
+            ShowTemporaryStatus("An update is already in progress...");
+            return;
+        }
+
         ShowTemporaryStatus("Checking GitHub for updates...");
+        ApplyUpdateVisualState(
+            UpdatePhase.Checking,
+            "Checking for updates...",
+            "Connecting to GitHub Releases",
+            percent: -1,
+            badgeText: "...",
+            badgeActive: false,
+            showBanner: true);
+
         if (System.Windows.Application.Current != null)
         {
-            _ = CheckGitHubReleaseAsync();
+            _updateCts ??= new CancellationTokenSource();
+            _ = CheckAndAutoUpdateAsync(isAutomatic: false, _updateCts.Token);
         }
     }
 
-    private async Task CheckGitHubReleaseAsync()
+    internal void ApplyUpdateVisualState(
+        UpdatePhase phase,
+        string title,
+        string detail,
+        double percent,
+        string? badgeText = null,
+        bool badgeActive = false,
+        bool showBanner = false)
     {
-        try
+        _updatePhase = phase;
+        string currentVer = UpdateManager.GetCurrentVersionDisplay();
+        bool isBusy = phase is UpdatePhase.Checking or UpdatePhase.Downloading or UpdatePhase.Verifying or UpdatePhase.Extracting or UpdatePhase.Installing;
+
+        // 1. Title bar update indicator dot & tooltip
+        if (dotTitleUpdate != null)
         {
-            using HttpResponseMessage response = await UpdateHttpClient.GetAsync(
-                "https://api.github.com/repos/youssefhazem3-dot/MicMute/releases/latest").ConfigureAwait(false);
-            var localVersion = typeof(MainWindow).Assembly.GetName().Version ?? new Version(1, 0, 0);
-            string localDisplay = $"{localVersion.Major}.{localVersion.Minor}.{localVersion.Build}";
-
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            bool showDot = isBusy || phase == UpdatePhase.Available;
+            dotTitleUpdate.Visibility = showDot ? Visibility.Visible : Visibility.Collapsed;
+            dotTitleUpdate.BeginAnimation(UIElement.OpacityProperty, null);
+            if (isBusy && IsLoaded && IsVisible)
             {
-                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus($"MicMute v{localDisplay} is up to date."); });
-                return;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus("Could not check updates (GitHub returned " + (int)response.StatusCode + ")."); });
-                return;
-            }
-
-            string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            using JsonDocument doc = JsonDocument.Parse(json);
-            string tag = doc.RootElement.TryGetProperty("tag_name", out JsonElement tagEl) && tagEl.ValueKind == JsonValueKind.String
-                ? (tagEl.GetString() ?? string.Empty).Trim().TrimStart('v', 'V')
-                : string.Empty;
-
-            if (Version.TryParse(tag, out Version? remoteVersion) && remoteVersion > new Version(localVersion.Major, localVersion.Minor, localVersion.Build))
-            {
-                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus($"Update available: v{tag} on GitHub Releases!"); });
+                var pulse = new DoubleAnimation(1.0, 0.35, TimeSpan.FromMilliseconds(650))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                };
+                dotTitleUpdate.BeginAnimation(UIElement.OpacityProperty, pulse);
             }
             else
             {
-                _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus($"MicMute v{localDisplay} is up to date."); });
+                dotTitleUpdate.Opacity = 1.0;
             }
         }
-        catch
+
+        if (btnAppMenu != null)
         {
-            _ = Dispatcher.BeginInvoke(() => { if (!_isDisposed) ShowTemporaryStatus("Could not check updates (offline or timed out)."); });
+            btnAppMenu.ToolTip = phase switch
+            {
+                UpdatePhase.UpToDate => $"MicMute v{currentVer} — Up to date",
+                UpdatePhase.Checking => $"MicMute v{currentVer} — Checking for updates...",
+                UpdatePhase.Downloading => $"MicMute v{currentVer} — {title}",
+                UpdatePhase.Verifying or UpdatePhase.Extracting or UpdatePhase.Installing => $"MicMute v{currentVer} — {title}",
+                UpdatePhase.Available => $"MicMute v{currentVer} — {title}",
+                _ => $"MicMute v{currentVer} Menu"
+            };
         }
+
+        // 2. App menu update item label, spinning icon, and status badge
+        if (tbMenuCheckUpdates != null)
+        {
+            tbMenuCheckUpdates.Text = phase switch
+            {
+                UpdatePhase.Checking => "Checking...",
+                UpdatePhase.Downloading => title,
+                UpdatePhase.Verifying => "Verifying update...",
+                UpdatePhase.Extracting => "Preparing update...",
+                UpdatePhase.Installing => "Installing update...",
+                UpdatePhase.Available when _pendingUpdateInfo != null =>
+                    $"Update to v{_pendingUpdateInfo.LatestVersion.Major}.{_pendingUpdateInfo.LatestVersion.Minor}.{_pendingUpdateInfo.LatestVersion.Build}",
+                _ => "Check for Updates..."
+            };
+        }
+
+        if (borderMenuUpdateBadge != null && tbMenuUpdateBadge != null)
+        {
+            if (string.IsNullOrWhiteSpace(badgeText))
+            {
+                borderMenuUpdateBadge.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                borderMenuUpdateBadge.Visibility = Visibility.Visible;
+                tbMenuUpdateBadge.Text = badgeText;
+                StyleMenuBadge(borderMenuUpdateBadge, tbMenuUpdateBadge, badgeActive);
+            }
+        }
+
+        SetSpinAnimation(menuUpdateIconRot, isBusy && IsLoaded && IsVisible);
+        SetSpinAnimation(updateBannerIconRot, isBusy && showBanner && IsLoaded && IsVisible);
+
+        // 3. Inline progress banner
+        if (borderUpdateBanner != null)
+        {
+            borderUpdateBanner.Visibility = showBanner ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (tbUpdateBannerTitle != null)
+        {
+            tbUpdateBannerTitle.Text = title;
+        }
+        if (tbUpdateBannerDetail != null)
+        {
+            tbUpdateBannerDetail.Text = detail;
+        }
+        if (tbUpdateBannerPercent != null)
+        {
+            tbUpdateBannerPercent.Text = percent >= 0 ? $"{Math.Round(Math.Clamp(percent, 0, 100)):F0}%" : string.Empty;
+        }
+
+        if (borderUpdateProgressFill != null && borderUpdateProgressTrack != null)
+        {
+            double trackWidth = borderUpdateProgressTrack.ActualWidth > 0 ? borderUpdateProgressTrack.ActualWidth : 356.0;
+            updateProgressIndeterminateTrans?.BeginAnimation(TranslateTransform.XProperty, null);
+            if (updateProgressIndeterminateTrans != null) updateProgressIndeterminateTrans.X = 0;
+
+            if (percent >= 0)
+            {
+                double clamped = Math.Clamp(percent, 0.0, 100.0);
+                borderUpdateProgressFill.Width = trackWidth * (clamped / 100.0);
+            }
+            else if (isBusy && showBanner)
+            {
+                double barWidth = Math.Max(48.0, trackWidth * 0.30);
+                borderUpdateProgressFill.Width = barWidth;
+                if (updateProgressIndeterminateTrans != null && IsLoaded && IsVisible)
+                {
+                    var slide = new DoubleAnimation(-barWidth, trackWidth, TimeSpan.FromMilliseconds(1100))
+                    {
+                        RepeatBehavior = RepeatBehavior.Forever,
+                        EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                    };
+                    updateProgressIndeterminateTrans.BeginAnimation(TranslateTransform.XProperty, slide);
+                }
+            }
+            else
+            {
+                borderUpdateProgressFill.Width = 0;
+            }
+        }
+    }
+
+    private static void SetSpinAnimation(RotateTransform? rot, bool active)
+    {
+        if (rot == null) return;
+        rot.BeginAnimation(RotateTransform.AngleProperty, null);
+        if (active)
+        {
+            var spin = new DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(950))
+            {
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            rot.BeginAnimation(RotateTransform.AngleProperty, spin);
+        }
+        else
+        {
+            rot.Angle = 0;
+        }
+    }
+
+    private async Task CheckAndAutoUpdateAsync(bool isAutomatic, CancellationToken cancellationToken)
+    {
+        if (Interlocked.CompareExchange(ref _updateCheckInFlight, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            if (isAutomatic)
+            {
+                _ = Dispatcher.BeginInvoke(() =>
+                {
+                    if (!_isDisposed)
+                    {
+                        ApplyUpdateVisualState(
+                            UpdatePhase.Checking,
+                            "Checking for updates...",
+                            "Checking GitHub Releases",
+                            percent: -1,
+                            badgeText: "...",
+                            badgeActive: false,
+                            showBanner: false);
+                    }
+                });
+            }
+
+            UpdateCheckResult result = await UpdateManager.CheckForUpdateAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (_isDisposed || cancellationToken.IsCancellationRequested) return;
+
+            if (result.Status == UpdateCheckStatus.UpdateAvailable && result.Update != null)
+            {
+                UpdateInfo update = result.Update;
+                string remoteDisplay = $"{update.LatestVersion.Major}.{update.LatestVersion.Minor}.{update.LatestVersion.Build}";
+                string localDisplay = UpdateManager.GetCurrentVersionDisplay();
+                _pendingUpdateInfo = update;
+
+                if (!UpdateManager.CanSelfUpdate())
+                {
+                    _ = Dispatcher.BeginInvoke(() =>
+                    {
+                        if (_isDisposed) return;
+                        ApplyUpdateVisualState(
+                            UpdatePhase.Available,
+                            $"Update v{remoteDisplay} available",
+                            $"v{localDisplay} → v{remoteDisplay}",
+                            percent: -1,
+                            badgeText: "NEW",
+                            badgeActive: true,
+                            showBanner: false);
+                        ShowTemporaryStatus($"Update available: v{remoteDisplay} on GitHub Releases!");
+                    });
+                    return;
+                }
+
+                await DownloadAndInstallUpdateAsync(update, localDisplay, remoteDisplay, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            _ = Dispatcher.BeginInvoke(() =>
+            {
+                if (_isDisposed) return;
+                if (result.Status is UpdateCheckStatus.UpToDate or UpdateCheckStatus.NoReleases)
+                {
+                    string currentVer = UpdateManager.GetCurrentVersionDisplay();
+                    ApplyUpdateVisualState(
+                        UpdatePhase.UpToDate,
+                        $"Up to date (v{currentVer})",
+                        "Latest version installed",
+                        percent: 100,
+                        badgeText: "Up to date",
+                        badgeActive: false,
+                        showBanner: false);
+                    if (!isAutomatic)
+                    {
+                        ShowTemporaryStatus(result.Message);
+                        ShowInfoModal(
+                            "You're up to date!",
+                            $"MicMute v{currentVer} is already the latest version.",
+                            "OK");
+                    }
+                }
+                else
+                {
+                    ApplyUpdateVisualState(
+                        UpdatePhase.Failed,
+                        "Update check failed",
+                        result.Message,
+                        percent: -1,
+                        badgeText: isAutomatic ? null : "Retry",
+                        badgeActive: false,
+                        showBanner: false);
+                    if (!isAutomatic)
+                    {
+                        ShowTemporaryStatus(result.Message);
+                    }
+                }
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogError("CheckAndAutoUpdateAsync failed", ex);
+            _ = Dispatcher.BeginInvoke(() =>
+            {
+                if (_isDisposed) return;
+                ApplyUpdateVisualState(
+                    UpdatePhase.Failed,
+                    "Update failed",
+                    ex.Message,
+                    percent: -1,
+                    badgeText: isAutomatic ? null : "Retry",
+                    badgeActive: false,
+                    showBanner: false);
+                if (!isAutomatic)
+                {
+                    ShowTemporaryStatus("Update failed: " + ex.Message);
+                }
+            });
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _updateCheckInFlight, 0);
+        }
+    }
+
+    private async Task DownloadAndInstallUpdateAsync(
+        UpdateInfo update,
+        string localDisplay,
+        string remoteDisplay,
+        CancellationToken cancellationToken)
+    {
+        var progress = new Progress<UpdateProgress>(p =>
+        {
+            if (_isDisposed) return;
+            _ = Dispatcher.BeginInvoke(() =>
+            {
+                if (_isDisposed) return;
+                string badge = p.Phase == UpdatePhase.Downloading && p.Percent >= 0
+                    ? $"{Math.Round(p.Percent):F0}%"
+                    : "...";
+                ApplyUpdateVisualState(
+                    p.Phase,
+                    p.StatusText,
+                    $"Updating v{localDisplay} → v{remoteDisplay}",
+                    p.Percent,
+                    badgeText: badge,
+                    badgeActive: true,
+                    showBanner: true);
+            });
+        });
+
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            if (_isDisposed) return;
+            ApplyUpdateVisualState(
+                UpdatePhase.Downloading,
+                $"Downloading v{remoteDisplay}...",
+                $"Updating v{localDisplay} → v{remoteDisplay}",
+                percent: 0,
+                badgeText: "0%",
+                badgeActive: true,
+                showBanner: true);
+        });
+
+        string stagedExePath = await UpdateManager.DownloadAndStageUpdateAsync(
+            update,
+            progress,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        if (_isDisposed || cancellationToken.IsCancellationRequested) return;
+
+        // Wait briefly if the user is actively recording a hotkey or answering a confirmation modal
+        while (!_isDisposed && !cancellationToken.IsCancellationRequested)
+        {
+            bool busyInteracting = await Dispatcher.InvokeAsync(() =>
+                _isRecordingHotkey || (borderModalOverlay != null && borderModalOverlay.Visibility == Visibility.Visible));
+            if (!busyInteracting) break;
+            await Task.Delay(400, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (_isDisposed || cancellationToken.IsCancellationRequested) return;
+
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (_isDisposed) return;
+            ApplyUpdateVisualState(
+                UpdatePhase.Installing,
+                $"Installing v{remoteDisplay}...",
+                "Restarting MicMute to finish update",
+                percent: 100,
+                badgeText: "...",
+                badgeActive: true,
+                showBanner: true);
+            SettingsManager.Flush();
+
+            string targetExe = AdminManager.GetExecutablePath();
+            bool shouldShowWindow = this.IsVisible && this.WindowState != WindowState.Minimized;
+            if (UpdateManager.LaunchStagedUpdater(stagedExePath, targetExe, shouldShowWindow, localDisplay))
+            {
+                (System.Windows.Application.Current as App)?.RequestExitForUpdate();
+            }
+            else
+            {
+                ApplyUpdateVisualState(
+                    UpdatePhase.Failed,
+                    "Update restart failed",
+                    "Could not start the updater helper",
+                    percent: -1,
+                    badgeText: "Retry",
+                    badgeActive: false,
+                    showBanner: false);
+                ShowTemporaryStatus("Could not launch updater. Please retry.");
+            }
+        });
     }
 
     public void BtnMenuAbout_Click(object sender, RoutedEventArgs e)
@@ -2005,7 +2548,7 @@ public partial class MainWindow : Window
         double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
         double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
 
-        double curWidth = this.ActualWidth > 0 ? this.ActualWidth : _preferredWidth;
+        double curWidth = this.ActualWidth > 0 ? this.ActualWidth : Math.Ceiling(_preferredWidth * _currentUiScale);
         double curHeight = this.ActualHeight > 0 ? this.ActualHeight : 440.0;
         double winCenterDipX = this.Left + curWidth / 2.0;
         double winCenterDipY = this.Top + curHeight / 2.0;
@@ -2026,8 +2569,9 @@ public partial class MainWindow : Window
             trayDipY = (wa.Bottom - 20) / dpiY;
         }
 
-        double startDeltaX = trayDipX - winCenterDipX;
-        double startDeltaY = trayDipY - winCenterDipY;
+        double safeUiScale = _currentUiScale > 0 ? _currentUiScale : 1.0;
+        double startDeltaX = (trayDipX - winCenterDipX) / safeUiScale;
+        double startDeltaY = (trayDipY - winCenterDipY) / safeUiScale;
 
         const double initialScale = 0.70;
         rootScaleTransform.ScaleX = initialScale;
@@ -3196,6 +3740,31 @@ public partial class MainWindow : Window
         catch (Exception ex) { ShowTemporaryStatus("Settings reset could not be completed: " + ex.Message); }
     }
 
+    internal void ShowInfoModal(string title, string message, string dismissLabel = "OK")
+    {
+        if (borderModalOverlay == null || tbModalTitle == null || tbModalMessage == null || btnModalConfirm == null)
+        {
+            return;
+        }
+
+        _modalSequenceId++;
+        _pendingModalConfirmAction = null;
+        tbModalTitle.Text = title;
+        tbModalMessage.Text = message;
+        btnModalConfirm.Content = dismissLabel;
+        btnModalConfirm.Style = (Style)FindResource("SecondaryActionButtonStyle");
+
+        if (btnModalCancel != null)
+        {
+            btnModalCancel.Visibility = Visibility.Collapsed;
+        }
+        Grid.SetColumn(btnModalConfirm, 0);
+        Grid.SetColumnSpan(btnModalConfirm, 3);
+
+        PresentModalOverlay();
+        btnModalConfirm.Focus();
+    }
+
     internal void ShowConfirmationModal(string title, string message, string confirmLabel, Action onConfirm, bool isDanger = false)
     {
         if (borderModalOverlay == null || tbModalTitle == null || tbModalMessage == null || btnModalConfirm == null)
@@ -3210,6 +3779,21 @@ public partial class MainWindow : Window
         tbModalMessage.Text = message;
         btnModalConfirm.Content = confirmLabel;
         btnModalConfirm.Style = (Style)FindResource(isDanger ? "DangerActionButtonStyle" : "SecondaryActionButtonStyle");
+
+        if (btnModalCancel != null)
+        {
+            btnModalCancel.Visibility = Visibility.Visible;
+        }
+        Grid.SetColumn(btnModalConfirm, 2);
+        Grid.SetColumnSpan(btnModalConfirm, 1);
+
+        PresentModalOverlay();
+        btnModalCancel?.Focus();
+    }
+
+    private void PresentModalOverlay()
+    {
+        if (borderModalOverlay == null) return;
 
         borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
         borderModalOverlay.Visibility = Visibility.Visible;
@@ -3244,8 +3828,6 @@ public partial class MainWindow : Window
                 modalCardScale.ScaleY = 1.0;
             }
         }
-
-        btnModalCancel?.Focus();
     }
 
     internal void CloseConfirmationModal(bool immediate = false)
@@ -3293,7 +3875,7 @@ public partial class MainWindow : Window
             }
             else if (e.Key == Key.Tab)
             {
-                if (btnModalCancel != null && btnModalConfirm != null)
+                if (btnModalCancel != null && btnModalCancel.Visibility == Visibility.Visible && btnModalConfirm != null)
                 {
                     if (btnModalCancel.IsKeyboardFocusWithin)
                     {
@@ -3303,6 +3885,11 @@ public partial class MainWindow : Window
                     {
                         btnModalCancel.Focus();
                     }
+                    e.Handled = true;
+                }
+                else if (btnModalConfirm != null)
+                {
+                    btnModalConfirm.Focus();
                     e.Handled = true;
                 }
             }
@@ -3350,6 +3937,14 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _isDisposed = true;
+        if (_periodicUpdateTimer != null)
+        {
+            _periodicUpdateTimer.Stop();
+            _periodicUpdateTimer = null;
+        }
+        try { _updateCts?.Cancel(); } catch { }
+        try { _updateCts?.Dispose(); } catch { }
+        _updateCts = null;
         _deviceRefreshDebouncer.Dispose();
         _statusDebouncer.Dispose();
         _volumeAudioDebouncer.Dispose();

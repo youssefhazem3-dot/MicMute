@@ -20,7 +20,10 @@ public static class UiBehavior
     public const double MaximumOsdDuration = 30.0;
     public const int NotifyIconTooltipMaximumLength = 127;
     public const double DefaultAdaptiveVerticalMargin = 24.0;
+    public const double DefaultAdaptiveHorizontalMargin = 24.0;
     public const double MinimumWindowHeight = 260.0;
+    public const double MinimumUiScale = 0.55;
+    public const double DynamicContentHeightHeadroom = 44.0;
 
     public static bool TryParseOsdDuration(string? text, CultureInfo culture, out double duration)
     {
@@ -198,6 +201,33 @@ public static class UiBehavior
             return 750.0;
         }
         return Math.Max(minimumHeight, workAreaHeight - verticalMargin);
+    }
+
+    public static double CalculateAdaptiveScale(
+        DipRect workArea,
+        double designWidth,
+        double designHeight,
+        double verticalMargin = DefaultAdaptiveVerticalMargin,
+        double horizontalMargin = DefaultAdaptiveHorizontalMargin,
+        double minimumScale = MinimumUiScale)
+    {
+        if (!double.IsFinite(workArea.Width) || workArea.Width <= 0
+            || !double.IsFinite(workArea.Height) || workArea.Height <= 0
+            || !double.IsFinite(designWidth) || designWidth <= 0
+            || !double.IsFinite(designHeight) || designHeight <= 0)
+        {
+            return 1.0;
+        }
+
+        double availableWidth = Math.Max(200.0, workArea.Width - Math.Max(0.0, horizontalMargin));
+        double availableHeight = CalculateAdaptiveMaxHeight(workArea.Height, verticalMargin);
+
+        double scaleX = availableWidth / designWidth;
+        double scaleY = availableHeight / designHeight;
+        double rawScale = Math.Min(1.0, Math.Min(scaleX, scaleY));
+
+        double safeMin = double.IsFinite(minimumScale) ? Math.Clamp(minimumScale, 0.25, 1.0) : MinimumUiScale;
+        return Math.Clamp(rawScale, safeMin, 1.0);
     }
 
     public static DipRect CalculateCenteredWindowBounds(DipRect workArea, double windowWidth, double windowHeight, double verticalMargin = DefaultAdaptiveVerticalMargin)

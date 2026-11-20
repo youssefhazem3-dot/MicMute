@@ -22,6 +22,9 @@
         FontWeight="Bold">
 
     <Window.Resources>
+        <!-- Responsive UI Scale Transform (shared by main shell and popups) -->
+        <ScaleTransform x:Key="WindowContentScaleTransform" ScaleX="1.0" ScaleY="1.0" />
+
         <!-- ========================================== -->
         <!-- Dynamic Theme Brushes (Apple Liquid Glass) -->
         <!-- ========================================== -->
@@ -973,7 +976,9 @@
                                    UseLayoutRounding="True">
                                 <Border x:Name="dropDownBorder"
                                         MinWidth="{Binding ActualWidth, ElementName=toggle}"
+                                        MaxWidth="{Binding ActualWidth, ElementName=toggle}"
                                         MaxHeight="220"
+                                        LayoutTransform="{StaticResource WindowContentScaleTransform}"
                                         Background="{DynamicResource InputBgBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="1"
@@ -1029,6 +1034,7 @@
                                                   RenderOptions.ClearTypeHint="Enabled"
                                                   TextOptions.TextFormattingMode="Display"
                                                   TextOptions.TextRenderingMode="ClearType"
+                                                  HorizontalScrollBarVisibility="Disabled"
                                                   VerticalScrollBarVisibility="Auto">
                                         <StackPanel IsItemsHost="True"
                                                     KeyboardNavigation.DirectionalNavigation="Cycle"
@@ -1218,9 +1224,13 @@
         </Style>
     </Window.Resources>
 
-    <!-- Outer Window Frame (iOS Liquid Glass Shell) -->
-    <Border x:Name="rootBorder"
-            Background="{DynamicResource WindowBgBrush}"
+    <Grid x:Name="windowScaleHost"
+          HorizontalAlignment="Center"
+          LayoutTransform="{StaticResource WindowContentScaleTransform}">
+        <!-- Outer Window Frame (iOS Liquid Glass Shell) -->
+        <Border x:Name="rootBorder"
+                Width="412"
+                Background="{DynamicResource WindowBgBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1.5"
             CornerRadius="20"
@@ -1283,6 +1293,21 @@
                                        FontWeight="Bold"
                                        FontSize="12"
                                        VerticalAlignment="Center" />
+                            <TextBlock x:Name="tbTitleVersion"
+                                       Text="v1.0.0"
+                                       Foreground="{DynamicResource TextDimBrush}"
+                                       FontWeight="SemiBold"
+                                       FontSize="9.5"
+                                       Margin="5,1,0,0"
+                                       VerticalAlignment="Center" />
+                            <Ellipse x:Name="dotTitleUpdate"
+                                     Width="6" Height="6"
+                                     Fill="{DynamicResource AccentBrush}"
+                                     Margin="5,0,0,0"
+                                     VerticalAlignment="Center"
+                                     Visibility="Collapsed"
+                                     SnapsToDevicePixels="False"
+                                     RenderOptions.EdgeMode="Unspecified" />
                             <Path x:Name="pathAppMenuChevron"
                                   Data="M 0,0 L 3.5,3.5 L 7,0"
                                   Stroke="{DynamicResource TextGrayBrush}"
@@ -1317,6 +1342,7 @@
                            SnapsToDevicePixels="True"
                            UseLayoutRounding="True">
                         <Border x:Name="borderAppMenu"
+                                LayoutTransform="{StaticResource WindowContentScaleTransform}"
                                 Background="{DynamicResource InputBgBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}"
                                 BorderThickness="1"
@@ -1483,26 +1509,53 @@
                                 <!-- Option 1: Check for Updates -->
                                 <Button x:Name="btnMenuCheckUpdates"
                                         Style="{StaticResource AppDropdownItemButtonStyle}"
-                                        ToolTip="Check GitHub for the latest MicMute release"
+                                        ToolTip="Check GitHub for the latest MicMute release and update automatically"
                                         Click="BtnMenuCheckUpdates_Click">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="20" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <Path Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                                        <Path x:Name="pathMenuUpdateIcon"
+                                              Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
                                               Fill="{DynamicResource TextGrayBrush}"
                                               Stretch="Uniform"
                                               Width="12" Height="12"
                                               HorizontalAlignment="Left"
-                                              VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1"
+                                              VerticalAlignment="Center"
+                                              RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <RotateTransform x:Name="menuUpdateIconRot" Angle="0" />
+                                            </Path.RenderTransform>
+                                        </Path>
+                                        <TextBlock x:Name="tbMenuCheckUpdates"
+                                                   Grid.Column="1"
                                                    Text="Check for Updates..."
                                                    FontSize="12"
                                                    FontWeight="Normal"
                                                    Foreground="{DynamicResource TextWhiteBrush}"
                                                    VerticalAlignment="Center"
                                                    Margin="4,0,0,0" />
+                                        <Border x:Name="borderMenuUpdateBadge"
+                                                Grid.Column="2"
+                                                MinWidth="46"
+                                                Background="{DynamicResource KeycapBgBrush}"
+                                                BorderBrush="{DynamicResource KeycapBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="5"
+                                                Padding="7,2"
+                                                Margin="10,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Visibility="Collapsed">
+                                            <TextBlock x:Name="tbMenuUpdateBadge"
+                                                       Text="OK"
+                                                       FontSize="10"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextGrayBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                 </Button>
 
@@ -1602,10 +1655,10 @@
                           Style="{StaticResource ModernScrollViewerStyle}"
                           Focusable="False"
                           VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
                           CanContentScroll="False"
                           PanningMode="VerticalOnly">
-                <StackPanel Margin="14,0,14,14" MinWidth="380">
+                <StackPanel Margin="14,0,14,14">
                     
                     <!-- HERO SECTION: Liquid Lens Button & Precision Capsule -->
                     <StackPanel HorizontalAlignment="Stretch" Margin="0,2,0,12">
@@ -1662,6 +1715,8 @@
                                     VerticalAlignment="Center">
                                 <TextBlock x:Name="tbHeroHotkey"
                                            Text="Insert"
+                                           MaxWidth="190"
+                                           TextTrimming="CharacterEllipsis"
                                            Foreground="{DynamicResource KeycapTextBrush}"
                                            FontFamily="Cascadia Mono, Consolas, Segoe UI Variable Text, Segoe UI, monospace"
                                            FontWeight="Bold"
@@ -1781,10 +1836,13 @@
 
                             <ComboBox x:Name="cbDevices"
                                       Style="{StaticResource ModernComboBoxStyle}"
+                                      HorizontalAlignment="Stretch"
                                       Margin="0,0,0,8">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Name}"
+                                                   ToolTip="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextWhiteBrush}"
                                                    VerticalAlignment="Center"
                                                    FontSize="11.5"
@@ -1844,7 +1902,8 @@
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border x:Name="borderHotkey"
                                             Height="28"
-                                            MaxWidth="138"
+                                            MaxWidth="104"
+                                            ToolTip="{Binding Text, ElementName=tbHotkey}"
                                             Background="{DynamicResource KeycapBgBrush}"
                                             BorderBrush="{DynamicResource KeycapBorderBrush}"
                                             BorderThickness="1"
@@ -2386,6 +2445,102 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Live Update Progress Indicator Banner (Visible while checking / downloading / installing) -->
+                    <Border x:Name="borderUpdateBanner"
+                            Visibility="Collapsed"
+                            Background="{DynamicResource WarningBgBrush}"
+                            BorderBrush="{DynamicResource WarningBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            SnapsToDevicePixels="False"
+                            RenderOptions.EdgeMode="Unspecified"
+                            Padding="10,8"
+                            Margin="0,0,0,6">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0"
+                                        Width="24" Height="24"
+                                        CornerRadius="6"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
+                                        Background="{DynamicResource SquircleBgBrush}"
+                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,9,0"
+                                        VerticalAlignment="Center">
+                                    <Path x:Name="pathUpdateBannerIcon"
+                                          Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                                          Fill="{DynamicResource SquircleIconBrush}"
+                                          Stretch="Uniform"
+                                          Width="12" Height="12"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          RenderTransformOrigin="0.5,0.5"
+                                          SnapsToDevicePixels="False"
+                                          RenderOptions.EdgeMode="Unspecified">
+                                        <Path.RenderTransform>
+                                            <RotateTransform x:Name="updateBannerIconRot" Angle="0" />
+                                        </Path.RenderTransform>
+                                    </Path>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="tbUpdateBannerTitle"
+                                               Text="Checking for updates..."
+                                               Foreground="{DynamicResource TextWhiteBrush}"
+                                               FontSize="10.5"
+                                               FontWeight="Bold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock x:Name="tbUpdateBannerDetail"
+                                               Text="Connecting to GitHub Releases"
+                                               Foreground="{DynamicResource TextGrayBrush}"
+                                               FontSize="9"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock x:Name="tbUpdateBannerPercent"
+                                           Grid.Column="2"
+                                           Text=""
+                                           Foreground="{DynamicResource TextGrayBrush}"
+                                           FontFamily="Cascadia Mono, Consolas, Segoe UI Variable Text, Segoe UI, monospace"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                            <Border x:Name="borderUpdateProgressTrack"
+                                    Grid.Row="1"
+                                    Height="4"
+                                    CornerRadius="2"
+                                    Margin="0,7,0,0"
+                                    Background="{DynamicResource SliderTrackEmptyBrush}"
+                                    ClipToBounds="True"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified">
+                                <Border x:Name="borderUpdateProgressFill"
+                                        Height="4"
+                                        Width="0"
+                                        CornerRadius="2"
+                                        HorizontalAlignment="Left"
+                                        Background="{DynamicResource SliderTrackBrush}"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="updateProgressIndeterminateTrans" X="0" />
+                                    </Border.RenderTransform>
+                                </Border>
+                            </Border>
+                        </Grid>
+                    </Border>
+
                     <!-- Warning / Notification Box -->
                     <Border x:Name="borderWarning"
                             Visibility="Collapsed"
@@ -2520,4 +2675,5 @@
             </Border>
         </Grid>
     </Border>
+    </Grid>
 </Window>

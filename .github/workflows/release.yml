@@ -27,6 +27,30 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Determine Release Tag & Stamp Assembly Version
+        id: meta
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.tag }}"
+          } else {
+            $tag = "${{ github.ref_name }}"
+          }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          $cleanVer = ($tag.TrimStart('v', 'V') -split '[-+]')[0]
+          if ($cleanVer -match '^\d+\.\d+(\.\d+)?(\.\d+)?$') {
+            $parts = $cleanVer.Split('.')
+            while ($parts.Length -lt 4) { $parts += '0' }
+            $asmVer = ($parts[0..3] -join '.')
+            $infoPath = 'src/MicMute/AssemblyInfo.cs'
+            $content = Get-Content -LiteralPath $infoPath -Raw
+            $content = [regex]::Replace($content, 'AssemblyVersion\("[^"]+"\)', "AssemblyVersion(`"$asmVer`")")
+            $content = [regex]::Replace($content, 'AssemblyFileVersion\("[^"]+"\)', "AssemblyFileVersion(`"$asmVer`")")
+            Set-Content -LiteralPath $infoPath -Value $content -NoNewline
+            Write-Host "Stamped AssemblyVersion & AssemblyFileVersion = $asmVer (from tag $tag)"
+          }
+
       - name: Build & Run All Tests
         run: |
           dotnet build MicMute.sln -c Release --nologo
@@ -61,16 +85,6 @@ jobs:
             "$hash  $($_.Name)"
           }
           $checksums | Set-Content -Path release-out/SHA256SUMS.txt -Encoding ascii
-
-      - name: Determine Release Tag
-        id: meta
-        shell: pwsh
-        run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            "tag=${{ inputs.tag }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          } else {
-            "tag=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
