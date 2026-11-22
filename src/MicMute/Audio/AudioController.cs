@@ -18,12 +18,13 @@ public class AudioController : IMMNotificationClient, IDisposable
     private string _targetDeviceId = string.Empty;
     private string _currentId = string.Empty;
     private string _currentName = "No Device";
-    private volatile bool _isUsingFallback;
     private volatile bool _syncAllMicrophones;
     private volatile bool _lockMuteState;
     private bool? _lockedTargetMute;
     private int _cachedMuteState = -1;
-    private volatile bool _disposed;
+    private int _disposed;
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     public event EventHandler? DevicesChanged;
     public event EventHandler<MuteStateChangedEventArgs>? MuteStateChanged;
@@ -44,15 +45,10 @@ public class AudioController : IMMNotificationClient, IDisposable
         catch { _workQueue.Dispose(); throw; }
     }
 
-    public bool IsMuted
-    {
-        get => !_disposed && Volatile.Read(ref _cachedMuteState) == 1;
-        set => SetMute(value, showOsd: true);
-    }
+    public bool IsMuted => !IsDisposed && Volatile.Read(ref _cachedMuteState) == 1;
 
     public void SetMute(bool value, bool showOsd = true) => Queue(() => SetMuteOnAudioThread(value, showOsd));
 
-    public bool IsUsingFallback => _isUsingFallback;
     public bool SyncAllMicrophones
     {
         get => _syncAllMicrophones;
@@ -90,13 +86,14 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     public Task<List<AudioDevice>> GetCaptureDevicesAsync()
     {
-        if (_disposed) return Task.FromResult(new List<AudioDevice>());
+        if (IsDisposed) return Task.FromResult(new List<AudioDevice>());
         return _workQueue.InvokeAsync(() =>
         {
             var devices = new List<AudioDevice>();
+            if (IsDisposed || _enumerator == null) return devices;
             try
             {
-                foreach (MMDevice device in _enumerator!.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+                foreach (MMDevice device in _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
                 {
                     using (device) { devices.Add(new AudioDevice(device.ID, device.FriendlyName)); }
                 }
@@ -115,7 +112,7 @@ public class AudioController : IMMNotificationClient, IDisposable
         Queue(() => { _targetDeviceId = deviceId ?? string.Empty; UpdateActiveDevice(); });
     }
 
-    public Task SetTargetDeviceAsync(string deviceId) => _disposed ? Task.CompletedTask :
+    public Task SetTargetDeviceAsync(string deviceId) => IsDisposed ? Task.CompletedTask :
         _workQueue.InvokeAsync(() => { _targetDeviceId = deviceId ?? string.Empty; UpdateActiveDevice(); });
 
     public void ToggleMute()
@@ -159,7 +156,7 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     private void SetMuteOnAudioThread(bool value, bool showOsd = true)
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
         _lockedTargetMute = value;
         if (_currentDevice == null)
         {
@@ -200,7 +197,7 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     private void ApplySyncToAllEndpoints(bool value, string excludeDeviceId)
     {
-        if (_disposed || _enumerator == null) return;
+        if (IsDisposed || _enumerator == null) return;
         try
         {
             foreach (MMDevice device in _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
@@ -218,71 +215,43 @@ public class AudioController : IMMNotificationClient, IDisposable
         }
     }
 
+    private static MMDevice? TryFindFallbackEndpoint(MMDeviceEnumerator enumerator)
+    {
+        try { return enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); } catch { }
+        try { return enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); } catch { }
+        try { return enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); } catch { }
+        try
+        {
+            var endpoints = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+            if (endpoints.Count > 0) return endpoints[0];
+        }
+        catch { }
+        return null;
+    }
+
     private void UpdateActiveDevice()
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
         MMDevice? candidate = null;
-        bool fallback = false;
-        if (!string.IsNullOrEmpty(_targetDeviceId))
+        if (_enumerator != null)
         {
-            try
+            if (!string.IsNullOrEmpty(_targetDeviceId))
             {
-                candidate = _enumerator!.GetDevice(_targetDeviceId);
-                if (candidate.State != DeviceState.Active) { candidate.Dispose(); candidate = null; }
-            }
-            catch { candidate?.Dispose(); candidate = null; }
-        }
-        if (candidate == null)
-        {
-            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; }
-            catch { candidate = null; }
-        }
-        if (candidate == null)
-        {
-            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); fallback = true; }
-            catch { candidate = null; }
-        }
-        if (candidate == null)
-        {
-            try { candidate = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; }
-            catch { candidate = null; }
-        }
-        if (candidate == null && _enumerator != null)
-        {
-            try
-            {
-                var endpoints = _enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-                if (endpoints.Count > 0)
+                try
                 {
-                    candidate = endpoints[0];
-                    fallback = true;
+                    candidate = _enumerator.GetDevice(_targetDeviceId);
+                    if (candidate.State != DeviceState.Active) { candidate.Dispose(); candidate = null; }
                 }
+                catch { candidate?.Dispose(); candidate = null; }
             }
-            catch { candidate = null; }
+            candidate ??= TryFindFallbackEndpoint(_enumerator);
         }
         if (candidate == null)
         {
             try
             {
                 var fresh = new MMDeviceEnumerator();
-                try { candidate = fresh.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications); fallback = true; } catch { }
-                if (candidate == null)
-                {
-                    try { candidate = fresh.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console); fallback = true; } catch { }
-                }
-                if (candidate == null)
-                {
-                    try { candidate = fresh.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia); fallback = true; } catch { }
-                }
-                if (candidate == null)
-                {
-                    try
-                    {
-                        var endpoints = fresh.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-                        if (endpoints.Count > 0) { candidate = endpoints[0]; fallback = true; }
-                    }
-                    catch { }
-                }
+                candidate = TryFindFallbackEndpoint(fresh);
                 if (candidate != null)
                 {
                     try { _enumerator?.UnregisterEndpointNotificationCallback(this); } catch { }
@@ -317,9 +286,8 @@ public class AudioController : IMMNotificationClient, IDisposable
                     }
                     if (_syncAllMicrophones) ApplySyncToAllEndpoints(muted, candidate.ID);
                     string name = candidate.FriendlyName;
-                    bool changed = _muteState.Current != muted || name != _currentName || _isUsingFallback != fallback;
+                    bool changed = _muteState.Current != muted || name != _currentName;
                     Volatile.Write(ref _currentName, name);
-                    _isUsingFallback = fallback;
                     _muteState.RecordLocalChange(muted);
                     Volatile.Write(ref _cachedMuteState, muted ? 1 : 0);
                     candidate.Dispose();
@@ -332,7 +300,6 @@ public class AudioController : IMMNotificationClient, IDisposable
 
         DetachCurrentDevice();
         _currentDevice = candidate;
-        _isUsingFallback = fallback && candidate != null;
         if (candidate == null)
         {
             WarningNotification?.Invoke(this, "No active audio capture devices found.");
@@ -397,8 +364,8 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     private void Queue(Action action)
     {
-        if (_disposed) return;
-        Task queued = _workQueue.InvokeAsync(() => { if (!_disposed) action(); });
+        if (IsDisposed) return;
+        Task queued = _workQueue.InvokeAsync(() => { if (!IsDisposed) action(); });
         _ = queued.ContinueWith(task =>
             System.Diagnostics.Trace.WriteLine("Audio operation failed: " + task.Exception?.GetBaseException()),
             TaskContinuationOptions.OnlyOnFaulted);
@@ -451,8 +418,10 @@ public class AudioController : IMMNotificationClient, IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        DevicesChanged = null;
+        MuteStateChanged = null;
+        WarningNotification = null;
         Task cleanup = _workQueue.InvokeAsync(() =>
         {
             try { _enumerator?.UnregisterEndpointNotificationCallback(this); } catch (Exception ex) { DiagnosticLogger.LogError("Failed to unregister notification callback", ex); }
@@ -473,5 +442,6 @@ public class AudioController : IMMNotificationClient, IDisposable
             if (task.IsFaulted) System.Diagnostics.Trace.WriteLine("Audio cleanup failed: " + task.Exception?.GetBaseException());
             _workQueue.Dispose();
         }, TaskScheduler.Default);
+        GC.SuppressFinalize(this);
     }
 }

@@ -187,7 +187,8 @@ public static class SettingsCases
 
         Check.Equal(Path.GetFullPath(custom), scope.Store.GetDataFolderPath());
         Check.True(!File.Exists(Path.Combine(scope.AppDirectory, "portable.flag")), "Migration must leave portable mode.");
-        AppSettings reloaded = new SettingsStore(scope.DefaultDirectory, scope.AppDirectory).Load();
+        using var verifyStore = new SettingsStore(scope.DefaultDirectory, scope.AppDirectory);
+        AppSettings reloaded = verifyStore.Load();
         Check.Equal("portable-device", reloaded.SelectedDeviceId);
         Check.Equal(2.0, reloaded.OsdDuration);
     }

@@ -34,7 +34,10 @@
                 SnapsToDevicePixels="False"
                 RenderOptions.EdgeMode="Unspecified">
             <Border.RenderTransform>
-                <ScaleTransform x:Name="panelScaleTransform" ScaleX="1" ScaleY="1" />
+                <TransformGroup>
+                    <ScaleTransform x:Name="panelScaleTransform" ScaleX="1" ScaleY="1" />
+                    <TranslateTransform x:Name="panelTranslateTransform" X="0" Y="0" />
+                </TransformGroup>
             </Border.RenderTransform>
             <Border.Effect>
                 <DropShadowEffect x:Name="osdShadow"

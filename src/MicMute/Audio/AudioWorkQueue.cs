@@ -9,22 +9,22 @@ namespace MicMute;
 internal sealed class AudioWorkQueue : IDisposable
 {
     private readonly Thread _thread;
-    private readonly ManualResetEventSlim _ready = new();
     private Dispatcher? _dispatcher;
     private int _disposed;
 
     public AudioWorkQueue()
     {
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _thread = new Thread(() =>
         {
             _dispatcher = Dispatcher.CurrentDispatcher;
-            _ready.Set();
+            ready.TrySetResult();
             Dispatcher.Run();
         })
         { IsBackground = true, Name = "MicMute_Audio" };
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
-        _ready.Wait();
+        ready.Task.GetAwaiter().GetResult();
     }
 
     public Task<T> InvokeAsync<T>(Func<T> action)
@@ -36,11 +36,16 @@ internal sealed class AudioWorkQueue : IDisposable
         var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         try
         {
-            _dispatcher!.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            DispatcherOperation op = _dispatcher!.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
             {
                 try { completion.TrySetResult(action()); }
                 catch (Exception ex) { completion.TrySetException(ex); }
             }));
+            op.Aborted += (_, _) => completion.TrySetException(new ObjectDisposedException(nameof(AudioWorkQueue)));
+            if (op.Status == DispatcherOperationStatus.Aborted)
+            {
+                completion.TrySetException(new ObjectDisposedException(nameof(AudioWorkQueue)));
+            }
         }
         catch (InvalidOperationException ex) { completion.TrySetException(ex); }
         return completion.Task;
@@ -54,6 +59,5 @@ internal sealed class AudioWorkQueue : IDisposable
         try { _dispatcher?.BeginInvokeShutdown(DispatcherPriority.Normal); }
         catch (InvalidOperationException) { }
         if (Thread.CurrentThread != _thread) _thread.Join(TimeSpan.FromMilliseconds(100));
-        _ready.Dispose();
     }
 }

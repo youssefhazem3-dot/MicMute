@@ -73,6 +73,9 @@ static class UiCases
         test(nameof(UiUxRefinementsTrayOsdMenuChipsModalAndToast), UiUxRefinementsTrayOsdMenuChipsModalAndToast);
         test(nameof(ResponsiveScalingFitsAllCommonLaptopResolutionsWithoutScrolling), ResponsiveScalingFitsAllCommonLaptopResolutionsWithoutScrolling);
         test(nameof(AutoUpdaterParsesReleasesVerifiesSha256ReplacesBinaryAndUpdatesVisualIndicators), AutoUpdaterParsesReleasesVerifiesSha256ReplacesBinaryAndUpdatesVisualIndicators);
+        test(nameof(SimplifiedMainWindowAndSettingsPopupWithRotatingGear), SimplifiedMainWindowAndSettingsPopupWithRotatingGear);
+        test(nameof(ModernMotionCurvesGlidingPillAndZeroLinearKeyframes), ModernMotionCurvesGlidingPillAndZeroLinearKeyframes);
+        test(nameof(MemoryLeakCleanupAndResourceLifecycle), MemoryLeakCleanupAndResourceLifecycle);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -357,11 +360,24 @@ static class UiCases
         var window = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(xaml);
         try
         {
-            foreach (string name in new[] { "btnStateToggle", "cbDevices", "cbStartMinimized", "txtOsdDuration", "sliderSoundVolume", "txtSoundVolume", "btnResetData", "tbStoragePath", "contentScrollViewer" })
-                Check.True(window.FindName(name) != null, "missing named control: " + name);
+            foreach (string name in new[] { "btnStateToggle", "cbDevices", "tbHotkey", "btnRecordHotkey", "btnSettingsToggle", "settingsGearRot", "contentScrollViewer" })
+                Check.True(window.FindName(name) != null, "missing named control on MainWindow: " + name);
             Check.True(window.FindName("contentScrollViewer") is System.Windows.Controls.ScrollViewer, "contentScrollViewer must be a ScrollViewer");
         }
         finally { window.Close(); }
+
+        using var settingsStream = typeof(SettingsWindow).Assembly.GetManifestResourceStream("MicMute.SettingsWindow.xaml");
+        Check.True(settingsStream != null, "settings window resource must be embedded");
+        using var settingsReader = new System.IO.StreamReader(settingsStream!);
+        string settingsXaml = System.Text.RegularExpressions.Regex.Replace(settingsReader.ReadToEnd(), @"\s+x:Class=""[^""]+""", "");
+        var settingsWindow = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(settingsXaml);
+        try
+        {
+            foreach (string name in new[] { "cbEnableOsd", "txtOsdDuration", "cbSoundFeedback", "sliderSoundVolume", "txtSoundVolume", "cbStartup", "cbStartMinimized", "cbRunAsAdmin", "btnResetData", "tbStoragePath", "settingsScrollViewer" })
+                Check.True(settingsWindow.FindName(name) != null, "missing named control on SettingsWindow: " + name);
+            Check.True(settingsWindow.FindName("settingsScrollViewer") is System.Windows.Controls.ScrollViewer, "settingsScrollViewer must be a ScrollViewer");
+        }
+        finally { settingsWindow.Close(); }
     }
 
     private static void HeroButtonMatchesAppLogoGeometryAndStateTriggers()
@@ -792,14 +808,14 @@ static class UiCases
 
     private static void SettingsLocationOptionsArePlacedUnderHeaderInEvenRow()
     {
-        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
-        Check.True(stream != null, "MainWindow.xaml resource must be embedded");
+        using var stream = typeof(SettingsWindow).Assembly.GetManifestResourceStream("MicMute.SettingsWindow.xaml");
+        Check.True(stream != null, "SettingsWindow.xaml resource must be embedded");
         using var reader = new System.IO.StreamReader(stream!);
         string rawXaml = reader.ReadToEnd();
 
         // 1. Verify Settings Location and description exist
         int groupStart = rawXaml.IndexOf("Settings Location", StringComparison.Ordinal);
-        Check.True(groupStart >= 0, "Settings Location must exist in MainWindow.xaml");
+        Check.True(groupStart >= 0, "Settings Location must exist in SettingsWindow.xaml");
 
         int descIdx = rawXaml.IndexOf("Configuration file and data directory", groupStart, StringComparison.Ordinal);
         Check.True(descIdx > groupStart, "Configuration file and data directory must exist");
@@ -928,12 +944,11 @@ static class UiCases
         Check.True(!UiBehavior.TryParseSoundVolume("", out _));
         Check.True(!UiBehavior.TryParseSoundVolume("   ", out _));
 
-        // 4. Verify slider control bindings from embedded XAML
-        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
-        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        // 4. Verify slider control bindings from embedded SettingsWindow XAML
+        using var stream = typeof(SettingsWindow).Assembly.GetManifestResourceStream("MicMute.SettingsWindow.xaml");
+        Check.True(stream != null, "SettingsWindow.xaml must be embedded");
         using var reader = new System.IO.StreamReader(stream!);
         string xaml = System.Text.RegularExpressions.Regex.Replace(reader.ReadToEnd(), @"\s+x:Class=""[^""]+""", "");
-        xaml = System.Text.RegularExpressions.Regex.Replace(xaml, @"\s+(Click|MouseLeftButtonDown|SelectionChanged|Checked|Unchecked|ValueChanged|LostFocus|KeyDown|TextChanged)=""[^""]+""", "");
         var window = (System.Windows.Window)System.Windows.Markup.XamlReader.Parse(xaml);
         try
         {
@@ -1207,14 +1222,14 @@ static class UiCases
 
     private static void MainWindowUiAccuratelyClarifiesAdminModeForAntiCheat()
     {
-        using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
-        Check.True(stream != null, "MainWindow.xaml must be embedded");
+        using var stream = typeof(SettingsWindow).Assembly.GetManifestResourceStream("MicMute.SettingsWindow.xaml");
+        Check.True(stream != null, "SettingsWindow.xaml must be embedded");
         using var reader = new System.IO.StreamReader(stream!);
         string xaml = reader.ReadToEnd();
 
         // Must clarify anti-cheat and elevated windows, and not claim games in general require admin
-        Check.True(xaml.Contains("Enables hotkeys over anti-cheat and elevated windows"), "MainWindow.xaml must clarify anti-cheat and elevated windows");
-        Check.True(!xaml.Contains("Enables hotkeys over games and elevated windows"), "MainWindow.xaml must not misleadingly claim normal games require admin");
+        Check.True(xaml.Contains("Enables hotkeys over anti-cheat and elevated windows"), "SettingsWindow.xaml must clarify anti-cheat and elevated windows");
+        Check.True(!xaml.Contains("Enables hotkeys over games and elevated windows"), "SettingsWindow.xaml must not misleadingly claim normal games require admin");
     }
 
     private static void TitleBarCaptionButtonsAndThemeToggleAreSymmetricallyAligned()
@@ -1282,21 +1297,18 @@ static class UiCases
         using var reader = new System.IO.StreamReader(stream!);
         string rawXaml = reader.ReadToEnd();
 
-        // 1. PopupAnimation must be Fade for smooth entrance without mechanical slide window clipping
-        Check.True(rawXaml.Contains(@"PopupAnimation=""Fade"""), "ComboBox Popup must use PopupAnimation=Fade");
+        // 1. PopupAnimation must be None so WPF's built-in choppy fade never fights our custom animation
+        Check.True(rawXaml.Contains(@"PopupAnimation=""None"""), "ComboBox Popup must use PopupAnimation=None for conflict-free custom animation");
 
-        // 2. Rotating chevron arrow with RotateTransform and QuadraticEase on IsChecked
+        // 2. Rotating chevron arrow with RotateTransform and ExponentialEase on IsChecked
         Check.True(rawXaml.Contains(@"x:Name=""arrowRot"""), "arrowRot RotateTransform must be defined");
         Check.True(rawXaml.Contains(@"Storyboard.TargetName=""arrowRot"""), "Storyboard must target arrowRot");
         Check.True(rawXaml.Contains(@"Storyboard.TargetProperty=""Angle"""), "Storyboard must animate Angle");
-        Check.True(rawXaml.Contains(@"<QuadraticEase EasingMode=""EaseOut"" />"), "Chevron rotation must use QuadraticEase");
+        Check.True(rawXaml.Contains(@"<ExponentialEase Exponent=""4.5"" EasingMode=""EaseOut"" />"), "Chevron rotation must use ExponentialEase");
 
-        // 3. Dropdown loaded animation: CubicEase opacity, subtle slide (Y: -6 -> 0), scale (0.96 -> 1.0)
-        Check.True(rawXaml.Contains(@"<EventTrigger RoutedEvent=""Loaded"">"), "dropDownBorder must have Loaded EventTrigger");
-        Check.True(rawXaml.Contains(@"<CubicEase EasingMode=""EaseOut"" />"), "Dropdown animation must use CubicEase");
-        Check.True(rawXaml.Contains(@"From=""0.0"" To=""1.0"""), "Dropdown must animate opacity from 0.0 to 1.0");
-        Check.True(rawXaml.Contains(@"From=""-6"" To=""0"""), "Dropdown must animate TranslateTransform.Y from -6 to 0");
-        Check.True(rawXaml.Contains(@"From=""0.96"" To=""1.0"""), "Dropdown must animate ScaleTransform.ScaleY from 0.96 to 1.0");
+        // 3. Named transforms on dropDownBorder for code-driven animation on every DropDownOpened
+        Check.True(rawXaml.Contains(@"x:Name=""dropDownScale"""), "dropDownScale ScaleTransform must be declared");
+        Check.True(rawXaml.Contains(@"x:Name=""dropDownTranslate"""), "dropDownTranslate TranslateTransform must be declared");
     }
 
     private static void HeroHotkeySynchronizesWithSettingsAndLiveChanges()
@@ -1627,9 +1639,9 @@ static class UiCases
         Check.True(rawXaml.Contains(@"x:Name=""themeTransitionOverlay"""), "themeTransitionOverlay must be defined");
         Check.True(rawXaml.Contains(@"x:Name=""themeIconRot"""), "themeIconRot must be defined");
 
-        // 2. Dropdown text sharpness and ClearType hints
-        Check.True(rawXaml.Contains(@"TextOptions.TextFormattingMode=""Display"""), "Display formatting mode must be configured");
-        Check.True(rawXaml.Contains(@"TextOptions.TextRenderingMode=""ClearType"""), "ClearType rendering mode must be configured");
+        // 2. Dropdown text sharpness, dynamic popup typography, and ClearType hints
+        Check.True(rawXaml.Contains(@"x:Key=""PopupTextFormattingMode"">Display</TextFormattingMode>"), "Display formatting mode must be configured for native 1.0 popups");
+        Check.True(rawXaml.Contains(@"x:Key=""PopupTextRenderingMode"">ClearType</TextRenderingMode>"), "ClearType rendering mode must be configured for native 1.0 popups");
         Check.True(rawXaml.Contains(@"RenderOptions.ClearTypeHint=""Enabled"""), "ClearTypeHint must be enabled for layered dropdown popups");
 
         // 3. Runtime element bindings
@@ -1776,9 +1788,13 @@ static class UiCases
         using var reader = new System.IO.StreamReader(stream!);
         string rawXaml = reader.ReadToEnd();
 
-        // 1. Verify X and Y properties in rootTranslateTransform
+        // 1. Verify X and Y properties in rootTranslateTransform and panelOsdDuration in SettingsWindow
         Check.True(rawXaml.Contains(@"x:Name=""rootTranslateTransform"" X=""0.0"" Y=""0.0"""), "rootTranslateTransform must declare X=0.0 and Y=0.0");
-        Check.True(rawXaml.Contains(@"x:Name=""panelOsdDuration"""), "panelOsdDuration must be declared in XAML");
+        using var settingsStream = typeof(SettingsWindow).Assembly.GetManifestResourceStream("MicMute.SettingsWindow.xaml");
+        Check.True(settingsStream != null, "SettingsWindow.xaml must be embedded");
+        using var settingsReader = new System.IO.StreamReader(settingsStream!);
+        string settingsRawXaml = settingsReader.ReadToEnd();
+        Check.True(settingsRawXaml.Contains(@"x:Name=""panelOsdDuration"""), "panelOsdDuration must be declared in SettingsWindow.xaml");
 
         // 2. Runtime verification of tray open animation
         using var audio = new AudioController();
@@ -2080,9 +2096,12 @@ static class UiCases
             OsdWindow.HideOsd();
             Check.Equal(0.0, inst.Opacity, "HideOsd should reset opacity to 0");
 
-            // 3. Tray animation does not allocate BitmapCache
+            // 3. Tray animation uses DPI-aware transient BitmapCache during motion and clears it on close/rest
             window.PlayOpenFromTrayAnimation(new System.Drawing.Point(500, 500));
-            Check.True(window.rootBorder != null && window.rootBorder.CacheMode == null, "rootBorder must not use BitmapCache");
+            Check.True(window.rootBorder != null && window.rootBorder.CacheMode is System.Windows.Media.BitmapCache,
+                "rootBorder must enable transient BitmapCache during tray open animation for smooth layered motion");
+            window.Close();
+            Check.True(window.rootBorder!.CacheMode == null, "rootBorder must clear transient BitmapCache on close");
         }
         finally
         {
@@ -2447,8 +2466,12 @@ static class UiCases
             Check.True(window.rootLayoutScaleTransform != null, "rootLayoutScaleTransform must be bound");
             Check.True(ReferenceEquals(window.windowScaleHost!.LayoutTransform, window.rootLayoutScaleTransform),
                 "windowScaleHost must share rootLayoutScaleTransform");
-            Check.True(ReferenceEquals(window.borderAppMenu?.LayoutTransform, window.rootLayoutScaleTransform),
-                "borderAppMenu must share rootLayoutScaleTransform");
+            Check.True(!ReferenceEquals(window.borderAppMenu?.LayoutTransform, window.rootLayoutScaleTransform),
+                "borderAppMenu must NOT re-apply rootLayoutScaleTransform (WPF PopupRoot inherits ancestor scale automatically)");
+            Check.True(window.borderAppMenu?.Effect == null,
+                "borderAppMenu must isolate DropShadowEffect on a sibling layer so menu text is never bitmap-rasterized");
+            Check.True(window.borderModalCard?.Effect == null,
+                "borderModalCard must isolate DropShadowEffect on a sibling layer so modal text is never bitmap-rasterized");
 
             // Populate a long Intel laptop microphone name that previously caused horizontal overflow
             var longDevice = new AudioDevice("id-intel-sst", "Microphone Array (Intel® Smart Sound Technology (Intel® SST))");
@@ -2456,14 +2479,17 @@ static class UiCases
             window.cbDevices.SelectedItem = longDevice;
             window.borderWarning.Visibility = System.Windows.Visibility.Collapsed;
 
+            // Simplified MainWindow is compact enough to run at native 1.0x across standard laptops,
+            // and scales down proportionally on ultra-compact displays (e.g., 800x400).
             var scenarios = new (string Label, DipRect WorkArea, bool ExpectFullScale)[]
             {
-                ("1366x768 @ 100%", new DipRect(0, 0, 1366, 720), false),
-                ("1920x1080 @ 150%", new DipRect(0, 0, 1280, 672), false),
-                ("1920x1080 @ 125%", new DipRect(0, 0, 1536, 816), false),
-                ("1920x1080 @ 175%", new DipRect(0, 0, 1097, 576), false),
-                ("1600x900 @ 100%", new DipRect(0, 0, 1600, 852), false),
+                ("1366x768 @ 100%", new DipRect(0, 0, 1366, 720), true),
+                ("1920x1080 @ 150%", new DipRect(0, 0, 1280, 672), true),
+                ("1920x1080 @ 125%", new DipRect(0, 0, 1536, 816), true),
+                ("1920x1080 @ 175%", new DipRect(0, 0, 1097, 576), true),
+                ("1600x900 @ 100%", new DipRect(0, 0, 1600, 852), true),
                 ("1920x1080 @ 100%", new DipRect(0, 0, 1920, 1032), true),
+                ("Compact 800x400", new DipRect(0, 0, 800, 400), false),
             };
 
             // Measure and arrange windowScaleHost directly so scenarios taller than a headless CI monitor
@@ -2493,7 +2519,7 @@ static class UiCases
 
                 if (expectFullScale)
                 {
-                    Check.Equal(1.0, window.CurrentUiScale, $"{label}: must run at native 1.0 scale");
+                    Check.Equal(1.0, window.CurrentUiScale, $"{label}: compact MainWindow must run at native 1.0 scale");
                     Check.Equal(412.0, window.Width, $"{label}: must preserve native 412 DIP width");
                 }
                 else
@@ -2512,13 +2538,91 @@ static class UiCases
                 }
             }
 
-            // Also verify a live shown window at laptop 1080p @ 150% (fits inside even 1024x768 CI displays)
+            // Also verify SettingsWindow fits cleanly across laptop resolutions without horizontal scrolling
+            var settingsWin = window.SettingsPopupWindow;
+            var settingsHost = settingsWin.settingsScaleHost!;
+            foreach (var (label, workArea) in new[]
+            {
+                ("1366x768 @ 100%", new DipRect(0, 0, 1366, 720)),
+                ("1920x1080 @ 150%", new DipRect(0, 0, 1280, 672)),
+                ("1920x1080 @ 175%", new DipRect(0, 0, 1097, 576)),
+                ("1920x1080 @ 100%", new DipRect(0, 0, 1920, 1032)),
+            })
+            {
+                settingsWin.ApplyAdaptiveBounds(workArea, new DipRect(100, 40, 412, 440));
+                settingsHost.Measure(new System.Windows.Size(settingsWin.Width, settingsWin.MaxHeight));
+                settingsHost.Arrange(new System.Windows.Rect(0, 0, settingsWin.Width, Math.Min(settingsWin.MaxHeight, settingsHost.DesiredSize.Height)));
+                settingsHost.UpdateLayout();
+                Check.True(settingsWin.settingsScrollViewer.ScrollableWidth <= 0.5,
+                    $"SettingsWindow {label}: must have zero horizontal scroll");
+                Check.True(settingsWin.settingsScrollViewer.ScrollableHeight <= 0.5,
+                    $"SettingsWindow {label}: must fit vertically without scrolling (ScrollableH={settingsWin.settingsScrollViewer.ScrollableHeight:F2}, Scale={settingsWin.CurrentUiScale:F3})");
+                Check.True(settingsWin.Width <= workArea.Width + 0.5,
+                    $"SettingsWindow {label}: width must fit inside work area");
+            }
+
+            // Verify live shown window under adaptive scaling (< 1.0) so scaled popups are tested end-to-end
             window.borderWarning.Visibility = System.Windows.Visibility.Collapsed;
             window.Show();
-            window.ApplyAdaptiveBounds(new DipRect(0, 0, 1280, 672), isInitialPlacement: true);
+            window.ApplyAdaptiveBounds(new DipRect(0, 0, 800, 400), isInitialPlacement: true);
             window.UpdateLayout();
-            Check.True(window.contentScrollViewer.ScrollableWidth <= 0.5, "live shown laptop window must have zero horizontal scroll");
-            Check.True(window.contentScrollViewer.ScrollableHeight <= 0.5, "live shown laptop window must have zero vertical scroll");
+            Check.True(window.CurrentUiScale < 1.0, "compact 800x400 display must engage adaptive scaling < 1.0");
+            Check.True(window.contentScrollViewer.ScrollableWidth <= 0.5, "live shown scaled window must have zero horizontal scroll");
+            Check.True(window.contentScrollViewer.ScrollableHeight <= 0.5, "live shown scaled window must have zero vertical scroll");
+            Check.Equal(System.Windows.Media.TextFormattingMode.Ideal,
+                (System.Windows.Media.TextFormattingMode)window.Resources["PopupTextFormattingMode"],
+                "scaled laptop popups must switch to Ideal text formatting to avoid pre-scale pixel-snapping blur");
+            Check.Equal(System.Windows.Media.TextRenderingMode.Auto,
+                (System.Windows.Media.TextRenderingMode)window.Resources["PopupTextRenderingMode"],
+                "scaled laptop popups must switch to Auto text rendering");
+
+            // Verify mic dropdown popup matches ComboBox toggle width 1:1 (no double-scaling) and isolates shadow
+            window.cbDevices.IsDropDownOpen = true;
+            window.UpdateLayout();
+            window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            var toggle = window.cbDevices.Template?.FindName("toggle", window.cbDevices) as System.Windows.FrameworkElement;
+            var dropDownBorder = window.cbDevices.Template?.FindName("dropDownBorder", window.cbDevices) as System.Windows.Controls.Border;
+            Check.True(toggle != null && dropDownBorder != null, "ComboBox toggle and dropDownBorder must exist");
+            Check.True(!ReferenceEquals(dropDownBorder!.LayoutTransform, window.rootLayoutScaleTransform),
+                "dropDownBorder must NOT re-apply rootLayoutScaleTransform");
+            Check.True(dropDownBorder.Effect == null,
+                "dropDownBorder must isolate DropShadowEffect on a sibling layer so dropdown text stays sharp");
+            var toggleLeft = toggle!.PointToScreen(new System.Windows.Point(0, 0));
+            var toggleRight = toggle.PointToScreen(new System.Windows.Point(toggle.ActualWidth, toggle.ActualHeight));
+            var ddLeft = dropDownBorder.PointToScreen(new System.Windows.Point(0, 0));
+            var ddRight = dropDownBorder.PointToScreen(new System.Windows.Point(dropDownBorder.ActualWidth, dropDownBorder.ActualHeight));
+            double toggleScreenW = toggleRight.X - toggleLeft.X;
+            double ddScreenW = ddRight.X - ddLeft.X;
+            Check.True(Math.Abs(ddScreenW - toggleScreenW) <= 1.5,
+                $"Mic dropdown width ({ddScreenW:F1}) must match ComboBox toggle width ({toggleScreenW:F1}) without double-scaling");
+            Check.True(Math.Abs(ddLeft.X - toggleLeft.X) <= 1.5,
+                $"Mic dropdown left edge ({ddLeft.X:F1}) must align with ComboBox toggle left edge ({toggleLeft.X:F1})");
+            window.cbDevices.IsDropDownOpen = false;
+
+            // Verify top-left app menu popup scales once with the main window (no double-scaling)
+            window.popupAppMenu!.IsOpen = true;
+            window.UpdateLayout();
+            window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            var rootLeft = window.rootBorder!.PointToScreen(new System.Windows.Point(0, 0));
+            var rootRight = window.rootBorder.PointToScreen(new System.Windows.Point(window.rootBorder.ActualWidth, window.rootBorder.ActualHeight));
+            var menuLeft = window.borderAppMenu!.PointToScreen(new System.Windows.Point(0, 0));
+            var menuRight = window.borderAppMenu.PointToScreen(new System.Windows.Point(window.borderAppMenu.ActualWidth, window.borderAppMenu.ActualHeight));
+            double rootScreenW = rootRight.X - rootLeft.X;
+            double menuScreenW = menuRight.X - menuLeft.X;
+            double expectedMenuRatio = window.borderAppMenu.ActualWidth / window.rootBorder.ActualWidth;
+            double actualMenuRatio = menuScreenW / rootScreenW;
+            Check.True(Math.Abs(actualMenuRatio - expectedMenuRatio) <= 0.02,
+                $"App menu width ratio ({actualMenuRatio:F3}) must match single-scaled ratio ({expectedMenuRatio:F3}), not double-scaled");
+            window.popupAppMenu.IsOpen = false;
+
+            // Verify native 1.0 desktop scale restores Display + ClearType popup typography
+            window.ApplyAdaptiveBounds(new DipRect(0, 0, 1920, 1032), isInitialPlacement: false);
+            Check.Equal(System.Windows.Media.TextFormattingMode.Display,
+                (System.Windows.Media.TextFormattingMode)window.Resources["PopupTextFormattingMode"],
+                "native 1.0 popups must use Display text formatting");
+            Check.Equal(System.Windows.Media.TextRenderingMode.ClearType,
+                (System.Windows.Media.TextRenderingMode)window.Resources["PopupTextRenderingMode"],
+                "native 1.0 popups must use ClearType text rendering");
         }
         finally
         {
@@ -2658,8 +2762,11 @@ static class UiCases
             Check.Equal(System.Windows.Visibility.Collapsed, window.borderUpdateBanner.Visibility, "update banner must hide when up to date");
             Check.Equal("Up to date", window.tbMenuUpdateBadge?.Text);
 
-            // Verify "You're up to date!" info modal popup displays single OK button and restores Cancel for confirmation modals
+            // Verify "You're up to date!" info modal collapses any transient bottom status toast so the modal stays centered and fixed
+            window.ShowTemporaryStatus("Checking GitHub for updates...");
+            Check.Equal(System.Windows.Visibility.Visible, window.borderWarning.Visibility, "Transient toast should be visible before modal");
             window.ShowInfoModal("You're up to date!", $"MicMute v{verDisplay} is already the latest version.", "OK");
+            Check.Equal(System.Windows.Visibility.Collapsed, window.borderWarning.Visibility, "Presenting modal must collapse transient bottom status toast immediately to prevent vertical jump");
             Check.Equal(System.Windows.Visibility.Visible, window.borderModalOverlay!.Visibility);
             Check.Equal("You're up to date!", window.tbModalTitle?.Text);
             Check.Equal("OK", window.btnModalConfirm?.Content as string);
@@ -2667,6 +2774,211 @@ static class UiCases
             Check.Equal(3, System.Windows.Controls.Grid.GetColumnSpan(window.btnModalConfirm!));
             window.BtnModalConfirm_Click(window.btnModalConfirm!, new System.Windows.RoutedEventArgs());
             Check.Equal(System.Windows.Visibility.Collapsed, window.borderModalOverlay.Visibility);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void SimplifiedMainWindowAndSettingsPopupWithRotatingGear()
+    {
+        // 1. Verify MainWindow.xaml is simplified (no Group 2 / Group 3 cards) and declares rotating Settings toggle
+        using var mainStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(mainStream != null, "MainWindow.xaml must be embedded");
+        using var mainReader = new System.IO.StreamReader(mainStream!);
+        string mainXaml = mainReader.ReadToEnd();
+        Check.True(mainXaml.Contains(@"x:Name=""btnSettingsToggle"""), "MainWindow must declare btnSettingsToggle");
+        Check.True(mainXaml.Contains(@"x:Name=""settingsGearRot"""), "MainWindow must declare settingsGearRot RotateTransform");
+        Check.True(mainXaml.Contains(@"x:Name=""settingsChevronRot"""), "MainWindow must declare settingsChevronRot RotateTransform");
+        Check.True(!mainXaml.Contains(@"x:Name=""cbEnableOsd"""), "MainWindow must not directly host cbEnableOsd");
+        Check.True(!mainXaml.Contains(@"x:Name=""cbSoundFeedback"""), "MainWindow must not directly host cbSoundFeedback");
+        Check.True(!mainXaml.Contains(@"x:Name=""cbStartup"""), "MainWindow must not directly host cbStartup");
+        Check.True(!mainXaml.Contains(@"x:Name=""cbStartMinimized"""), "MainWindow must not directly host cbStartMinimized");
+        Check.True(!mainXaml.Contains(@"x:Name=""cbRunAsAdmin"""), "MainWindow must not directly host cbRunAsAdmin");
+        Check.True(!mainXaml.Contains("Settings Location"), "MainWindow must not directly host Settings Location card");
+
+        // 2. Verify smart adjacent placement math (right preferred, left fallback, narrow center fallback)
+        var wa = new DipRect(0, 0, 1920, 1032);
+        var centeredAnchor = new DipRect(754, 290, 412, 440);
+        var placedRight = UiBehavior.CalculateAdjacentPopupBounds(wa, centeredAnchor, 412, 560, gap: 12);
+        Check.Equal(centeredAnchor.Left + centeredAnchor.Width + 12, placedRight.Left, "Should open to the right of MainWindow when room exists");
+        Check.Equal(centeredAnchor.Top, placedRight.Top, "Should align top edge with MainWindow when within work area");
+
+        var rightEdgeAnchor = new DipRect(1480, 290, 412, 440);
+        var placedLeft = UiBehavior.CalculateAdjacentPopupBounds(wa, rightEdgeAnchor, 412, 560, gap: 12);
+        Check.Equal(rightEdgeAnchor.Left - 12 - 412, placedLeft.Left, "Should flip to the left of MainWindow near the right screen edge");
+
+        var narrowWa = new DipRect(0, 0, 600, 720);
+        var narrowPlaced = UiBehavior.CalculateAdjacentPopupBounds(narrowWa, new DipRect(94, 100, 412, 440), 412, 560, gap: 12);
+        Check.True(narrowPlaced.Left >= narrowWa.Left && narrowPlaced.Left + narrowPlaced.Width <= narrowWa.Left + narrowWa.Width + 0.5,
+            "Narrow fallback must stay cleanly inside work area");
+
+        // 3. Verify version bump tracking (1.0.7)
+        Check.Equal("1.0.7", UpdateManager.GetCurrentVersionDisplay(), "App version must reflect +0.0.1 bump to 1.0.7");
+
+        // 4. Runtime verification of Settings toggle, gear rotation, SettingsWindow open/close, theme sync & lifecycle
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            Check.Equal("v1.0.7", window.tbTitleVersion?.Text, "Title bar must show v1.0.7");
+            Check.Equal("Version 1.0.7", window.tbMenuVersion?.Text, "App menu must show Version 1.0.7");
+            Check.True(window.btnSettingsToggle != null, "btnSettingsToggle must be bound");
+            Check.True(window.settingsGearRot != null, "settingsGearRot must be bound");
+            Check.True(window._settingsWindow != null, "SettingsPopupWindow must be initialized");
+            Check.True(!window.SettingsPopupWindow.IsSettingsOpen, "SettingsPopupWindow must start closed");
+            Check.Equal(0.0, window.settingsGearRot!.Angle, "Gear icon must start at 0 degrees");
+
+            // Clicking btnSettingsToggle opens SettingsPopupWindow and rotates gear to 180 degrees
+            window.BtnSettingsToggle_Click(window.btnSettingsToggle!, new System.Windows.RoutedEventArgs());
+            Check.True(window.SettingsPopupWindow.IsSettingsOpen, "Clicking btnSettingsToggle must open SettingsPopupWindow");
+            Check.True(window.SettingsPopupWindow.IsVisible, "SettingsPopupWindow must be visible when open");
+            Check.Equal("Open", window.btnSettingsToggle!.Tag as string, "btnSettingsToggle Tag must reflect Open state");
+            Check.Equal(180.0, window.settingsGearRot!.Angle, "Opening Settings must rotate gear to 180 degrees");
+            Check.Equal(180.0, window.settingsChevronRot!.Angle, "Opening Settings must flip chevron to 180 degrees");
+
+            // Theme sync: toggling Light Mode must keep SettingsPopupWindow Resources in sync
+            window.SetLightMode(true);
+            Check.True(ReferenceEquals(window.SettingsPopupWindow.Resources, window.Resources),
+                "SettingsPopupWindow must share MainWindow theme Resources");
+            window.SetLightMode(false);
+            Check.True(ReferenceEquals(window.SettingsPopupWindow.Resources, window.Resources),
+                "SettingsPopupWindow must remain synced after toggling back to Dark Mode");
+
+            // Clicking btnSettingsToggle again closes SettingsPopupWindow and unwinds gear back to 0 degrees
+            window.BtnSettingsToggle_Click(window.btnSettingsToggle!, new System.Windows.RoutedEventArgs());
+            Check.True(!window.SettingsPopupWindow.IsSettingsOpen, "Second click must close SettingsPopupWindow");
+            Check.True(window.btnSettingsToggle.Tag == null, "btnSettingsToggle Tag must clear when closed");
+            Check.Equal(0.0, window.settingsGearRot.Angle, "Closing Settings must unwind gear back to 0 degrees");
+            Check.Equal(0.0, window.settingsChevronRot.Angle, "Closing Settings must restore chevron to 0 degrees");
+
+            // Re-open and verify closing MainWindow cleanly shuts down SettingsPopupWindow
+            window.OpenSettingsWindow();
+            Check.True(window.SettingsPopupWindow.IsSettingsOpen, "SettingsPopupWindow must reopen cleanly");
+            window.Close();
+            Check.True(!window.SettingsPopupWindow.IsSettingsOpen, "Closing MainWindow must close SettingsPopupWindow");
+        }
+        finally
+        {
+            try { window.Close(); } catch { }
+        }
+    }
+
+    private static void ModernMotionCurvesGlidingPillAndZeroLinearKeyframes()
+    {
+        // 1. Verify MainWindow.xaml has zero linear SplineDoubleKeyFrames missing KeySpline
+        using var mainStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        Check.True(mainStream != null, "MainWindow.xaml must be embedded");
+        using var mainReader = new System.IO.StreamReader(mainStream!);
+        string mainXaml = mainReader.ReadToEnd();
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(mainXaml, @"<SplineDoubleKeyFrame\b[^>]*/>"))
+        {
+            Check.True(m.Value.Contains("KeySpline="), $"Every SplineDoubleKeyFrame must define KeySpline (found linear keyframe: {m.Value})");
+        }
+
+        // 2. Verify Hero ripple/slash, ToggleSwitch isolated hover/squish, and GPU Slider thumb transforms
+        Check.True(mainXaml.Contains(@"x:Name=""heroRippleRing"""), "Hero button must declare expanding ripple ring");
+        Check.True(mainXaml.Contains(@"x:Name=""pressScale"""), "Hero button must separate pressScale from hover gridScale");
+        Check.True(mainXaml.Contains(@"x:Name=""slashScale"""), "Hero button must animate mute slash");
+        Check.True(mainXaml.Contains(@"x:Name=""knobSquishScale""") && mainXaml.Contains(@"x:Name=""knobHoverScale"""),
+            "ToggleSwitch must isolate knobSquishScale from knobHoverScale");
+        Check.True(mainXaml.Contains(@"x:Name=""thumbHoverScale""") && mainXaml.Contains(@"x:Name=""thumbDragScale"""),
+            "Slider thumb must use GPU ScaleTransform instead of layout Width/Height resizing");
+        Check.True(!mainXaml.Contains(@"TargetName=""thumbCircle"" Property=""Width"""),
+            "Slider thumb must not snap layout Width on hover/drag");
+
+        // 3. Verify SettingsWindow gliding pill & synchronized theme overlay, and OsdWindow translate transform
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        var osd = new OsdWindow();
+        try
+        {
+            var settingsWin = window.SettingsPopupWindow;
+            Check.True(settingsWin.settingsThemeOverlay != null, "SettingsWindow must bind synchronized theme crossfade overlay");
+            Check.True(settingsWin.borderOsdPosPill != null && settingsWin.osdPosPillTranslate != null,
+                "SettingsWindow must bind gliding OSD position pill indicator");
+            Check.True(osd.panelTranslateTransform != null, "OsdWindow must bind panelTranslateTransform");
+
+            // Measure SettingsWindow so gridOsdPosition has real width and verify pill translates across Center -> Bottom -> Top
+            settingsWin.settingsScaleHost!.Measure(new System.Windows.Size(412, 600));
+            settingsWin.settingsScaleHost.Arrange(new System.Windows.Rect(0, 0, 412, 560));
+            settingsWin.settingsScaleHost.UpdateLayout();
+
+            settingsWin.UpdateOsdPositionPill(0, animate: false);
+            double xCenter = settingsWin.osdPosPillTranslate!.X;
+            settingsWin.UpdateOsdPositionPill(1, animate: false);
+            double xBottom = settingsWin.osdPosPillTranslate.X;
+            settingsWin.UpdateOsdPositionPill(2, animate: false);
+            double xTop = settingsWin.osdPosPillTranslate.X;
+            Check.True(xCenter == 0.0 && xBottom > xCenter + 40.0 && xTop > xBottom + 40.0,
+                $"Gliding pill X positions must advance cleanly across segments (Center={xCenter:F1}, Bottom={xBottom:F1}, Top={xTop:F1})");
+
+            // Verify transient GPU BitmapCache helper enables and clears cleanly
+            UiMotion.EnableTransientCache(window.rootBorder, window);
+            Check.True(window.rootBorder!.CacheMode is System.Windows.Media.BitmapCache, "EnableTransientCache must attach BitmapCache");
+            UiMotion.ClearTransientCache(window.rootBorder);
+            Check.True(window.rootBorder.CacheMode == null, "ClearTransientCache must release CacheMode cleanly");
+        }
+        finally
+        {
+            osd.Close();
+            window.Close();
+        }
+    }
+
+    private static void MemoryLeakCleanupAndResourceLifecycle()
+    {
+        // 1. Hotkey recording pulse brush is tracked and cleared cleanly on cancel/close
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            var pulseBrushField = typeof(MainWindow).GetField("_recordingPulseBrush",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Check.True(pulseBrushField != null, "MainWindow must track _recordingPulseBrush to stop its RepeatBehavior.Forever clock");
+
+            window.StartRecordingHotkey();
+            Check.True(pulseBrushField!.GetValue(window) != null, "StartRecordingHotkey must assign _recordingPulseBrush");
+            // Calling SetLightMode while recording must replace without leaking the previous brush
+            var firstBrush = pulseBrushField.GetValue(window);
+            window.SetLightMode(true);
+            var secondBrush = pulseBrushField.GetValue(window);
+            Check.True(secondBrush != null && !ReferenceEquals(firstBrush, secondBrush), "Theme switch while recording must swap pulse brush cleanly");
+
+            // Cancelling via Deactivated must clear _recordingPulseBrush
+            typeof(MainWindow).GetMethod("OnDeactivated", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .Invoke(window, new object[] { EventArgs.Empty });
+            Check.True(pulseBrushField.GetValue(window) == null, "Cancelling hotkey recording must stop and clear _recordingPulseBrush");
+
+            // 2. OsdWindow Close clears static _instance and removes WndProc hook
+            var osdInstanceField = typeof(OsdWindow).GetField("_instance",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var osdHwndSourceField = typeof(OsdWindow).GetField("_hwndSource",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Check.True(osdInstanceField != null && osdHwndSourceField != null, "OsdWindow must track _instance and _hwndSource");
+            OsdWindow.WarmUp();
+            var osd = osdInstanceField!.GetValue(null) as OsdWindow;
+            Check.True(osd != null, "OsdWindow.WarmUp must initialize _instance");
+            osd!.Close();
+            Check.True(osdInstanceField.GetValue(null) == null, "OsdWindow.Close must clear static _instance");
+            Check.True(osdHwndSourceField!.GetValue(osd) == null, "OsdWindow.Close must detach _hwndSource hook");
+
+            // 3. AudioFeedback.SetVolume reuses SoundPlayer instances instead of leaking handles on every change
+            var mutePlayerField = typeof(AudioFeedback).GetField("_mutePlayer",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var rawMuteField = typeof(AudioFeedback).GetField("_rawMuteWavBytes",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Check.True(mutePlayerField != null && rawMuteField != null, "AudioFeedback fields must exist");
+            AudioFeedback.SetVolume(80);
+            var playerAt80 = mutePlayerField!.GetValue(null);
+            AudioFeedback.SetVolume(55);
+            var playerAt55 = mutePlayerField.GetValue(null);
+            Check.True(playerAt80 != null && ReferenceEquals(playerAt80, playerAt55),
+                "AudioFeedback.SetVolume must reuse existing SoundPlayer instances to avoid leaking kernel handles");
+            AudioFeedback.Dispose();
+            Check.True(mutePlayerField.GetValue(null) == null, "AudioFeedback.Dispose must release SoundPlayer");
+            Check.True(rawMuteField!.GetValue(null) == null, "AudioFeedback.Dispose must release cached LOH WAV buffers");
         }
         finally
         {

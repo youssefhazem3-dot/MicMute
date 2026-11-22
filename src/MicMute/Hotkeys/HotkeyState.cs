@@ -169,12 +169,13 @@ internal sealed class HotkeyState
 /// <summary>Tracks modifiers in each ordered native stream, including both sides.</summary>
 internal sealed class HotkeyModifiers
 {
+    private static readonly int[] ModifierVirtualKeys = { 0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C };
     private readonly bool[] _keys = new bool[256];
 
     public void Reset(Func<int, bool> isDown)
     {
         Array.Clear(_keys);
-        foreach (int vk in new[] { 0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C })
+        foreach (int vk in ModifierVirtualKeys)
             _keys[vk] = isDown(vk);
     }
 
@@ -185,7 +186,7 @@ internal sealed class HotkeyModifiers
 
     public void Synchronize(Func<int, bool> isDown)
     {
-        foreach (int vk in new[] { 0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C })
+        foreach (int vk in ModifierVirtualKeys)
         {
             if (_keys[vk] && !isDown(vk))
             {

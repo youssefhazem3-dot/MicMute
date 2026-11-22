@@ -59,22 +59,29 @@ public class HotkeyManager : IDisposable
     [DllImport("user32.dll")]
     private static extern int GetMessageTime();
 
-    private readonly IntPtr _hWnd;
-    private HwndSource? _hwndSource;
+    private const int WM_KEYUP = 0x0101;
+    private const int WM_SYSKEYUP = 0x0105;
+    private const uint RIDEV_REMOVE = 0x00000001;
+
+    private volatile HwndSource? _hwndSource;
     private readonly HotkeyState _state = new();
     private readonly HotkeyModifiers _hookModifiers = new();
     private readonly HotkeyModifiers _rawModifiers = new();
-    private readonly AutoResetEvent _pollWake = new(false);
+    private readonly AutoResetEvent _pollWake;
     private readonly LowLevelKeyboardProc _proc;
     private readonly Thread _pollingThread;
     private IntPtr _hookId;
     private long _lastHookEventTick = Environment.TickCount64;
+    private long _lastHookInstallAttemptTick;
     private IntPtr _rawInputBuffer;
     private int _currentVk;
     private Key _currentKey;
     private ModifierKeys _currentModifiers;
     private int _bindingVersion;
-    private volatile bool _disposed;
+    private int _disposed;
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+    private static bool IsMouseVk(int vk) => vk is >= 0x04 and <= 0x06;
 
     public const Key MouseMiddleKey = Key.NoName;
     public const Key MouseXButton1Key = Key.Pa1;
@@ -95,15 +102,19 @@ public class HotkeyManager : IDisposable
 
     public HotkeyManager(IntPtr hWnd)
     {
-        _hWnd = hWnd;
-        _hwndSource = HwndSource.FromHwnd(hWnd) ?? throw new ArgumentException("A live window handle is required.", nameof(hWnd));
+        HwndSource source = HwndSource.FromHwnd(hWnd) ?? throw new ArgumentException("A live window handle is required.", nameof(hWnd));
+        _hwndSource = source;
+        _pollWake = new AutoResetEvent(false);
         _proc = HookCallback;
         _rawInputBuffer = Marshal.AllocHGlobal(128);
+        bool hwndHookAdded = false;
+        bool rawInputRegistered = false;
         try
         {
             _hookModifiers.Reset(IsKeyDown);
             _rawModifiers.Reset(IsKeyDown);
-            _hwndSource.AddHook(HwndHook);
+            source.AddHook(HwndHook);
+            hwndHookAdded = true;
             try
             {
                 ChangeWindowMessageFilterEx(hWnd, WM_INPUT, MSGFLT_ALLOW, IntPtr.Zero);
@@ -112,7 +123,7 @@ public class HotkeyManager : IDisposable
             {
                 DiagnosticLogger.LogError("ChangeWindowMessageFilterEx failed", ex);
             }
-            RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_INPUTSINK, hwndTarget = hWnd } },
+            rawInputRegistered = RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_INPUTSINK, hwndTarget = hWnd } },
                 1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
             InstallHook();
             _pollingThread = new Thread(PollLoop) { IsBackground = true, Priority = ThreadPriority.AboveNormal, Name = "MicMute_InputPoller" };
@@ -120,15 +131,29 @@ public class HotkeyManager : IDisposable
         }
         catch
         {
-            Marshal.FreeHGlobal(_rawInputBuffer);
-            _rawInputBuffer = IntPtr.Zero;
+            IntPtr hook = Interlocked.Exchange(ref _hookId, IntPtr.Zero);
+            if (hook != IntPtr.Zero) try { UnhookWindowsHookEx(hook); } catch { }
+            if (rawInputRegistered)
+            {
+                try
+                {
+                    RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_REMOVE, hwndTarget = IntPtr.Zero } },
+                        1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
+                }
+                catch { }
+            }
+            if (hwndHookAdded) try { source.RemoveHook(HwndHook); } catch { }
+            _hwndSource = null;
+            _pollWake.Dispose();
+            IntPtr buf = Interlocked.Exchange(ref _rawInputBuffer, IntPtr.Zero);
+            if (buf != IntPtr.Zero) Marshal.FreeHGlobal(buf);
             throw;
         }
     }
 
     public bool Register(Key key, ModifierKeys modifiers)
     {
-        if (_disposed) return false;
+        if (IsDisposed) return false;
         int vk = ToVirtualKey(key);
         if (vk <= 0 || vk >= 255 || ((int)modifiers & ~15) != 0) return false;
         if (Volatile.Read(ref _currentVk) != 0 && _currentKey == key && _currentModifiers == modifiers) return true;
@@ -158,7 +183,7 @@ public class HotkeyManager : IDisposable
 
     public void RefreshHook()
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
         IntPtr prev = Interlocked.Exchange(ref _hookId, IntPtr.Zero);
         if (prev != IntPtr.Zero)
         {
@@ -179,11 +204,12 @@ public class HotkeyManager : IDisposable
     private void PollLoop()
     {
         long lastHookRecoveryCheck = Environment.TickCount64;
-        while (!_disposed)
+        while (!IsDisposed)
         {
             try
             {
                 int vk = Volatile.Read(ref _currentVk);
+                bool isMouse = IsMouseVk(vk);
                 int version = Volatile.Read(ref _bindingVersion);
                 bool isTargetDown = vk != 0 && IsKeyDown(vk);
                 ModifierKeys modifiers = isTargetDown ? PhysicalModifiers() : ModifierKeys.None;
@@ -195,7 +221,7 @@ public class HotkeyManager : IDisposable
                         QueueActivation(version);
                         // Physical poller caught an activation that low-level hook missed.
                         // The hook may have timed out or been dropped by Windows; self-heal.
-                        if (!IsMouseKey(_currentKey)) ScheduleHookRefresh();
+                        if (!isMouse) ScheduleHookRefresh();
                     }
                     if (_state.ConsumeRelease())
                     {
@@ -204,7 +230,7 @@ public class HotkeyManager : IDisposable
                 }
 
                 long now = Environment.TickCount64;
-                if (!IsMouseKey(_currentKey))
+                if (!isMouse)
                 {
                     bool hookMissing = Volatile.Read(ref _hookId) == IntPtr.Zero;
                     bool hookSilent = now - Volatile.Read(ref _lastHookEventTick) > 10000;
@@ -216,7 +242,7 @@ public class HotkeyManager : IDisposable
                     }
                 }
 
-                int waitMs = vk == 0 ? Timeout.Infinite : (IsMouseKey(_currentKey) ? 4 : 16);
+                int waitMs = vk == 0 ? Timeout.Infinite : (isMouse ? 4 : 16);
                 _pollWake.WaitOne(waitMs);
             }
             catch (ObjectDisposedException)
@@ -229,7 +255,7 @@ public class HotkeyManager : IDisposable
     private void ScheduleHookRefresh()
     {
         HwndSource? source = _hwndSource;
-        if (_disposed || source == null || source.Dispatcher.HasShutdownStarted) return;
+        if (IsDisposed || source == null || source.Dispatcher.HasShutdownStarted) return;
         try
         {
             source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(RefreshHook));
@@ -240,12 +266,12 @@ public class HotkeyManager : IDisposable
     private void QueueActivation(int version)
     {
         HwndSource? source = _hwndSource;
-        if (_disposed || source == null || source.Dispatcher.HasShutdownStarted) return;
+        if (IsDisposed || source == null || source.Dispatcher.HasShutdownStarted) return;
         try
         {
             source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
             {
-                if (!_disposed && version == Volatile.Read(ref _bindingVersion)) HotkeyPressed?.Invoke();
+                if (!IsDisposed && version == Volatile.Read(ref _bindingVersion)) HotkeyPressed?.Invoke();
             }));
         }
         catch (InvalidOperationException) { }
@@ -254,12 +280,12 @@ public class HotkeyManager : IDisposable
     private void QueueRelease(int version)
     {
         HwndSource? source = _hwndSource;
-        if (_disposed || source == null || source.Dispatcher.HasShutdownStarted) return;
+        if (IsDisposed || source == null || source.Dispatcher.HasShutdownStarted) return;
         try
         {
             source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
             {
-                if (!_disposed && version == Volatile.Read(ref _bindingVersion)) HotkeyReleased?.Invoke();
+                if (!IsDisposed && version == Volatile.Read(ref _bindingVersion)) HotkeyReleased?.Invoke();
             }));
         }
         catch (InvalidOperationException) { }
@@ -267,11 +293,16 @@ public class HotkeyManager : IDisposable
 
     private void InstallHook()
     {
-        if (_disposed || Volatile.Read(ref _hookId) != IntPtr.Zero) return;
+        if (IsDisposed || Volatile.Read(ref _hookId) != IntPtr.Zero) return;
+        Volatile.Write(ref _lastHookInstallAttemptTick, Environment.TickCount64);
         IntPtr installed = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
-        Volatile.Write(ref _hookId, installed);
         if (installed != IntPtr.Zero)
         {
+            if (IsDisposed || Interlocked.CompareExchange(ref _hookId, installed, IntPtr.Zero) != IntPtr.Zero)
+            {
+                try { UnhookWindowsHookEx(installed); } catch { }
+                return;
+            }
             Volatile.Write(ref _lastHookEventTick, Environment.TickCount64);
         }
         else
@@ -283,12 +314,12 @@ public class HotkeyManager : IDisposable
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (!_disposed && nCode >= 0 && lParam != IntPtr.Zero)
+        if (!IsDisposed && nCode >= 0 && lParam != IntPtr.Zero)
         {
             Volatile.Write(ref _lastHookEventTick, Environment.TickCount64);
             int message = wParam.ToInt32();
             bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
-            if (down || message == 0x101 || message == 0x105)
+            if (down || message == WM_KEYUP || message == WM_SYSKEYUP)
             {
                 int vk = Marshal.ReadInt32(lParam);
                 uint timestamp = unchecked((uint)Marshal.ReadInt32(lParam, 12));
@@ -301,18 +332,19 @@ public class HotkeyManager : IDisposable
                     QueueRelease(version);
             }
         }
-        return CallNextHookEx(_hookId, nCode, wParam, lParam);
+        return CallNextHookEx(Volatile.Read(ref _hookId), nCode, wParam, lParam);
     }
 
     private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (_disposed) return IntPtr.Zero;
+        if (IsDisposed) return IntPtr.Zero;
         int version = Volatile.Read(ref _bindingVersion);
-        if (msg == WM_INPUT && _rawInputBuffer != IntPtr.Zero)
+        IntPtr buffer = Volatile.Read(ref _rawInputBuffer);
+        if (msg == WM_INPUT && buffer != IntPtr.Zero)
         {
             uint size = 128;
-            uint bytes = GetRawInputData(lParam, RID_INPUT, _rawInputBuffer, ref size, (uint)RawKeyboardPacket.HeaderSize);
-            if (RawKeyboardPacket.TryRead(_rawInputBuffer, bytes, size, 128, out int vk, out bool down))
+            uint bytes = GetRawInputData(lParam, RID_INPUT, buffer, ref size, (uint)RawKeyboardPacket.HeaderSize);
+            if (RawKeyboardPacket.TryRead(buffer, bytes, size, 128, out int vk, out bool down))
             {
                 _rawModifiers.Synchronize(IsKeyDown);
                 _rawModifiers.Observe(vk, down);
@@ -320,7 +352,10 @@ public class HotkeyManager : IDisposable
                     QueueActivation(version);
                 if (!down && _state.ConsumeRelease())
                     QueueRelease(version);
-                if (!IsMouseKey(_currentKey) && Environment.TickCount64 - Volatile.Read(ref _lastHookEventTick) > 250)
+                long now = Environment.TickCount64;
+                if (!IsMouseVk(Volatile.Read(ref _currentVk))
+                    && now - Volatile.Read(ref _lastHookEventTick) > 250
+                    && now - Volatile.Read(ref _lastHookInstallAttemptTick) > 2000)
                 {
                     RefreshHook();
                 }
@@ -331,25 +366,35 @@ public class HotkeyManager : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Unregister();
-        _pollWake.Set();
+        HotkeyPressed = null;
+        HotkeyReleased = null;
+        try { _pollWake.Set(); } catch (ObjectDisposedException) { }
         _pollingThread.Join(1000);
         _pollWake.Dispose();
-        if (_hookId != IntPtr.Zero)
+        IntPtr hook = Interlocked.Exchange(ref _hookId, IntPtr.Zero);
+        if (hook != IntPtr.Zero)
         {
-            UnhookWindowsHookEx(_hookId);
-            _hookId = IntPtr.Zero;
+            try { UnhookWindowsHookEx(hook); } catch { }
         }
-        RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = 1, hwndTarget = IntPtr.Zero } },
-            1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
-        _hwndSource?.RemoveHook(HwndHook);
+        try
+        {
+            RegisterRawInputDevices(new[] { new RAWINPUTDEVICE { usUsagePage = 1, usUsage = 6, dwFlags = RIDEV_REMOVE, hwndTarget = IntPtr.Zero } },
+                1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
+        }
+        catch { }
+        HwndSource? source = _hwndSource;
         _hwndSource = null;
-        if (_rawInputBuffer != IntPtr.Zero)
+        if (source != null)
         {
-            Marshal.FreeHGlobal(_rawInputBuffer);
-            _rawInputBuffer = IntPtr.Zero;
+            try { source.RemoveHook(HwndHook); } catch { }
         }
+        IntPtr buffer = Interlocked.Exchange(ref _rawInputBuffer, IntPtr.Zero);
+        if (buffer != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+        GC.SuppressFinalize(this);
     }
 }

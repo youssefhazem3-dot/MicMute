@@ -65,7 +65,6 @@ public partial class MainWindow : Window
 
     internal System.Windows.Controls.Button btnStateToggle = null!;
     internal TextBlock tbStatusText = null!;
-    internal DropShadowEffect statusGlow = null!;
     internal Border? borderStatusCapsule;
     internal System.Windows.Shapes.Ellipse? dotStatus;
     internal DropShadowEffect? dotGlow;
@@ -124,6 +123,11 @@ public partial class MainWindow : Window
     internal TextBlock? tbHeroHotkeySuffix;
     internal System.Windows.Controls.Button? btnHotkeyMode;
     internal System.Windows.Controls.Button btnRecordHotkey = null!;
+    internal System.Windows.Controls.Button? btnSettingsToggle;
+    internal RotateTransform? settingsGearRot;
+    internal RotateTransform? settingsChevronRot;
+    internal SettingsWindow? _settingsWindow;
+    internal SettingsWindow SettingsPopupWindow => _settingsWindow!;
     internal System.Windows.Controls.CheckBox cbEnableOsd = null!;
     internal Grid? panelOsdDuration;
     internal Slider sliderOsdDuration = null!;
@@ -143,7 +147,6 @@ public partial class MainWindow : Window
     internal TextBlock tbWarningMessage = null!;
     internal Border borderWarningIcon = null!;
     internal System.Windows.Shapes.Path pathWarningIcon = null!;
-    internal System.Windows.Controls.Image imgAppIcon = null!;
     internal ScrollViewer contentScrollViewer = null!;
     internal Grid? windowScaleHost;
     internal ScaleTransform? rootLayoutScaleTransform;
@@ -171,6 +174,7 @@ public partial class MainWindow : Window
     private bool _soundVolumeChangedDuringDrag;
     private bool _isPointerInteractingWithVolumeSlider;
     private int _warningSequenceId;
+    private bool _isTemporaryStatusActive;
     private int _modalSequenceId;
     private Action? _pendingModalConfirmAction;
 
@@ -178,6 +182,8 @@ public partial class MainWindow : Window
     private System.Drawing.Icon? _icoBig;
     private IntPtr _hIconSmall = IntPtr.Zero;
     private IntPtr _hIconBig = IntPtr.Zero;
+    private HwndSource? _hwndSource;
+    private SolidColorBrush? _recordingPulseBrush;
     private bool _isMinimizing;
     private bool _isRestoring;
 
@@ -186,6 +192,7 @@ public partial class MainWindow : Window
     private static readonly Geometry MoonIconGeometry = Freeze(Geometry.Parse("M21,12.79A9,9 0 1 1 11.21,3 7,7 0 0 0 21,12.79z"));
     private static readonly Geometry SunIconGeometry = Freeze(Geometry.Parse("M12,7 A5,5 0 1 0 12,17 A5,5 0 1 0 12,7 Z M11,1 H13 V4 H11 Z M11,20 H13 V23 H11 Z M1,11 H4 V13 H1 Z M20,11 H23 V13 H20 Z M4.22,3.51 L5.64,4.93 L4.22,6.34 L2.81,4.93 Z M18.36,17.66 L19.78,19.07 L18.36,20.49 L16.95,19.07 Z M4.22,20.49 L5.64,19.07 L4.22,17.66 L2.81,19.07 Z M18.36,6.34 L19.78,4.93 L18.36,3.51 L16.95,4.93 Z"));
 
+    private const int WM_DESTROY = 0x0002;
     private const int WM_SETTINGCHANGE = 0x001A;
     private const int WM_DISPLAYCHANGE = 0x007E;
     private const int WM_DPICHANGED = 0x02E0;
@@ -203,9 +210,6 @@ public partial class MainWindow : Window
     private const int ICON_SMALL2 = 2;
     private const int GCLP_HICON = -14;
     private const int GCLP_HICONSM = -34;
-
-    [DllImport("user32.dll", EntryPoint = "DestroyIcon", SetLastError = true)]
-    private static extern bool DestroyIcon(IntPtr hIcon);
 
     [DllImport("user32.dll", EntryPoint = "SetClassLongPtr", CharSet = CharSet.Auto)]
     private static extern IntPtr SetClassLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
@@ -229,9 +233,6 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
@@ -348,7 +349,6 @@ public partial class MainWindow : Window
             tbStatusText = (TextBlock)root.FindName("tbStatusText");
             dotStatus = root.FindName("dotStatus") as System.Windows.Shapes.Ellipse;
             dotGlow = root.FindName("dotGlow") as DropShadowEffect;
-            statusGlow = (DropShadowEffect)root.FindName("statusGlow") ?? dotGlow!;
             borderStatusCapsule = root.FindName("borderStatusCapsule") as Border;
             btnTitleTheme = root.FindName("btnTitleTheme") as System.Windows.Controls.Button;
             pathTitleTheme = root.FindName("pathTitleTheme") as System.Windows.Shapes.Path;
@@ -411,7 +411,6 @@ public partial class MainWindow : Window
             if (btnAppMenu != null)
             {
                 btnAppMenu.Click += BtnAppMenu_Click;
-                btnAppMenu.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
             }
 
             if (btnMenuStartupState != null)
@@ -462,31 +461,40 @@ public partial class MainWindow : Window
             tbHeroHotkeySuffix = root.FindName("tbHeroHotkeySuffix") as TextBlock;
             btnHotkeyMode = root.FindName("btnHotkeyMode") as System.Windows.Controls.Button;
             btnRecordHotkey = (System.Windows.Controls.Button)root.FindName("btnRecordHotkey");
-            cbEnableOsd = (System.Windows.Controls.CheckBox)root.FindName("cbEnableOsd");
-            panelOsdDuration = root.FindName("panelOsdDuration") as Grid;
-            sliderOsdDuration = (Slider)root.FindName("sliderOsdDuration");
+            btnSettingsToggle = root.FindName("btnSettingsToggle") as System.Windows.Controls.Button;
+            settingsGearRot = root.FindName("settingsGearRot") as RotateTransform;
+            settingsChevronRot = root.FindName("settingsChevronRot") as RotateTransform;
+            cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
+
+            // Host secondary settings inside the owned Liquid Glass Settings popup window
+            // while keeping all control bindings and handlers single-sourced on MainWindow.
+            _settingsWindow = new SettingsWindow(this);
+            _settingsWindow.OpenStateChanged += SettingsWindow_OpenStateChanged;
+
+            cbEnableOsd = _settingsWindow.cbEnableOsd;
+            panelOsdDuration = _settingsWindow.panelOsdDuration;
+            sliderOsdDuration = _settingsWindow.sliderOsdDuration;
             if (sliderOsdDuration != null)
             {
                 sliderOsdDuration.Minimum = UiBehavior.MinimumOsdDuration;
                 sliderOsdDuration.Maximum = UiBehavior.MaximumOsdDuration;
             }
-            borderOsdDurationKeycap = root.FindName("borderOsdDurationKeycap") as Border;
-            txtOsdDuration = (System.Windows.Controls.TextBox)root.FindName("txtOsdDuration");
-            cbStartup = (System.Windows.Controls.CheckBox)root.FindName("cbStartup");
-            cbStartMinimized = (System.Windows.Controls.CheckBox)root.FindName("cbStartMinimized");
-            cbLightMode = (System.Windows.Controls.CheckBox)root.FindName("cbLightMode");
-            cbRunAsAdmin = (System.Windows.Controls.CheckBox)root.FindName("cbRunAsAdmin");
-            cbSoundFeedback = (System.Windows.Controls.CheckBox)root.FindName("cbSoundFeedback");
-            panelSoundVolume = root.FindName("panelSoundVolume") as Grid;
-            sliderSoundVolume = (Slider)root.FindName("sliderSoundVolume");
+            borderOsdDurationKeycap = _settingsWindow.borderOsdDurationKeycap;
+            txtOsdDuration = _settingsWindow.txtOsdDuration;
+            cbStartup = _settingsWindow.cbStartup;
+            cbStartMinimized = _settingsWindow.cbStartMinimized;
+            cbRunAsAdmin = _settingsWindow.cbRunAsAdmin;
+            cbSoundFeedback = _settingsWindow.cbSoundFeedback;
+            panelSoundVolume = _settingsWindow.panelSoundVolume;
+            sliderSoundVolume = _settingsWindow.sliderSoundVolume;
             if (sliderSoundVolume != null)
             {
                 sliderSoundVolume.Minimum = UiBehavior.MinimumSoundVolume;
                 sliderSoundVolume.Maximum = UiBehavior.MaximumSoundVolume;
             }
-            borderSoundVolumeKeycap = root.FindName("borderSoundVolumeKeycap") as Border;
-            txtSoundVolume = (System.Windows.Controls.TextBox)root.FindName("txtSoundVolume");
-            tbStoragePath = (TextBlock)root.FindName("tbStoragePath");
+            borderSoundVolumeKeycap = _settingsWindow.borderSoundVolumeKeycap;
+            txtSoundVolume = _settingsWindow.txtSoundVolume;
+            tbStoragePath = _settingsWindow.tbStoragePath;
             borderWarning = (Border)root.FindName("borderWarning");
             tbWarningMessage = (TextBlock)root.FindName("tbWarningMessage");
             borderWarningIcon = (Border)root.FindName("borderWarningIcon");
@@ -507,9 +515,9 @@ public partial class MainWindow : Window
             panelHeroModeChips = root.FindName("panelHeroModeChips") as StackPanel;
             chipMuteLock = root.FindName("chipMuteLock") as Border;
             chipSyncAllMics = root.FindName("chipSyncAllMics") as Border;
-            btnOsdPosCenter = root.FindName("btnOsdPosCenter") as System.Windows.Controls.Button;
-            btnOsdPosBottom = root.FindName("btnOsdPosBottom") as System.Windows.Controls.Button;
-            btnOsdPosTop = root.FindName("btnOsdPosTop") as System.Windows.Controls.Button;
+            btnOsdPosCenter = _settingsWindow.btnOsdPosCenter;
+            btnOsdPosBottom = _settingsWindow.btnOsdPosBottom;
+            btnOsdPosTop = _settingsWindow.btnOsdPosTop;
             if (btnOsdPosCenter != null) btnOsdPosCenter.Click += BtnOsdPosCenter_Click;
             if (btnOsdPosBottom != null) btnOsdPosBottom.Click += BtnOsdPosBottom_Click;
             if (btnOsdPosTop != null) btnOsdPosTop.Click += BtnOsdPosTop_Click;
@@ -539,50 +547,33 @@ public partial class MainWindow : Window
             var titleBar = (Border)root.FindName("borderTitleBar");
             if (titleBar != null) titleBar.MouseLeftButtonDown += TitleBar_MouseLeftButtonDown;
             btnMin = (System.Windows.Controls.Button)root.FindName("btnMinimize");
-            if (btnMin != null)
-            {
-                btnMin.Click += MinimizeButton_Click;
-                btnMin.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
-            }
+            if (btnMin != null) btnMin.Click += MinimizeButton_Click;
             btnCls = (System.Windows.Controls.Button)root.FindName("btnClose");
-            if (btnCls != null)
+            if (btnCls != null) btnCls.Click += CloseButton_Click;
+            if (btnTitleTheme != null) btnTitleTheme.Click += BtnTitleTheme_Click;
+            if (btnSettingsToggle != null)
             {
-                btnCls.Click += CloseButton_Click;
-                btnCls.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
+                btnSettingsToggle.Click += BtnSettingsToggle_Click;
+                btnSettingsToggle.MouseEnter += (_, _) => AnimateSettingsGear(isHovered: true, isOpen: _settingsWindow?.IsSettingsOpen == true);
+                btnSettingsToggle.MouseLeave += (_, _) => AnimateSettingsGear(isHovered: false, isOpen: _settingsWindow?.IsSettingsOpen == true);
             }
-            if (btnTitleTheme != null)
-            {
-                btnTitleTheme.Click += BtnTitleTheme_Click;
-                btnTitleTheme.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
-            }
-            var btnOpenFolder = (System.Windows.Controls.Button)root.FindName("btnOpenFolder");
-            if (btnOpenFolder != null) btnOpenFolder.Click += BtnOpenDataFolder_Click;
-            var btnChangeFolder = (System.Windows.Controls.Button)root.FindName("btnChangeFolder");
-            if (btnChangeFolder != null) btnChangeFolder.Click += BtnChangeDataFolder_Click;
-            var btnResetData = (System.Windows.Controls.Button)root.FindName("btnResetData");
-            if (btnResetData != null) btnResetData.Click += BtnResetSettings_Click;
+            if (_settingsWindow.btnOpenFolder != null) _settingsWindow.btnOpenFolder.Click += BtnOpenDataFolder_Click;
+            if (_settingsWindow.btnChangeFolder != null) _settingsWindow.btnChangeFolder.Click += BtnChangeDataFolder_Click;
+            if (_settingsWindow.btnResetData != null) _settingsWindow.btnResetData.Click += BtnResetSettings_Click;
 
-            var imgIcon = (System.Windows.Controls.Image)root.FindName("imgAppIcon");
-            imgAppIcon = imgIcon;
-            if (imgIcon != null)
+            try
             {
-                try
+                using Stream? iconStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.app.ico");
+                if (iconStream != null)
                 {
-                    using (Stream? iconStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.app.ico"))
-                    {
-                        if (iconStream != null)
-                        {
-                            var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(iconStream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                            var bestFrame = decoder.Frames.OrderByDescending(f => f.PixelWidth * f.PixelHeight).FirstOrDefault() ?? decoder.Frames[0];
-                            imgIcon.Source = bestFrame;
-                            this.Icon = bestFrame;
-                        }
-                    }
+                    var decoder = BitmapDecoder.Create(iconStream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+                    var bestFrame = decoder.Frames.OrderByDescending(f => f.PixelWidth * f.PixelHeight).FirstOrDefault() ?? decoder.Frames[0];
+                    this.Icon = bestFrame;
                 }
-                catch (Exception ex)
-                {
-                    DiagnosticLogger.LogError("Failed to load embedded window icon", ex);
-                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError("Failed to load embedded window icon", ex);
             }
 
             this.ShowInTaskbar = true;
@@ -600,14 +591,11 @@ public partial class MainWindow : Window
             try { root.Close(); } catch { }
         }
 
-        if (btnStateToggle != null)
-        {
-            btnStateToggle.Click += BtnStateToggle_Click;
-            btnStateToggle.PreviewMouseLeftButtonDown += (s, e) => { if (!this.IsActive) this.Activate(); };
-        }
+        if (btnStateToggle != null) btnStateToggle.Click += BtnStateToggle_Click;
         if (cbDevices != null)
         {
             cbDevices.SelectionChanged += CbDevices_SelectionChanged;
+            cbDevices.DropDownOpened += CbDevices_DropDownOpened;
             cbDevices.DropDownClosed += CbDevices_DropDownClosed;
             _dropDownOpenHandler = (s, e) =>
             {
@@ -754,44 +742,22 @@ public partial class MainWindow : Window
                 }
             };
         }
-        if (sliderOsdDuration != null && contentScrollViewer != null)
-        {
-            sliderOsdDuration.PreviewMouseWheel += (s, e) =>
-            {
-                if (!sliderOsdDuration.IsFocused)
-                {
-                    e.Handled = true;
-                    var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
-                    {
-                        RoutedEvent = UIElement.MouseWheelEvent,
-                        Source = s
-                    };
-                    contentScrollViewer.RaiseEvent(eventArg);
-                }
-            };
-        }
-        if (sliderSoundVolume != null && contentScrollViewer != null)
-        {
-            sliderSoundVolume.PreviewMouseWheel += (s, e) =>
-            {
-                if (!sliderSoundVolume.IsFocused)
-                {
-                    e.Handled = true;
-                    var eventArg = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
-                    {
-                        RoutedEvent = UIElement.MouseWheelEvent,
-                        Source = s
-                    };
-                    contentScrollViewer.RaiseEvent(eventArg);
-                }
-            };
-        }
         this.SizeChanged += MainWindow_SizeChanged;
         this.PreviewMouseLeftButtonDown += (s, e) =>
         {
             if (!this.IsActive)
             {
                 this.Activate();
+            }
+        };
+        this.IsVisibleChanged += (_, _) =>
+        {
+            if (!this.IsVisible)
+            {
+                CloseSettingsWindow(immediate: true);
+                CloseAppMenuAnimated(immediate: true);
+                ClearThemeOverlay();
+                StopRepeatingAnimations();
             }
         };
     }
@@ -823,17 +789,8 @@ public partial class MainWindow : Window
             && root.FindName("cbDevices") is System.Windows.Controls.ComboBox
             && root.FindName("tbHotkey") is TextBlock
             && root.FindName("btnRecordHotkey") is System.Windows.Controls.Button
-            && root.FindName("cbEnableOsd") is System.Windows.Controls.CheckBox
-            && root.FindName("sliderOsdDuration") is Slider
-            && root.FindName("txtOsdDuration") is System.Windows.Controls.TextBox
-            && root.FindName("cbStartup") is System.Windows.Controls.CheckBox
-            && root.FindName("cbStartMinimized") is System.Windows.Controls.CheckBox
+            && root.FindName("btnSettingsToggle") is System.Windows.Controls.Button
             && root.FindName("cbLightMode") is System.Windows.Controls.CheckBox
-            && root.FindName("cbRunAsAdmin") is System.Windows.Controls.CheckBox
-            && root.FindName("cbSoundFeedback") is System.Windows.Controls.CheckBox
-            && root.FindName("sliderSoundVolume") is Slider
-            && root.FindName("txtSoundVolume") is System.Windows.Controls.TextBox
-            && root.FindName("tbStoragePath") is TextBlock
             && root.FindName("borderWarning") is Border
             && root.FindName("tbWarningMessage") is TextBlock
             && root.FindName("contentScrollViewer") is ScrollViewer;
@@ -891,7 +848,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) { DiagnosticLogger.LogError("Error setting window icons", ex); }
 
-        HwndSource.FromHwnd(hwnd)?.AddHook(HwndMessageHook);
+        _hwndSource = HwndSource.FromHwnd(hwnd);
+        _hwndSource?.AddHook(HwndMessageHook);
         _hotkeyManager = new HotkeyManager(hwnd);
         _hotkeyManager.HotkeyPressed += HotkeyManager_HotkeyPressed;
         _hotkeyManager.HotkeyReleased += HotkeyManager_HotkeyReleased;
@@ -958,6 +916,23 @@ public partial class MainWindow : Window
         }
         if (screen == null) return null;
 
+        var (scaleX, scaleY) = GetMonitorDpiScale(screen, hwnd, useWindowMonitor);
+        return new DipRect(
+            screen.WorkingArea.Left / scaleX,
+            screen.WorkingArea.Top / scaleY,
+            screen.WorkingArea.Width / scaleX,
+            screen.WorkingArea.Height / scaleY);
+    }
+
+    internal DipRect? GetWorkAreaForWindow(Window target)
+    {
+        IntPtr hwnd = new WindowInteropHelper(target).Handle;
+        Screen? screen = hwnd != IntPtr.Zero ? Screen.FromHandle(hwnd) : null;
+        bool useWindowMonitor = screen != null;
+        if (screen == null)
+        {
+            return GetTargetWorkAreaDip(preferCursorScreen: false);
+        }
         var (scaleX, scaleY) = GetMonitorDpiScale(screen, hwnd, useWindowMonitor);
         return new DipRect(
             screen.WorkingArea.Left / scaleX,
@@ -1034,8 +1009,40 @@ public partial class MainWindow : Window
         }
     }
 
+    private void DetachWindowHooksAndIcons(IntPtr hwnd)
+    {
+        if (_hwndSource != null)
+        {
+            _hwndSource.RemoveHook(HwndMessageHook);
+            _hwndSource = null;
+        }
+        else if (hwnd != IntPtr.Zero)
+        {
+            HwndSource.FromHwnd(hwnd)?.RemoveHook(HwndMessageHook);
+        }
+
+        if (hwnd != IntPtr.Zero)
+        {
+            if (_hIconSmall != IntPtr.Zero)
+            {
+                SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, IntPtr.Zero);
+                try { SetClassLongPtr(hwnd, GCLP_HICONSM, IntPtr.Zero); } catch { }
+            }
+            if (_hIconBig != IntPtr.Zero)
+            {
+                SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, IntPtr.Zero);
+                try { SetClassLongPtr(hwnd, GCLP_HICON, IntPtr.Zero); } catch { }
+            }
+        }
+    }
+
     private IntPtr HwndMessageHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg == WM_DESTROY)
+        {
+            DetachWindowHooksAndIcons(hwnd);
+            return IntPtr.Zero;
+        }
         if (msg == WM_GETICON)
         {
             int iconType = wParam.ToInt32();
@@ -1182,12 +1189,10 @@ public partial class MainWindow : Window
 
         if (AdminManager.IsRunningAsAdmin())
         {
-            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute (Administrator Mode)";
             tbStatusText.ToolTip = "Administrator Mode Active: Hotkeys enabled over anti-cheat and elevated windows";
         }
         else
         {
-            if (imgAppIcon != null) imgAppIcon.ToolTip = "Mic Mute";
             tbStatusText.ToolTip = "Mic Mute Active: In-game hotkeys and OSD ready";
         }
 
@@ -1273,6 +1278,8 @@ public partial class MainWindow : Window
         if (btnOsdPosCenter != null) btnOsdPosCenter.Tag = normalized == "Center" ? "Selected" : null;
         if (btnOsdPosBottom != null) btnOsdPosBottom.Tag = normalized == "Bottom" ? "Selected" : null;
         if (btnOsdPosTop != null) btnOsdPosTop.Tag = normalized == "Top" ? "Selected" : null;
+        int pillIndex = normalized switch { "Bottom" => 1, "Top" => 2, _ => 0 };
+        _settingsWindow?.UpdateOsdPositionPill(pillIndex, animate: _isInitialized && !_isReloadingSettings);
     }
 
     private void UpdateHeroModeChips(AppSettings settings)
@@ -1359,6 +1366,22 @@ public partial class MainWindow : Window
             if (Math.Abs(rootLayoutScaleTransform.ScaleY - clampedScale) > 0.0005)
                 rootLayoutScaleTransform.ScaleY = clampedScale;
         }
+
+        // Display text formatting pre-snaps glyphs to unscaled 1.0 pixel boundaries before
+        // PopupRoot scales them, causing blurry text on adaptively scaled laptop displays.
+        // Switch popup text formatting to Ideal+Auto whenever the window is scaled below 1.0.
+        bool isScaled = clampedScale < 0.999;
+        TextFormattingMode targetFormatting = isScaled ? TextFormattingMode.Ideal : TextFormattingMode.Display;
+        TextRenderingMode targetRendering = isScaled ? TextRenderingMode.Auto : TextRenderingMode.ClearType;
+        if (this.Resources["PopupTextFormattingMode"] is not TextFormattingMode curFmt || curFmt != targetFormatting)
+        {
+            this.Resources["PopupTextFormattingMode"] = targetFormatting;
+        }
+        if (this.Resources["PopupTextRenderingMode"] is not TextRenderingMode curRnd || curRnd != targetRendering)
+        {
+            this.Resources["PopupTextRenderingMode"] = targetRendering;
+        }
+
         if (changed)
         {
             windowScaleHost?.InvalidateMeasure();
@@ -1407,8 +1430,66 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CbDevices_DropDownOpened(object? sender, EventArgs e)
+    {
+        if (cbDevices?.Template == null) return;
+        var ddBorder = cbDevices.Template.FindName("dropDownBorder", cbDevices) as Border;
+        if (ddBorder == null) return;
+
+        var ddScale = cbDevices.Template.FindName("dropDownScale", cbDevices) as ScaleTransform;
+        var ddTrans = cbDevices.Template.FindName("dropDownTranslate", cbDevices) as TranslateTransform;
+
+        if (!IsLoaded || !IsVisible)
+        {
+            ddBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            ddBorder.Opacity = 1.0;
+            if (ddScale != null) ddScale.ScaleY = 1.0;
+            if (ddTrans != null) ddTrans.Y = 0.0;
+            return;
+        }
+
+        UiMotion.EnableTransientCache(ddBorder, this);
+        ddBorder.BeginAnimation(UIElement.OpacityProperty, null);
+        ddBorder.Opacity = 0.0;
+        DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate };
+        fadeIn.Completed += (_, _) =>
+        {
+            UiMotion.ClearTransientCache(ddBorder);
+            ddBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            ddBorder.Opacity = 1.0;
+            if (ddTrans != null)
+            {
+                ddTrans.BeginAnimation(TranslateTransform.YProperty, null);
+                ddTrans.Y = 0.0;
+            }
+            if (ddScale != null)
+            {
+                ddScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                ddScale.ScaleY = 1.0;
+            }
+        };
+        ddBorder.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+
+        if (ddTrans != null)
+        {
+            ddTrans.BeginAnimation(TranslateTransform.YProperty, null);
+            ddTrans.Y = -6.0;
+            ddTrans.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-6.0, 0.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
+        }
+        if (ddScale != null)
+        {
+            ddScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            ddScale.ScaleY = 0.96;
+            ddScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.96, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
+        }
+    }
+
     private void CbDevices_DropDownClosed(object? sender, EventArgs e)
     {
+        if (cbDevices?.Template?.FindName("dropDownBorder", cbDevices) is Border ddBorder)
+        {
+            UiMotion.ClearTransientCache(ddBorder);
+        }
         if (_pendingDeviceList != null)
         {
             var pending = _pendingDeviceList;
@@ -1810,7 +1891,7 @@ public partial class MainWindow : Window
     }
 
     // =========================================================================
-    // DaVinci Resolve-style Top-Left App Menu Handlers (Placeholders for Future Features)
+    // DaVinci Resolve-style Top-Left App Menu Handlers
     // =========================================================================
 
     public void BtnAppMenu_Click(object sender, RoutedEventArgs e)
@@ -1819,7 +1900,7 @@ public partial class MainWindow : Window
 
         if (popupAppMenu.IsOpen)
         {
-            popupAppMenu.IsOpen = false;
+            CloseAppMenuAnimated();
             return;
         }
 
@@ -1831,6 +1912,98 @@ public partial class MainWindow : Window
         }
 
         popupAppMenu.IsOpen = true;
+    }
+
+    public void BtnSettingsToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsWindow == null || _isDisposed) return;
+
+        if (_settingsWindow.IsSettingsOpen)
+        {
+            CloseSettingsWindow(immediate: false);
+        }
+        else
+        {
+            OpenSettingsWindow();
+        }
+    }
+
+    internal void OpenSettingsWindow()
+    {
+        if (_settingsWindow == null || _isDisposed) return;
+
+        if (popupAppMenu != null && popupAppMenu.IsOpen)
+        {
+            popupAppMenu.IsOpen = false;
+        }
+
+        DipRect workArea = GetTargetWorkAreaDip(preferCursorScreen: false)
+            ?? new DipRect(0, 0, SystemParameters.WorkArea.Width, SystemParameters.WorkArea.Height);
+        double anchorW = ActualWidth > 0 ? ActualWidth : Width;
+        double anchorH = ActualHeight > 0 ? ActualHeight : MeasureUnscaledContentHeight() * _currentUiScale;
+        DipRect anchorBounds = new DipRect(Left, Top, anchorW, anchorH);
+
+        _settingsWindow.ShowSettings(workArea, anchorBounds);
+    }
+
+    internal void CloseSettingsWindow(bool immediate = false)
+    {
+        _settingsWindow?.HideSettings(immediate);
+    }
+
+    private void SettingsWindow_OpenStateChanged(bool isOpen)
+    {
+        if (btnSettingsToggle != null)
+        {
+            btnSettingsToggle.Tag = isOpen ? "Open" : null;
+        }
+        AnimateSettingsGear(isHovered: btnSettingsToggle?.IsMouseOver == true, isOpen: isOpen, isStateToggle: true);
+
+        if (settingsChevronRot != null)
+        {
+            double targetChevron = isOpen ? 180.0 : 0.0;
+            if (IsLoaded && IsVisible)
+            {
+                DoubleAnimation chevAnim = new DoubleAnimation(targetChevron, UiMotion.Standard)
+                {
+                    EasingFunction = UiMotion.Decelerate
+                };
+                settingsChevronRot.BeginAnimation(RotateTransform.AngleProperty, chevAnim);
+            }
+            else
+            {
+                settingsChevronRot.BeginAnimation(RotateTransform.AngleProperty, null);
+                settingsChevronRot.Angle = targetChevron;
+            }
+        }
+    }
+
+    private void AnimateSettingsGear(bool isHovered, bool isOpen, bool isStateToggle = false)
+    {
+        if (settingsGearRot == null) return;
+
+        double targetAngle = (isOpen, isHovered) switch
+        {
+            (true, true) => 225.0,
+            (true, false) => 180.0,
+            (false, true) => 45.0,
+            (false, false) => 0.0
+        };
+
+        if (IsLoaded && IsVisible)
+        {
+            Duration dur = isStateToggle ? UiMotion.Emphasized : UiMotion.Standard;
+            DoubleAnimation gearAnim = new DoubleAnimation(targetAngle, dur)
+            {
+                EasingFunction = UiMotion.Decelerate
+            };
+            settingsGearRot.BeginAnimation(RotateTransform.AngleProperty, gearAnim);
+        }
+        else
+        {
+            settingsGearRot.BeginAnimation(RotateTransform.AngleProperty, null);
+            settingsGearRot.Angle = targetAngle;
+        }
     }
 
     public void BtnHotkeyMode_Click(object sender, RoutedEventArgs e)
@@ -1846,38 +2019,124 @@ public partial class MainWindow : Window
             : "Shortcut mode: Toggle.");
     }
 
+    private bool _isClosingAppMenu;
+
+    private void CloseAppMenuAnimated(bool immediate = false)
+    {
+        if (popupAppMenu == null || !popupAppMenu.IsOpen) return;
+
+        if (immediate || !IsLoaded || !IsVisible || borderAppMenu == null)
+        {
+            _isClosingAppMenu = false;
+            UiMotion.ClearTransientCache(borderAppMenu);
+            popupAppMenu.IsOpen = false;
+            return;
+        }
+
+        if (_isClosingAppMenu) return;
+        _isClosingAppMenu = true;
+
+        if (appMenuChevronRot != null)
+        {
+            appMenuChevronRot.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0.0, UiMotion.Standard)
+            {
+                EasingFunction = UiMotion.Decelerate
+            });
+        }
+
+        UiMotion.EnableTransientCache(borderAppMenu, this);
+        Duration dur = new Duration(TimeSpan.FromMilliseconds(100));
+        DoubleAnimation fadeOut = new DoubleAnimation(borderAppMenu.Opacity, 0.0, dur)
+        {
+            EasingFunction = UiMotion.Accelerate
+        };
+        fadeOut.Completed += (_, _) =>
+        {
+            _isClosingAppMenu = false;
+            UiMotion.ClearTransientCache(borderAppMenu);
+            if (popupAppMenu != null && popupAppMenu.IsOpen)
+            {
+                popupAppMenu.IsOpen = false;
+            }
+            borderAppMenu.BeginAnimation(UIElement.OpacityProperty, null);
+            borderAppMenu.Opacity = 1.0;
+        };
+        borderAppMenu.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+        if (appMenuTranslate != null)
+        {
+            appMenuTranslate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(appMenuTranslate.Y, -4.0, dur)
+            {
+                EasingFunction = UiMotion.Accelerate
+            });
+        }
+        if (appMenuScale != null)
+        {
+            appMenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(appMenuScale.ScaleY, 0.97, dur)
+            {
+                EasingFunction = UiMotion.Accelerate
+            });
+        }
+    }
+
     private void AnimateAppMenuOpenState(bool isOpen)
     {
         if (appMenuChevronRot != null)
         {
-            DoubleAnimation chevAnim = new DoubleAnimation(isOpen ? 180.0 : 0.0, TimeSpan.FromMilliseconds(160))
+            DoubleAnimation chevAnim = new DoubleAnimation(isOpen ? 180.0 : 0.0, UiMotion.Standard)
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = UiMotion.Decelerate
             };
             appMenuChevronRot.BeginAnimation(RotateTransform.AngleProperty, chevAnim);
         }
 
         if (isOpen && borderAppMenu != null)
         {
-            CubicEase ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            Duration dur = TimeSpan.FromMilliseconds(160);
+            _isClosingAppMenu = false;
+            UiMotion.EnableTransientCache(borderAppMenu, this);
+            IEasingFunction ease = UiMotion.Decelerate;
+            Duration dur = UiMotion.Fast;
 
             borderAppMenu.BeginAnimation(UIElement.OpacityProperty, null);
             borderAppMenu.Opacity = 0.0;
-            borderAppMenu.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.0, 1.0, dur) { EasingFunction = ease });
+            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, dur) { EasingFunction = ease };
+            fadeIn.Completed += (_, _) =>
+            {
+                if (!_isClosingAppMenu)
+                {
+                    UiMotion.ClearTransientCache(borderAppMenu);
+                    borderAppMenu.BeginAnimation(UIElement.OpacityProperty, null);
+                    borderAppMenu.Opacity = 1.0;
+                    if (appMenuTranslate != null)
+                    {
+                        appMenuTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+                        appMenuTranslate.Y = 0.0;
+                    }
+                    if (appMenuScale != null)
+                    {
+                        appMenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                        appMenuScale.ScaleY = 1.0;
+                    }
+                }
+            };
+            borderAppMenu.BeginAnimation(UIElement.OpacityProperty, fadeIn);
 
             if (appMenuTranslate != null)
             {
                 appMenuTranslate.BeginAnimation(TranslateTransform.YProperty, null);
-                appMenuTranslate.Y = -5.0;
-                appMenuTranslate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-5.0, 0.0, dur) { EasingFunction = ease });
+                appMenuTranslate.Y = -6.0;
+                appMenuTranslate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-6.0, 0.0, dur) { EasingFunction = ease });
             }
             if (appMenuScale != null)
             {
                 appMenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                appMenuScale.ScaleY = 0.97;
-                appMenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.97, 1.0, dur) { EasingFunction = ease });
+                appMenuScale.ScaleY = 0.96;
+                appMenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.96, 1.0, dur) { EasingFunction = ease });
             }
+        }
+        else if (!isOpen)
+        {
+            _isClosingAppMenu = false;
+            UiMotion.ClearTransientCache(borderAppMenu);
         }
     }
 
@@ -1928,7 +2187,14 @@ public partial class MainWindow : Window
 
     private void ScheduleAutomaticUpdateChecks()
     {
-        _updateCts?.Dispose();
+        if (_periodicUpdateTimer != null)
+        {
+            _periodicUpdateTimer.Stop();
+            _periodicUpdateTimer.Tick -= PeriodicUpdateTimer_Tick;
+            _periodicUpdateTimer = null;
+        }
+        try { _updateCts?.Cancel(); } catch { }
+        try { _updateCts?.Dispose(); } catch { }
         _updateCts = new CancellationTokenSource();
         CancellationToken ct = _updateCts.Token;
 
@@ -1951,18 +2217,22 @@ public partial class MainWindow : Window
         {
             Interval = TimeSpan.FromHours(6)
         };
-        _periodicUpdateTimer.Tick += (_, _) =>
-        {
-            if (!_isDisposed && _updateCts != null && !_updateCts.IsCancellationRequested)
-            {
-                _ = CheckAndAutoUpdateAsync(isAutomatic: true, _updateCts.Token);
-            }
-        };
+        _periodicUpdateTimer.Tick += PeriodicUpdateTimer_Tick;
         _periodicUpdateTimer.Start();
+    }
+
+    private void PeriodicUpdateTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_isDisposed && _updateCts != null && !_updateCts.IsCancellationRequested)
+        {
+            _ = CheckAndAutoUpdateAsync(isAutomatic: true, _updateCts.Token);
+        }
     }
 
     public void BtnMenuCheckUpdates_Click(object sender, RoutedEventArgs e)
     {
+        if (_isDisposed) return;
+
         if (popupAppMenu != null)
         {
             popupAppMenu.IsOpen = false;
@@ -2141,6 +2411,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private void StopRepeatingAnimations()
+    {
+        StopRecordingHotkeyBorderPulse();
+        if (dotTitleUpdate != null)
+        {
+            dotTitleUpdate.BeginAnimation(UIElement.OpacityProperty, null);
+            dotTitleUpdate.Opacity = 1.0;
+        }
+        SetSpinAnimation(menuUpdateIconRot, active: false);
+        SetSpinAnimation(updateBannerIconRot, active: false);
+        if (updateProgressIndeterminateTrans != null)
+        {
+            updateProgressIndeterminateTrans.BeginAnimation(TranslateTransform.XProperty, null);
+            updateProgressIndeterminateTrans.X = 0;
+        }
+    }
+
     private async Task CheckAndAutoUpdateAsync(bool isAutomatic, CancellationToken cancellationToken)
     {
         if (!isAutomatic)
@@ -2223,7 +2510,7 @@ public partial class MainWindow : Window
                         showBanner: false);
                     if (showManualFeedback)
                     {
-                        ShowTemporaryStatus(result.Message);
+                        HideWarningSurfaceImmediate();
                         ShowInfoModal(
                             "You're up to date!",
                             $"MicMute v{currentVer} is already the latest version.",
@@ -2394,6 +2681,7 @@ public partial class MainWindow : Window
         {
             popupAppMenu.IsOpen = false;
         }
+        CloseSettingsWindow(immediate: true);
 
         if (!IsLoaded || !IsVisible || ActualWidth <= 0 || rootBorder == null || rootScaleTransform == null || rootTranslateTransform == null)
         {
@@ -2405,22 +2693,22 @@ public partial class MainWindow : Window
         _isMinimizing = true;
         _isRestoring = false;
 
-        // Cancel any pending animations
+        // Cancel any pending animations and enable transient GPU caching during whole-window transition
+        UiMotion.EnableTransientCache(rootBorder, this);
         rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
         rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
 
-        const int animMs = 240;
-        var duration = new Duration(TimeSpan.FromMilliseconds(animMs));
-        var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
+        Duration duration = new Duration(TimeSpan.FromMilliseconds(180));
+        IEasingFunction ease = UiMotion.Accelerate;
 
         var opacityAnim = new DoubleAnimation(rootBorder.Opacity, 0.0, duration) { EasingFunction = ease };
-        var scaleXAnim = new DoubleAnimation(rootScaleTransform.ScaleX, 0.92, duration) { EasingFunction = ease };
-        var scaleYAnim = new DoubleAnimation(rootScaleTransform.ScaleY, 0.92, duration) { EasingFunction = ease };
+        var scaleXAnim = new DoubleAnimation(rootScaleTransform.ScaleX, 0.94, duration) { EasingFunction = ease };
+        var scaleYAnim = new DoubleAnimation(rootScaleTransform.ScaleY, 0.94, duration) { EasingFunction = ease };
         var transXAnim = new DoubleAnimation(rootTranslateTransform.X, 0.0, duration) { EasingFunction = ease };
-        var transYAnim = new DoubleAnimation(rootTranslateTransform.Y, 20.0, duration) { EasingFunction = ease };
+        var transYAnim = new DoubleAnimation(rootTranslateTransform.Y, 16.0, duration) { EasingFunction = ease };
 
         opacityAnim.Completed += (s, ev) =>
         {
@@ -2431,6 +2719,7 @@ public partial class MainWindow : Window
             finally
             {
                 _isMinimizing = false;
+                UiMotion.ClearTransientCache(rootBorder);
 
                 rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
                 rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
@@ -2440,10 +2729,10 @@ public partial class MainWindow : Window
 
                 // Keep Opacity at 0.0 while minimized to eliminate the single-frame flash before Windows completes hiding the HWND
                 rootBorder.Opacity = 0.0;
-                rootScaleTransform.ScaleX = 0.92;
-                rootScaleTransform.ScaleY = 0.92;
+                rootScaleTransform.ScaleX = 0.94;
+                rootScaleTransform.ScaleY = 0.94;
                 rootTranslateTransform.X = 0.0;
-                rootTranslateTransform.Y = 20.0;
+                rootTranslateTransform.Y = 16.0;
             }
         };
 
@@ -2466,7 +2755,7 @@ public partial class MainWindow : Window
         else if (WindowState == WindowState.Minimized)
         {
             _isRestoring = false;
-            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(App.TrimWorkingSet));
+            CloseSettingsWindow(immediate: true);
         }
     }
 
@@ -2484,6 +2773,7 @@ public partial class MainWindow : Window
 
     private void ResetRootTransformsToIdentity()
     {
+        UiMotion.ClearTransientCache(rootBorder);
         if (rootBorder != null)
         {
             rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
@@ -2519,7 +2809,8 @@ public partial class MainWindow : Window
         _isRestoring = true;
         _isMinimizing = false;
 
-        // Cancel any pending animations
+        // Cancel any pending animations and cache visual tree into GPU bitmap for silky motion
+        UiMotion.EnableTransientCache(rootBorder, this);
         rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
@@ -2527,20 +2818,18 @@ public partial class MainWindow : Window
         rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
 
         rootBorder.Opacity = 0.0;
-        rootScaleTransform.ScaleX = 0.92;
-        rootScaleTransform.ScaleY = 0.92;
+        rootScaleTransform.ScaleX = 0.94;
+        rootScaleTransform.ScaleY = 0.94;
         rootTranslateTransform.X = 0.0;
-        rootTranslateTransform.Y = 20.0;
+        rootTranslateTransform.Y = 16.0;
 
-        const int animMs = 280;
-        var duration = new Duration(TimeSpan.FromMilliseconds(animMs));
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        Duration duration = new Duration(TimeSpan.FromMilliseconds(240));
+        IEasingFunction ease = UiMotion.Decelerate;
 
         var opacityAnim = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = ease };
-        var scaleXAnim = new DoubleAnimation(0.92, 1.0, duration) { EasingFunction = ease };
-        var scaleYAnim = new DoubleAnimation(0.92, 1.0, duration) { EasingFunction = ease };
-        var transXAnim = new DoubleAnimation(0.0, 0.0, duration) { EasingFunction = ease };
-        var transYAnim = new DoubleAnimation(20.0, 0.0, duration) { EasingFunction = ease };
+        var scaleXAnim = new DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease };
+        var scaleYAnim = new DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease };
+        var transYAnim = new DoubleAnimation(16.0, 0.0, duration) { EasingFunction = ease };
 
         scaleXAnim.Completed += (s, ev) =>
         {
@@ -2551,7 +2840,6 @@ public partial class MainWindow : Window
         rootBorder.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnim);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnim);
-        rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, transXAnim);
         rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, transYAnim);
     }
 
@@ -2595,40 +2883,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Convert tray point from physical pixels to WPF DIPs
-        DpiScale dpi = VisualTreeHelper.GetDpi(this);
-        double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
-        double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
-
-        double curWidth = this.ActualWidth > 0 ? this.ActualWidth : Math.Ceiling(_preferredWidth * _currentUiScale);
-        double curHeight = this.ActualHeight > 0 ? this.ActualHeight : 440.0;
-        double winCenterDipX = this.Left + curWidth / 2.0;
-        double winCenterDipY = this.Top + curHeight / 2.0;
-
-        double trayDipX;
-        double trayDipY;
-
-        if (trayPixelPoint.HasValue && (trayPixelPoint.Value.X != 0 || trayPixelPoint.Value.Y != 0))
-        {
-            trayDipX = trayPixelPoint.Value.X / dpiX;
-            trayDipY = trayPixelPoint.Value.Y / dpiY;
-        }
-        else
-        {
-            var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)(winCenterDipX * dpiX), (int)(winCenterDipY * dpiY))) ?? System.Windows.Forms.Screen.PrimaryScreen;
-            var wa = screen?.WorkingArea ?? new System.Drawing.Rectangle(0, 0, (int)(1920 * dpiX), (int)(1080 * dpiY));
-            trayDipX = (wa.Right - 40) / dpiX;
-            trayDipY = (wa.Bottom - 20) / dpiY;
-        }
-
-        double safeUiScale = _currentUiScale > 0 ? _currentUiScale : 1.0;
-        double startDeltaX = (trayDipX - winCenterDipX) / safeUiScale;
-        double startDeltaY = (trayDipY - winCenterDipY) / safeUiScale;
-
-        const double initialScale = 0.70;
+        // Subtle, unclipped in-bounds lift (never translates outside the window rectangle)
+        const double initialScale = 0.94;
+        const double startDeltaY = 18.0;
         rootScaleTransform.ScaleX = initialScale;
         rootScaleTransform.ScaleY = initialScale;
-        rootTranslateTransform.X = startDeltaX;
+        rootTranslateTransform.X = 0.0;
         rootTranslateTransform.Y = startDeltaY;
         rootBorder.Opacity = 0.0;
 
@@ -2645,38 +2905,25 @@ public partial class MainWindow : Window
             SetForegroundWindow(hwnd);
         }
 
-        const int animMs = 280;
-        var duration = new Duration(TimeSpan.FromMilliseconds(animMs));
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        UiMotion.EnableTransientCache(rootBorder, this);
+        Duration duration = UiMotion.Emphasized;
+        IEasingFunction ease = UiMotion.Decelerate;
 
         var opacityAnim = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = ease };
         var scaleXAnim = new DoubleAnimation(initialScale, 1.0, duration) { EasingFunction = ease };
         var scaleYAnim = new DoubleAnimation(initialScale, 1.0, duration) { EasingFunction = ease };
-        var transXAnim = new DoubleAnimation(startDeltaX, 0.0, duration) { EasingFunction = ease };
         var transYAnim = new DoubleAnimation(startDeltaY, 0.0, duration) { EasingFunction = ease };
 
         scaleXAnim.Completed += (s, ev) =>
         {
             _isOpenFromTrayActive = false;
             _isRestoring = false;
-
-            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
-            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
-            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-
-            rootBorder.Opacity = 1.0;
-            rootScaleTransform.ScaleX = 1.0;
-            rootScaleTransform.ScaleY = 1.0;
-            rootTranslateTransform.X = 0.0;
-            rootTranslateTransform.Y = 0.0;
+            ResetRootTransformsToIdentity();
         };
 
         rootBorder.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnim);
         rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnim);
-        rootTranslateTransform.BeginAnimation(TranslateTransform.XProperty, transXAnim);
         rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, transYAnim);
     }
 
@@ -2706,11 +2953,22 @@ public partial class MainWindow : Window
         tbHotkey.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
         if (tbHeroHotkey != null) tbHeroHotkey.Text = "...";
         ApplyRecordingHotkeyBorderPulse();
+        PreviewKeyDown -= MainWindow_PreviewKeyDown;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
+    }
+
+    private void StopRecordingHotkeyBorderPulse()
+    {
+        if (_recordingPulseBrush != null)
+        {
+            _recordingPulseBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+            _recordingPulseBrush = null;
+        }
     }
 
     private void ApplyRecordingHotkeyBorderPulse()
     {
+        StopRecordingHotkeyBorderPulse();
         if (borderHotkey == null) return;
         System.Windows.Media.Color accent = TryFindResource("AccentColor") is System.Windows.Media.Color themeAccent
             ? themeAccent
@@ -2718,6 +2976,7 @@ public partial class MainWindow : Window
                 ? System.Windows.Media.Color.FromRgb(71, 85, 105)
                 : System.Windows.Media.Color.FromRgb(255, 255, 255));
         SolidColorBrush pulseBrush = new SolidColorBrush(accent);
+        _recordingPulseBrush = pulseBrush;
         borderHotkey.BorderBrush = pulseBrush;
         if (IsLoaded && IsVisible)
         {
@@ -2744,6 +3003,7 @@ public partial class MainWindow : Window
     {
         _isRecordingHotkey = false;
         _holdToggledActive = false;
+        StopRecordingHotkeyBorderPulse();
         btnRecordHotkey.Content = "Record";
         if (borderHotkey != null)
         {
@@ -2854,8 +3114,8 @@ public partial class MainWindow : Window
 
         if (IsLoaded && IsVisible)
         {
-            CubicEase ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            Duration dur = TimeSpan.FromMilliseconds(160);
+            IEasingFunction ease = UiMotion.Decelerate;
+            Duration dur = UiMotion.Fast;
             borderWarning.Opacity = wasCollapsed ? 0.0 : borderWarning.Opacity;
             DoubleAnimation fadeIn = new DoubleAnimation(wasCollapsed ? 0.0 : borderWarning.Opacity, 1.0, dur) { EasingFunction = ease };
             fadeIn.Completed += (_, _) =>
@@ -2895,8 +3155,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private void HideWarningSurfaceImmediate()
+    {
+        _isTemporaryStatusActive = false;
+        _warningSequenceId++;
+        if (borderWarning == null) return;
+        borderWarning.BeginAnimation(UIElement.OpacityProperty, null);
+        borderWarning.Opacity = 1.0;
+        borderWarning.Visibility = Visibility.Collapsed;
+        if (warningTranslate != null)
+        {
+            warningTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+            warningTranslate.Y = 0.0;
+        }
+    }
+
     private void HideWarningSurfaceAnimated()
     {
+        _isTemporaryStatusActive = false;
         if (borderWarning == null || borderWarning.Visibility != Visibility.Visible) return;
         int seq = ++_warningSequenceId;
 
@@ -2908,9 +3184,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        DoubleAnimation fadeOut = new DoubleAnimation(borderWarning.Opacity, 0.0, TimeSpan.FromMilliseconds(140))
+        DoubleAnimation fadeOut = new DoubleAnimation(borderWarning.Opacity, 0.0, UiMotion.Exit)
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            EasingFunction = UiMotion.Accelerate
         };
         fadeOut.Completed += (_, _) =>
         {
@@ -2924,9 +3200,10 @@ public partial class MainWindow : Window
         borderWarning.BeginAnimation(UIElement.OpacityProperty, fadeOut);
     }
 
-    private void ShowTemporaryStatus(string message)
+    internal void ShowTemporaryStatus(string message)
     {
         if (_isDisposed) return;
+        _isTemporaryStatusActive = true;
         if (pathWarningIcon != null)
         {
             bool isWarning = message.StartsWith("Could not", StringComparison.OrdinalIgnoreCase) ||
@@ -3003,6 +3280,7 @@ public partial class MainWindow : Window
 
     private void ShowWarningMessage(string labelText, string micName)
     {
+        _isTemporaryStatusActive = false;
         if (pathWarningIcon != null)
         {
             pathWarningIcon.Data = IconWarning;
@@ -3236,7 +3514,6 @@ public partial class MainWindow : Window
 
             dict["ScrollBarThumbBrush"] = Alpha(40, 0, 0, 0);
             dict["ScrollBarThumbHoverBrush"] = Alpha(70, 0, 0, 0);
-            dict["ScrollBarThumbDragBrush"] = Alpha(100, 0, 0, 0);
 
             dict["MenuBadgeActiveBgBrush"] = Solid(71, 85, 105);
             dict["MenuBadgeActiveTextBrush"] = Solid(255, 255, 255);
@@ -3327,7 +3604,6 @@ public partial class MainWindow : Window
 
             dict["ScrollBarThumbBrush"] = Alpha(36, 255, 255, 255);
             dict["ScrollBarThumbHoverBrush"] = Alpha(65, 255, 255, 255);
-            dict["ScrollBarThumbDragBrush"] = Alpha(100, 255, 255, 255);
 
             dict["MenuBadgeActiveBgBrush"] = Solid(228, 228, 231);
             dict["MenuBadgeActiveTextBrush"] = Solid(24, 24, 27);
@@ -3357,6 +3633,7 @@ public partial class MainWindow : Window
         bool animateTransition = IsLoaded && IsVisible && ActualWidth > 0 && rootBorder != null && themeTransitionOverlay != null;
         if (animateTransition)
         {
+            _settingsWindow?.CaptureThemeSnapshotIfVisible();
             try
             {
                 var dpi = VisualTreeHelper.GetDpi(this);
@@ -3368,7 +3645,8 @@ public partial class MainWindow : Window
 
                 var imgBrush = new ImageBrush(rtb);
                 imgBrush.Freeze();
-                themeTransitionOverlay!.Fill = imgBrush;
+                themeTransitionOverlay!.BeginAnimation(UIElement.OpacityProperty, null);
+                themeTransitionOverlay.Fill = imgBrush;
                 themeTransitionOverlay.Opacity = 1.0;
                 themeTransitionOverlay.Visibility = Visibility.Visible;
             }
@@ -3415,6 +3693,7 @@ public partial class MainWindow : Window
         {
             popupAppMenu.Resources = this.Resources;
         }
+        _settingsWindow?.SyncThemeResources(this.Resources);
 
         if (_isRecordingHotkey)
         {
@@ -3430,30 +3709,27 @@ public partial class MainWindow : Window
         if (animateTransition && themeTransitionOverlay != null)
         {
             // Flush layout and resource changes synchronously under the opaque snapshot overlay
-            // so there is zero layout work or resource thrashing during the crossfade animation.
+            // so both MainWindow and SettingsWindow crossfade together in lockstep.
             UpdateLayout();
+            _settingsWindow?.PlayThemeCrossfadeIfVisible();
 
-            // Slower by 20%: 260ms * 1.20 = 312ms
-            const int animMs = 312;
             if (themeIconRot != null)
             {
-                var rotAnim = new DoubleAnimation(0, 360, new Duration(TimeSpan.FromMilliseconds(animMs)))
+                var rotAnim = new DoubleAnimation(-90, 0, UiMotion.Standard)
                 {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                    EasingFunction = UiMotion.Decelerate
                 };
                 themeIconRot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
             }
 
-            var fadeOut = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromMilliseconds(animMs)))
+            var fadeOut = new DoubleAnimation(1.0, 0.0, UiMotion.Standard)
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = UiMotion.Decelerate
             };
             fadeOut.Completed += (s, ev) =>
             {
                 if (transitionVersion != _themeTransitionVersion) return;
-                themeTransitionOverlay.Opacity = 0.0;
-                themeTransitionOverlay.Visibility = Visibility.Collapsed;
-                themeTransitionOverlay.Fill = null;
+                ClearThemeOverlay();
             };
             themeTransitionOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
         }
@@ -3461,6 +3737,18 @@ public partial class MainWindow : Window
         {
             themeIconRot.BeginAnimation(RotateTransform.AngleProperty, null);
             themeIconRot.Angle = 0;
+        }
+    }
+
+    private void ClearThemeOverlay()
+    {
+        _themeTransitionVersion++;
+        if (themeTransitionOverlay != null)
+        {
+            themeTransitionOverlay.BeginAnimation(UIElement.OpacityProperty, null);
+            themeTransitionOverlay.Opacity = 0.0;
+            themeTransitionOverlay.Visibility = Visibility.Collapsed;
+            themeTransitionOverlay.Fill = null;
         }
     }
 
@@ -3526,9 +3814,9 @@ public partial class MainWindow : Window
         if (IsLoaded && IsVisible && !_isReloadingSettings)
         {
             double fromOpacity = enabled ? 0.45 : 1.0;
-            DoubleAnimation anim = new DoubleAnimation(fromOpacity, targetOpacity, TimeSpan.FromMilliseconds(180))
+            DoubleAnimation anim = new DoubleAnimation(fromOpacity, targetOpacity, UiMotion.Fast)
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = UiMotion.Decelerate
             };
             anim.Completed += (_, _) =>
             {
@@ -3678,8 +3966,8 @@ public partial class MainWindow : Window
             e.Handled = true;
             int restoreVal = _soundVolumeBeforeEdit ?? SettingsManager.Load().SoundVolume;
             SettingsManager.Save(SettingsManager.Load() with { SoundVolume = restoreVal });
+            _volumeAudioDebouncer.Cancel();
             AudioFeedback.SetVolume(restoreVal);
-            _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(1), () => AudioFeedback.SetVolume(restoreVal));
             _isUpdatingSoundVolumeTextFromSlider = true;
             sliderSoundVolume.Value = restoreVal;
             txtSoundVolume.Text = UiBehavior.FormatSoundVolume(restoreVal);
@@ -3723,8 +4011,8 @@ public partial class MainWindow : Window
             {
                 SoundVolume = clamped
             });
+            _volumeAudioDebouncer.Cancel();
             AudioFeedback.SetVolume(clamped);
-            _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(1), () => AudioFeedback.SetVolume(clamped));
             _isUpdatingSoundVolumeTextFromSlider = true;
             sliderSoundVolume.Value = clamped;
             txtSoundVolume.Text = UiBehavior.FormatSoundVolume(clamped);
@@ -3819,6 +4107,12 @@ public partial class MainWindow : Window
 
     internal void ShowConfirmationModal(string title, string message, string confirmLabel, Action onConfirm, bool isDanger = false)
     {
+        if (_settingsWindow != null && _settingsWindow.IsVisible && _settingsWindow.IsActive)
+        {
+            _settingsWindow.ShowConfirmationModal(title, message, confirmLabel, onConfirm, isDanger);
+            return;
+        }
+
         if (borderModalOverlay == null || tbModalTitle == null || tbModalMessage == null || btnModalConfirm == null)
         {
             onConfirm();
@@ -3847,6 +4141,13 @@ public partial class MainWindow : Window
     {
         if (borderModalOverlay == null) return;
 
+        // Collapse any transient bottom status toast before presenting the modal so the
+        // SizeToContent window height stays fixed and the centered modal never shifts vertically.
+        if (_isTemporaryStatusActive)
+        {
+            HideWarningSurfaceImmediate();
+        }
+
         borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
         borderModalOverlay.Visibility = Visibility.Visible;
         if (contentScrollViewer != null)
@@ -3856,17 +4157,35 @@ public partial class MainWindow : Window
 
         if (IsLoaded && IsVisible)
         {
-            CubicEase ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            int seq = _modalSequenceId;
+            UiMotion.EnableTransientCache(borderModalCard, this);
             borderModalOverlay.Opacity = 0.0;
-            borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(150)) { EasingFunction = ease });
+            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate };
+            fadeIn.Completed += (_, _) =>
+            {
+                if (seq == _modalSequenceId)
+                {
+                    UiMotion.ClearTransientCache(borderModalCard);
+                    borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
+                    borderModalOverlay.Opacity = 1.0;
+                    if (modalCardScale != null)
+                    {
+                        modalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                        modalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                        modalCardScale.ScaleX = 1.0;
+                        modalCardScale.ScaleY = 1.0;
+                    }
+                }
+            };
+            borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, fadeIn);
             if (modalCardScale != null)
             {
                 modalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
                 modalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                modalCardScale.ScaleX = 0.96;
-                modalCardScale.ScaleY = 0.96;
-                modalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.96, 1.0, TimeSpan.FromMilliseconds(160)) { EasingFunction = ease });
-                modalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.96, 1.0, TimeSpan.FromMilliseconds(160)) { EasingFunction = ease });
+                modalCardScale.ScaleX = 0.94;
+                modalCardScale.ScaleY = 0.94;
+                modalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.94, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
+                modalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.94, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
             }
         }
         else
@@ -3894,25 +4213,47 @@ public partial class MainWindow : Window
         int seq = ++_modalSequenceId;
         if (immediate || !IsLoaded || !IsVisible)
         {
+            UiMotion.ClearTransientCache(borderModalCard);
             borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
             borderModalOverlay.Opacity = 0.0;
             borderModalOverlay.Visibility = Visibility.Collapsed;
+            if (modalCardScale != null)
+            {
+                modalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                modalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                modalCardScale.ScaleX = 1.0;
+                modalCardScale.ScaleY = 1.0;
+            }
             return;
         }
 
-        DoubleAnimation fadeOut = new DoubleAnimation(borderModalOverlay.Opacity, 0.0, TimeSpan.FromMilliseconds(120))
+        UiMotion.EnableTransientCache(borderModalCard, this);
+        DoubleAnimation fadeOut = new DoubleAnimation(borderModalOverlay.Opacity, 0.0, UiMotion.Exit)
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            EasingFunction = UiMotion.Accelerate
         };
         fadeOut.Completed += (_, _) =>
         {
             if (seq == _modalSequenceId)
             {
+                UiMotion.ClearTransientCache(borderModalCard);
                 borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
                 borderModalOverlay.Opacity = 0.0;
                 borderModalOverlay.Visibility = Visibility.Collapsed;
+                if (modalCardScale != null)
+                {
+                    modalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                    modalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                    modalCardScale.ScaleX = 1.0;
+                    modalCardScale.ScaleY = 1.0;
+                }
             }
         };
+        if (modalCardScale != null)
+        {
+            modalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(modalCardScale.ScaleX, 0.96, UiMotion.Exit) { EasingFunction = UiMotion.Accelerate });
+            modalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(modalCardScale.ScaleY, 0.96, UiMotion.Exit) { EasingFunction = UiMotion.Accelerate });
+        }
         borderModalOverlay.BeginAnimation(UIElement.OpacityProperty, fadeOut);
     }
 
@@ -3920,7 +4261,16 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Escape && popupAppMenu != null && popupAppMenu.IsOpen)
         {
-            popupAppMenu.IsOpen = false;
+            CloseAppMenuAnimated();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape
+            && (borderModalOverlay == null || borderModalOverlay.Visibility != Visibility.Visible)
+            && _settingsWindow != null && _settingsWindow.IsSettingsOpen)
+        {
+            CloseSettingsWindow(immediate: false);
             e.Handled = true;
             return;
         }
@@ -3971,34 +4321,35 @@ public partial class MainWindow : Window
     {
         _isMinimizing = false;
         _isRestoring = false;
+        CloseAppMenuAnimated(immediate: true);
+        CloseSettingsWindow(immediate: true);
         CloseConfirmationModal(immediate: true);
-        if (rootBorder != null)
-        {
-            rootBorder.BeginAnimation(UIElement.OpacityProperty, null);
-            rootBorder.CacheMode = null;
-            rootBorder.Opacity = 1.0;
-        }
-        if (rootScaleTransform != null)
-        {
-            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            rootScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            rootScaleTransform.ScaleX = 1.0;
-            rootScaleTransform.ScaleY = 1.0;
-        }
-        if (rootTranslateTransform != null)
-        {
-            rootTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-            rootTranslateTransform.Y = 0.0;
-        }
+        ClearThemeOverlay();
+        ResetRootTransformsToIdentity();
         base.OnClosing(e);
     }
 
     protected override void OnClosed(EventArgs e)
     {
         _isDisposed = true;
+        if (_isRecordingHotkey)
+        {
+            _isRecordingHotkey = false;
+            PreviewKeyDown -= MainWindow_PreviewKeyDown;
+        }
+        StopRepeatingAnimations();
+        ClearThemeOverlay();
+        CloseAppMenuAnimated(immediate: true);
+        CloseConfirmationModal(immediate: true);
+        if (_settingsWindow != null)
+        {
+            _settingsWindow.OpenStateChanged -= SettingsWindow_OpenStateChanged;
+            _settingsWindow.ForceClose();
+        }
         if (_periodicUpdateTimer != null)
         {
             _periodicUpdateTimer.Stop();
+            _periodicUpdateTimer.Tick -= PeriodicUpdateTimer_Tick;
             _periodicUpdateTimer = null;
         }
         try { _updateCts?.Cancel(); } catch { }
@@ -4012,6 +4363,7 @@ public partial class MainWindow : Window
         _audioController.MuteStateChanged -= AudioController_MuteStateChanged;
         _audioController.DevicesChanged -= AudioController_DevicesChanged;
         _audioController.WarningNotification -= AudioController_WarningNotification;
+        TaskbarCreated = null;
 
         if (cbDevices != null && _dropDownOpenHandler != null)
         {
@@ -4022,21 +4374,7 @@ public partial class MainWindow : Window
 
         try
         {
-            IntPtr hwnd = new WindowInteropHelper(this).Handle;
-            if (hwnd != IntPtr.Zero)
-            {
-                HwndSource.FromHwnd(hwnd)?.RemoveHook(HwndMessageHook);
-                if (_hIconSmall != IntPtr.Zero)
-                {
-                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, IntPtr.Zero);
-                    try { SetClassLongPtr(hwnd, GCLP_HICONSM, IntPtr.Zero); } catch { }
-                }
-                if (_hIconBig != IntPtr.Zero)
-                {
-                    SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, IntPtr.Zero);
-                    try { SetClassLongPtr(hwnd, GCLP_HICON, IntPtr.Zero); } catch { }
-                }
-            }
+            DetachWindowHooksAndIcons(new WindowInteropHelper(this).Handle);
         }
         catch (Exception ex) { DiagnosticLogger.LogError("Error clearing window icons", ex); }
 

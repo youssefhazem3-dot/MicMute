@@ -25,6 +25,24 @@ public static class UiBehavior
     public const double MinimumUiScale = 0.55;
     public const double DynamicContentHeightHeadroom = 52.0;
 
+    private static string StripDurationSuffix(string text)
+    {
+        string candidate = text.Trim();
+        if (candidate.EndsWith("seconds", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate.Substring(0, candidate.Length - 7).Trim();
+        }
+        if (candidate.EndsWith("sec", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate.Substring(0, candidate.Length - 3).Trim();
+        }
+        if (candidate.EndsWith("s", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate.Substring(0, candidate.Length - 1).Trim();
+        }
+        return candidate;
+    }
+
     public static bool TryParseOsdDuration(string? text, CultureInfo culture, out double duration)
     {
         duration = 0;
@@ -34,20 +52,7 @@ public static class UiBehavior
         }
 
         const NumberStyles styles = NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite;
-        string candidate = text.Trim();
-        if (candidate.EndsWith("seconds", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate.Substring(0, candidate.Length - 7).Trim();
-        }
-        else if (candidate.EndsWith("sec", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate.Substring(0, candidate.Length - 3).Trim();
-        }
-        else if (candidate.EndsWith("s", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate.Substring(0, candidate.Length - 1).Trim();
-        }
-
+        string candidate = StripDurationSuffix(text);
         string normalized = candidate.Replace(',', '.');
         if (!double.TryParse(candidate, styles, culture, out duration)
             && !double.TryParse(normalized, styles, CultureInfo.InvariantCulture, out duration)
@@ -63,19 +68,7 @@ public static class UiBehavior
     {
         value = 0;
         if (string.IsNullOrWhiteSpace(text)) return false;
-        string candidate = text.Trim();
-        if (candidate.EndsWith("seconds", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate.Substring(0, candidate.Length - 7).Trim();
-        }
-        else if (candidate.EndsWith("sec", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate.Substring(0, candidate.Length - 3).Trim();
-        }
-        else if (candidate.EndsWith("s", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate.Substring(0, candidate.Length - 1).Trim();
-        }
+        string candidate = StripDurationSuffix(text);
 
         const NumberStyles styles = NumberStyles.Float;
         string normalized = candidate.Replace(',', '.');
@@ -270,6 +263,53 @@ public static class UiBehavior
         double minLeft = workArea.Left;
         double maxLeft = workArea.Left + workArea.Width - width;
         double left = maxLeft >= minLeft ? Math.Clamp(currentBounds.Left, minLeft, maxLeft) : minLeft;
+
+        return new DipRect(left, top, width, height);
+    }
+
+    public static DipRect CalculateAdjacentPopupBounds(
+        DipRect workArea,
+        DipRect anchorBounds,
+        double popupWidth,
+        double popupHeight,
+        double gap = 12.0,
+        double verticalMargin = DefaultAdaptiveVerticalMargin)
+    {
+        double width = Math.Max(200.0, Math.Min(popupWidth, workArea.Width));
+        double maxHeight = CalculateAdaptiveMaxHeight(workArea.Height, verticalMargin);
+        double height = Math.Min(Math.Max(120.0, popupHeight), maxHeight);
+        double safeGap = double.IsFinite(gap) ? Math.Max(0.0, gap) : 12.0;
+
+        if (!double.IsFinite(anchorBounds.Left) || !double.IsFinite(anchorBounds.Top)
+            || !double.IsFinite(anchorBounds.Width) || anchorBounds.Width <= 0)
+        {
+            return CalculateCenteredWindowBounds(workArea, width, height, verticalMargin);
+        }
+
+        double minLeft = workArea.Left;
+        double maxLeft = workArea.Left + workArea.Width - width;
+        double rightCandidate = anchorBounds.Left + anchorBounds.Width + safeGap;
+        double leftCandidate = anchorBounds.Left - safeGap - width;
+
+        double left;
+        if (rightCandidate <= maxLeft + 0.5)
+        {
+            left = Math.Max(minLeft, rightCandidate);
+        }
+        else if (leftCandidate >= minLeft - 0.5)
+        {
+            left = Math.Min(maxLeft, leftCandidate);
+        }
+        else
+        {
+            double centered = workArea.Left + Math.Max(0.0, (workArea.Width - width) / 2.0);
+            left = maxLeft >= minLeft ? Math.Clamp(centered, minLeft, maxLeft) : minLeft;
+        }
+
+        double halfMargin = verticalMargin / 2.0;
+        double minTop = workArea.Top + halfMargin;
+        double maxTop = workArea.Top + workArea.Height - height - halfMargin;
+        double top = maxTop >= minTop ? Math.Clamp(anchorBounds.Top, minTop, maxTop) : minTop;
 
         return new DipRect(left, top, width, height);
     }

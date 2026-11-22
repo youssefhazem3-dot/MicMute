@@ -62,6 +62,7 @@ foreach ($source in ($sources | Select-Object -Unique)) { $response += '"' + $so
 $resources = @(
     @{ Path = (Join-Path $srcRoot 'UI/App.xaml'); Name = 'MicMute.App.xaml' },
     @{ Path = (Join-Path $srcRoot 'UI/MainWindow.xaml'); Name = 'MicMute.MainWindow.xaml' },
+    @{ Path = (Join-Path $srcRoot 'UI/SettingsWindow.xaml'); Name = 'MicMute.SettingsWindow.xaml' },
     @{ Path = (Join-Path $srcRoot 'UI/OsdWindow.xaml'); Name = 'MicMute.OsdWindow.xaml' },
     @{ Path = (Join-Path $srcRoot 'Assets/app.ico'); Name = 'MicMute.app.ico' },
     @{ Path = (Join-Path $srcRoot 'Assets/sounds/mute.wav'); Name = 'MicMute.sounds.mute.wav' },

@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Forms;
@@ -60,13 +59,6 @@ public partial class App : System.Windows.Application
 
     [DllImport("shell32.dll", SetLastError = true)]
     private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
-
-    internal static void TrimWorkingSet()
-    {
-        // Intentionally left as a no-op: calling EmptyWorkingSet forces the process's
-        // WH_KEYBOARD_LL hook callback and UI dispatcher pages out to the pagefile,
-        // which can cause Windows LowLevelHooksTimeout silent hook drops under heavy game RAM pressure.
-    }
 
     internal class LiquidGlassContextMenu : ContextMenuStrip
     {
@@ -129,7 +121,6 @@ public partial class App : System.Windows.Application
             base.OnVisibleChanged(e);
             if (Visible)
             {
-                RefreshTheme();
                 ApplyWindowRounding();
             }
         }
@@ -168,11 +159,6 @@ public partial class App : System.Windows.Application
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             e.Graphics.Clear(bgColor);
-
-            using SolidBrush brush = new SolidBrush(bgColor);
-            RectangleF rect = new RectangleF(0.5f, 0.5f, e.ToolStrip.Width - 1f, e.ToolStrip.Height - 1f);
-            using GraphicsPath path = CreateRoundedRectanglePath(rect, 8f);
-            e.Graphics.FillPath(brush, path);
 
             // Clean divider line centered in the margin gap above Quit so hover pills never touch it
             for (int i = 1; i < e.ToolStrip.Items.Count; i++)
@@ -411,6 +397,7 @@ public partial class App : System.Windows.Application
     private const string MutexName = "Global\\MicMuteAppMutex_7FA5D9E0-9E11-40EA-B368-C8E649F56A49";
     private NotifyIcon? _notifyIcon;
     private ToolStripMenuItem? _trayMuteMenuItem;
+    private Font? _trayMenuFont;
     private AudioController? _audioController;
     private MainWindow? _mainWindow;
 
@@ -433,6 +420,14 @@ public partial class App : System.Windows.Application
         {
             return;
         }
+
+        // Enable Per-Monitor V2 DPI awareness before any UI/window handle is created
+        // (matching <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode> with custom Main).
+        try
+        {
+            System.Windows.Forms.Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        }
+        catch { }
 
         if (UpdateManager.TryGetCleanupDirectory(args, out string cleanupDir))
         {
@@ -488,7 +483,6 @@ public partial class App : System.Windows.Application
         try
         {
             App app = new App();
-            app.InitializeComponent();
             app.Run();
         }
         catch (Exception ex)
@@ -501,14 +495,6 @@ public partial class App : System.Windows.Application
             }
             catch { }
         }
-    }
-
-    /// <summary>
-    /// Explicit implementation required when EnableDefaultApplicationDefinition is disabled.
-    /// Application resources are configured programmatically or loaded on demand.
-    /// </summary>
-    public void InitializeComponent()
-    {
     }
 
     private const int HWND_BROADCAST = 0xFFFF;
@@ -652,7 +638,8 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        // Automatic High Refresh Rate Detection (capped at 120 FPS to avoid heavy DWM layered composition)
+        // Automatic High Refresh Rate Detection (matched to native display refresh up to 240 FPS
+        // to eliminate beat-frequency judder on 144Hz/165Hz/240Hz panels)
         try
         {
             int refreshRate = 60;
@@ -660,7 +647,7 @@ public partial class App : System.Windows.Application
             devMode.dmSize = (short)Marshal.SizeOf(devMode);
             if (EnumDisplaySettings(null, -1, ref devMode) && devMode.dmDisplayFrequency > 30)
             {
-                refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 120);
+                refreshRate = Math.Clamp(devMode.dmDisplayFrequency, 60, 240);
             }
             if (!_frameRateMetadataOverridden)
             {
@@ -685,9 +672,6 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         base.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        // Preload the OSD to reduce work on the first toggle.
-        OsdWindow.WarmUp();
-
         AppSettings appSettings = SettingsManager.Load();
         AdminManager.SetRunAsAdmin(appSettings.RunAsAdmin);
         if (appSettings.RunAsAdmin && !AdminManager.IsRunningAsAdmin() && !UiBehavior.TryGetParentProcessId(e.Args, out _))
@@ -706,6 +690,9 @@ public partial class App : System.Windows.Application
                 return;
             }
         }
+
+        // Preload the OSD after elevation check to avoid creating an HWND during restart.
+        OsdWindow.WarmUp();
         StartupManager.SetStartup(appSettings.RunOnStartup, appSettings.RunAsAdmin);
         _audioController = new AudioController
         {
@@ -731,15 +718,7 @@ public partial class App : System.Windows.Application
         }
 
         _mainWindow = new MainWindow(_audioController);
-        _mainWindow.TaskbarCreated += (_, _) =>
-        {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.Visible = false;
-                _notifyIcon.Visible = true;
-                UpdateTrayIconState();
-            }
-        };
+        _mainWindow.TaskbarCreated += MainWindow_TaskbarCreated;
         if (!UiBehavior.ShouldStartMinimized(appSettings.StartMinimized, e.Args))
         {
             _mainWindow.Show();
@@ -756,9 +735,18 @@ public partial class App : System.Windows.Application
         else
         {
             _mainWindow.Visibility = Visibility.Hidden;
-            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(TrimWorkingSet));
         }
         _mainWindow.Closing += MainWindow_Closing;
+    }
+
+    private void MainWindow_TaskbarCreated(object? sender, EventArgs e)
+    {
+        if (_notifyIcon != null)
+        {
+            _notifyIcon.Visible = false;
+            _notifyIcon.Visible = true;
+            UpdateTrayIconState();
+        }
     }
 
     private void InitializeTrayIcon()
@@ -777,21 +765,24 @@ public partial class App : System.Windows.Application
         };
         LiquidGlassContextMenu contextMenuStrip = new LiquidGlassContextMenu();
         contextMenuStrip.Renderer = new LiquidGlassMenuRenderer(contextMenuStrip);
+        _trayMenuFont?.Dispose();
+        _trayMenuFont = null;
         try
         {
-            contextMenuStrip.Font = new Font("Segoe UI Variable Text", 9f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
+            _trayMenuFont = new Font("Segoe UI Variable Text", 9f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
         }
         catch
         {
             try
             {
-                contextMenuStrip.Font = new Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
+                _trayMenuFont = new Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
             }
             catch
             {
-                contextMenuStrip.Font = new Font("Arial", 9f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
+                _trayMenuFont = new Font("Arial", 9f, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
             }
         }
+        contextMenuStrip.Font = _trayMenuFont;
 
         ToolStripMenuItem value = new ToolStripMenuItem("Mute Mic", null, delegate
         {
@@ -1036,6 +1027,14 @@ public partial class App : System.Windows.Application
         float d = radius * 2f;
         if (d > rect.Width) d = rect.Width;
         if (d > rect.Height) d = rect.Height;
+        if (d <= 0f)
+        {
+            if (rect.Width > 0f && rect.Height > 0f)
+            {
+                path.AddRectangle(rect);
+            }
+            return path;
+        }
         path.AddArc(rect.X, rect.Y, d, d, 180f, 90f);
         path.AddArc(rect.Right - d, rect.Y, d, d, 270f, 90f);
         path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0f, 90f);
@@ -1082,7 +1081,6 @@ public partial class App : System.Windows.Application
     {
         e.Cancel = true;
         _mainWindow?.Hide();
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(TrimWorkingSet));
     }
 
     private void Teardown()
@@ -1095,10 +1093,14 @@ public partial class App : System.Windows.Application
             if (_notifyIcon != null)
             {
                 _notifyIcon.Visible = false;
+                _notifyIcon.Icon = null;
                 _notifyIcon.ContextMenuStrip?.Dispose();
                 _notifyIcon.Dispose();
                 _notifyIcon = null;
             }
+            _trayMuteMenuItem = null;
+            _trayMenuFont?.Dispose();
+            _trayMenuFont = null;
         }
         catch (Exception ex) { DiagnosticLogger.LogError("NotifyIcon disposal failed during teardown", ex); }
 
@@ -1112,6 +1114,7 @@ public partial class App : System.Windows.Application
         {
             if (_mainWindow != null)
             {
+                _mainWindow.TaskbarCreated -= MainWindow_TaskbarCreated;
                 _mainWindow.Closing -= MainWindow_Closing;
                 _mainWindow.Close();
                 _mainWindow = null;
@@ -1135,6 +1138,9 @@ public partial class App : System.Windows.Application
             }
         }
         catch (Exception ex) { DiagnosticLogger.LogError("AudioController disposal failed during teardown", ex); }
+
+        try { SettingsManager.Dispose(); }
+        catch (Exception ex) { DiagnosticLogger.LogError("SettingsManager.Dispose failed during teardown", ex); }
 
         try
         {

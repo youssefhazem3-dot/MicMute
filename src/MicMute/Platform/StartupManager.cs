@@ -18,8 +18,7 @@ public static class StartupManager
         string exePath = AdminManager.GetExecutablePath();
 
         // Never write test runners or development hosts to real system startup
-        if (exePath.Contains("MicMute.Tests", StringComparison.OrdinalIgnoreCase) ||
-            exePath.Contains("testhost", StringComparison.OrdinalIgnoreCase))
+        if (IsTestHost(exePath))
         {
             return;
         }
@@ -210,8 +209,8 @@ public static class StartupManager
             FileName = schtasksPath,
             CreateNoWindow = true,
             UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            RedirectStandardOutput = false,
+            RedirectStandardError = false
         };
         psi.ArgumentList.Add("/create");
         psi.ArgumentList.Add("/tn");
@@ -277,8 +276,8 @@ public static class StartupManager
             FileName = schtasksPath,
             CreateNoWindow = true,
             UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            RedirectStandardOutput = false,
+            RedirectStandardError = false
         };
         psi.ArgumentList.Add("/delete");
         psi.ArgumentList.Add("/tn");
@@ -363,8 +362,8 @@ public static class StartupManager
                 FileName = schtasksPath,
                 CreateNoWindow = true,
                 UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
+                RedirectStandardOutput = false,
+                RedirectStandardError = false
             };
             psi.ArgumentList.Add("/query");
             psi.ArgumentList.Add("/tn");

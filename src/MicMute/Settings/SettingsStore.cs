@@ -88,32 +88,27 @@ public sealed class SettingsStore : IDisposable
     public void SetCustomDataFolder(string newPath)
     {
         string destination = string.IsNullOrWhiteSpace(newPath) ? _defaultFolder : Path.GetFullPath(newPath);
-        lock (_sync)
+        string? failureMessage = null;
+        Exception? persistFailure = null;
+        try
         {
-            ThrowIfDisposed();
-            PersistBeforeLocationChangeNoLock();
-            bool isDefault = PathsEqual(destination, _defaultFolder);
-            AppSettings moved = LoadNoLock() with { CustomDataPath = isDefault ? string.Empty : destination, UsePortableMode = false };
-            MoveSettingsNoLock(destination, moved, !isDefault, removePortableArtifacts: true, createPortableFlag: false);
-        }
-    }
-
-    public void SetPortableMode(bool enable)
-    {
-        lock (_sync)
-        {
-            ThrowIfDisposed();
-            PersistBeforeLocationChangeNoLock();
-            AppSettings current = LoadNoLock();
-            if (enable)
+            lock (_sync)
             {
-                MoveSettingsNoLock(_appDirectory, current with { UsePortableMode = true }, null, removePortableArtifacts: false, createPortableFlag: true);
-                return;
+                ThrowIfDisposed();
+                persistFailure = PersistBeforeLocationChangeNoLock(out failureMessage);
+                if (persistFailure is null)
+                {
+                    bool isDefault = PathsEqual(destination, _defaultFolder);
+                    AppSettings moved = LoadNoLock() with { CustomDataPath = isDefault ? string.Empty : destination, UsePortableMode = false };
+                    MoveSettingsNoLock(destination, moved, !isDefault, removePortableArtifacts: true);
+                }
             }
-
-            string destination = GetConfiguredCustomFolderNoLock() ?? _defaultFolder;
-            MoveSettingsNoLock(destination, current with { UsePortableMode = false }, null, removePortableArtifacts: true, createPortableFlag: false);
         }
+        finally
+        {
+            RaiseSaveFailure(failureMessage);
+        }
+        if (persistFailure is not null) throw persistFailure;
     }
 
     public void ResetAllSettings()
@@ -177,15 +172,13 @@ public sealed class SettingsStore : IDisposable
         return _cachedSettings;
     }
 
-    private void PersistBeforeLocationChangeNoLock()
+    private Exception? PersistBeforeLocationChangeNoLock(out string? message)
     {
         _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
-        Exception? failure = PersistPendingNoLock(out string? message);
-        RaiseSaveFailure(message);
-        if (failure is not null) throw failure;
+        return PersistPendingNoLock(out message);
     }
 
-    private void MoveSettingsNoLock(string destinationFolder, AppSettings settings, bool? writeLocationPointer, bool removePortableArtifacts, bool createPortableFlag)
+    private void MoveSettingsNoLock(string destinationFolder, AppSettings settings, bool? writeLocationPointer, bool removePortableArtifacts)
     {
         string destinationSettings = Path.Combine(destinationFolder, "settings.json");
         string sourceSettings = Path.Combine(_appDirectory, "settings.json");
@@ -205,11 +198,6 @@ public sealed class SettingsStore : IDisposable
             {
                 if (flagBefore) File.Delete(portableFlag);
                 if (!PathsEqual(destinationSettings, sourceSettings) && File.Exists(sourceSettings)) File.Delete(sourceSettings);
-            }
-            else if (createPortableFlag && !flagBefore)
-            {
-                Directory.CreateDirectory(_appDirectory);
-                File.WriteAllText(portableFlag, "1", Utf8NoBom);
             }
 
             _cachedSettings = settings;

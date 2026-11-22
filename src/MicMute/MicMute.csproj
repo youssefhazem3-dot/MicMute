@@ -31,6 +31,7 @@
   <ItemGroup>
     <EmbeddedResource Include="UI\App.xaml" LogicalName="MicMute.App.xaml" />
     <EmbeddedResource Include="UI\MainWindow.xaml" LogicalName="MicMute.MainWindow.xaml" />
+    <EmbeddedResource Include="UI\SettingsWindow.xaml" LogicalName="MicMute.SettingsWindow.xaml" />
     <EmbeddedResource Include="UI\OsdWindow.xaml" LogicalName="MicMute.OsdWindow.xaml" />
     <EmbeddedResource Include="Assets\app.ico" LogicalName="MicMute.app.ico" />
     <EmbeddedResource Include="Assets\sounds\mute.wav" LogicalName="MicMute.sounds.mute.wav" />

@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
 
@@ -12,8 +11,7 @@ public static class SettingsCodec
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        WriteIndented = false,
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
+        WriteIndented = false
     };
 
     private static readonly JsonDocumentOptions DocumentOptions = new()
@@ -45,7 +43,7 @@ public static class SettingsCodec
             AppSettings defaults = new();
             return Normalize(new AppSettings
             {
-                SelectedDeviceId = RepairEndpointId(GetString(root, "SelectedDeviceId", defaults.SelectedDeviceId)),
+                SelectedDeviceId = GetString(root, "SelectedDeviceId", defaults.SelectedDeviceId),
                 Hotkey = GetEnum(root, "Hotkey", defaults.Hotkey),
                 HotkeyModifiers = GetEnum(root, "HotkeyModifiers", defaults.HotkeyModifiers),
                 RunOnStartup = GetBoolean(root, "RunOnStartup", defaults.RunOnStartup),

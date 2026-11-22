@@ -22,8 +22,11 @@
         FontWeight="Bold">
 
     <Window.Resources>
-        <!-- Responsive UI Scale Transform (shared by main shell and popups) -->
+        <!-- Responsive UI Scale Transform (applied to main shell; WPF Popups inherit ancestor transform automatically) -->
         <ScaleTransform x:Key="WindowContentScaleTransform" ScaleX="1.0" ScaleY="1.0" />
+        <!-- Dynamic Popup Typography: Display+ClearType at native 1.0 scale, Ideal+Auto when adaptively scaled -->
+        <TextFormattingMode x:Key="PopupTextFormattingMode">Display</TextFormattingMode>
+        <TextRenderingMode x:Key="PopupTextRenderingMode">ClearType</TextRenderingMode>
 
         <!-- ========================================== -->
         <!-- Dynamic Theme Brushes (Apple Liquid Glass) -->
@@ -108,7 +111,6 @@
         <SolidColorBrush x:Key="CaptionButtonPressedBrush" Color="#30FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#25FFFFFF" />
         <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#45FFFFFF" />
-        <SolidColorBrush x:Key="ScrollBarThumbDragBrush" Color="#70FFFFFF" />
 
         <!-- Active Pill Badge & Segmented Control Brushes (Monochrome Liquid Glass) -->
         <SolidColorBrush x:Key="MenuBadgeActiveBgBrush" Color="#E4E4E7" />
@@ -292,9 +294,75 @@
             </Setter>
         </Style>
 
-        <!-- ========================================== -->
-        <!-- CHUNKY LIQUID GLASS TOGGLE SWITCH (52x30)  -->
-        <!-- ========================================== -->
+        <!-- Settings Toggle Card Button Style (Liquid Glass Interactive Row) -->
+        <Style x:Key="SettingsToggleCardButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ClickMode" Value="Press" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="cardBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="16"
+                                Padding="{TemplateBinding Padding}"
+                                RenderTransformOrigin="0.5,0.5"
+                                SnapsToDevicePixels="False"
+                                RenderOptions.EdgeMode="Unspecified">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="cardScale" ScaleX="1.0" ScaleY="1.0" />
+                            </Border.RenderTransform>
+                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                                <Setter TargetName="cardBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="Tag" Value="Open">
+                                <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                                <Setter TargetName="cardBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleX" To="0.985" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleY" To="0.985" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.15">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.15">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ToggleSwitchStyle" TargetType="CheckBox">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
 
@@ -349,8 +417,9 @@
                                     Cursor="Hand">
                                 <Border.RenderTransform>
                                     <TransformGroup>
+                                        <ScaleTransform x:Name="knobSquishScale" ScaleX="1.0" ScaleY="1.0" CenterX="12" CenterY="12" />
+                                        <ScaleTransform x:Name="knobHoverScale" ScaleX="1.0" ScaleY="1.0" CenterX="12" CenterY="12" />
                                         <TranslateTransform x:Name="knobTrans" X="0" />
-                                        <ScaleTransform x:Name="knobScale" ScaleX="1.0" ScaleY="1.0" CenterX="12" CenterY="12" />
                                     </TransformGroup>
                                 </Border.RenderTransform>
                                 <Border.Effect>
@@ -381,17 +450,21 @@
                                                              To="22"
                                                              Duration="0:0:0.22">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobScale" Storyboard.TargetProperty="ScaleX">
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.09" Value="1.15" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" />
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobSquishScale" Storyboard.TargetProperty="ScaleX">
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.08" Value="1.14" KeySpline="0.16,1,0.3,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" KeySpline="0.16,1,0.3,1" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimation Storyboard.TargetName="glow"
                                                              Storyboard.TargetProperty="Opacity"
                                                              To="0.22"
-                                                             Duration="0:0:0.20" />
+                                                             Duration="0:0:0.20">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <ExponentialEase Exponent="4" EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -403,42 +476,45 @@
                                                              To="0"
                                                              Duration="0:0:0.22">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobScale" Storyboard.TargetProperty="ScaleX">
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.09" Value="1.15" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" />
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobSquishScale" Storyboard.TargetProperty="ScaleX">
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.08" Value="1.14" KeySpline="0.16,1,0.3,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" KeySpline="0.16,1,0.3,1" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimation Storyboard.TargetName="glow"
                                                              Storyboard.TargetProperty="Opacity"
                                                              To="0"
-                                                             Duration="0:0:0.20" />
+                                                             Duration="0:0:0.18">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <ExponentialEase Exponent="4" EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
                             </Trigger>
 
-                            <!-- Hover Bounce Interaction matching OSD Slider -->
+                            <!-- Hover Bounce Interaction on Knob Only (isolated on knobHoverScale so it never fights click squish) -->
                             <Trigger SourceName="knob" Property="IsMouseOver" Value="True">
-
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                            <DoubleAnimation Storyboard.TargetName="knobHoverScale"
                                                              Storyboard.TargetProperty="ScaleX"
-                                                             To="1.10"
-                                                             Duration="0:0:0.15">
+                                                             To="1.09"
+                                                             Duration="0:0:0.14">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                            <DoubleAnimation Storyboard.TargetName="knobHoverScale"
                                                              Storyboard.TargetProperty="ScaleY"
-                                                             To="1.10"
-                                                             Duration="0:0:0.15">
+                                                             To="1.09"
+                                                             Duration="0:0:0.14">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
@@ -447,20 +523,20 @@
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                            <DoubleAnimation Storyboard.TargetName="knobHoverScale"
                                                              Storyboard.TargetProperty="ScaleX"
                                                              To="1.00"
                                                              Duration="0:0:0.16">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="knobScale"
+                                            <DoubleAnimation Storyboard.TargetName="knobHoverScale"
                                                              Storyboard.TargetProperty="ScaleY"
                                                              To="1.00"
                                                              Duration="0:0:0.16">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
@@ -530,7 +606,7 @@
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
                                                 <Grid Background="Transparent" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
-                                                    <!-- Crystal Bead Thumb with Liquid Specular Rim -->
+                                                     <!-- Crystal Bead Thumb with GPU ScaleTransform (zero layout thrash) -->
                                                     <Border x:Name="thumbCircle"
                                                             Width="18" Height="18"
                                                             CornerRadius="9"
@@ -539,8 +615,15 @@
                                                             BorderThickness="2"
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Center"
+                                                            RenderTransformOrigin="0.5,0.5"
                                                             SnapsToDevicePixels="False"
                                                             RenderOptions.EdgeMode="Unspecified">
+                                                        <Border.RenderTransform>
+                                                            <TransformGroup>
+                                                                <ScaleTransform x:Name="thumbHoverScale" ScaleX="1.0" ScaleY="1.0" />
+                                                                <ScaleTransform x:Name="thumbDragScale" ScaleX="1.0" ScaleY="1.0" />
+                                                            </TransformGroup>
+                                                        </Border.RenderTransform>
                                                         <Border.Effect>
                                                             <DropShadowEffect BlurRadius="6" ShadowDepth="1.5" Opacity="0.3" Color="Black" />
                                                         </Border.Effect>
@@ -558,14 +641,56 @@
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
                                                         <Setter Property="Cursor" Value="Hand" />
-                                                        <Setter TargetName="thumbCircle" Property="Width" Value="20" />
-                                                        <Setter TargetName="thumbCircle" Property="Height" Value="20" />
-                                                        <Setter TargetName="thumbCircle" Property="CornerRadius" Value="10" />
+                                                        <Trigger.EnterActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleX" To="1.14" Duration="0:0:0.14">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleY" To="1.14" Duration="0:0:0.14">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </Trigger.EnterActions>
+                                                        <Trigger.ExitActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.16">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.16">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </Trigger.ExitActions>
                                                     </Trigger>
                                                     <Trigger Property="IsDragging" Value="True">
-                                                        <Setter TargetName="thumbCircle" Property="Width" Value="20" />
-                                                        <Setter TargetName="thumbCircle" Property="Height" Value="20" />
-                                                        <Setter TargetName="thumbCircle" Property="CornerRadius" Value="10" />
+                                                        <Trigger.EnterActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleX" To="0.93" Duration="0:0:0.08">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleY" To="0.93" Duration="0:0:0.08">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </Trigger.EnterActions>
+                                                        <Trigger.ExitActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.15">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                    <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.15">
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                    </DoubleAnimation>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </Trigger.ExitActions>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -595,8 +720,26 @@
                     <ControlTemplate TargetType="Button">
                         <Grid x:Name="rootGrid" Background="Transparent" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
                             <Grid.RenderTransform>
-                                <ScaleTransform x:Name="gridScale" ScaleX="1.0" ScaleY="1.0" />
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="pressScale" ScaleX="1.0" ScaleY="1.0" />
+                                    <ScaleTransform x:Name="gridScale" ScaleX="1.0" ScaleY="1.0" />
+                                </TransformGroup>
                             </Grid.RenderTransform>
+
+                            <!-- Expanding Tactile Ripple Ring on State Toggle -->
+                            <Ellipse x:Name="heroRippleRing"
+                                     Width="84" Height="84"
+                                     Stroke="{DynamicResource AccentBrush}"
+                                     StrokeThickness="2"
+                                     Opacity="0.0"
+                                     IsHitTestVisible="False"
+                                     RenderTransformOrigin="0.5,0.5"
+                                     SnapsToDevicePixels="False"
+                                     RenderOptions.EdgeMode="Unspecified">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform x:Name="heroRippleScale" ScaleX="0.92" ScaleY="0.92" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
 
                             <!-- Dynamic Ambient Halo (Physically Offset Downward from Overhead Light) -->
                             <Ellipse x:Name="glow"
@@ -616,8 +759,7 @@
                             </Ellipse>
 
                             <!-- Outer Jewel-Cut Glass Bevel Ring (Physically Grounded Downward Contact Shadow) -->
-                            <Border x:Name="outerJewelRing"
-                                    Width="86" Height="86"
+                            <Border Width="86" Height="86"
                                     CornerRadius="43"
                                     BorderBrush="{DynamicResource JewelRingBorderBrush}"
                                     BorderThickness="1.5"
@@ -682,18 +824,28 @@
                                               StrokeThickness="5.0"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
+                                              RenderTransformOrigin="0.5,0.5"
                                               SnapsToDevicePixels="False"
                                               RenderOptions.EdgeMode="Unspecified"
-                                              Visibility="Collapsed" />
+                                              Visibility="Collapsed">
+                                            <Line.RenderTransform>
+                                                <ScaleTransform x:Name="slashBgScale" ScaleX="1.0" ScaleY="1.0" />
+                                            </Line.RenderTransform>
+                                        </Line>
                                         <Line x:Name="slash"
                                               X1="3" Y1="3" X2="29" Y2="29"
                                               Stroke="#FFFFFF"
                                               StrokeThickness="2.5"
                                               StrokeStartLineCap="Round"
                                               StrokeEndLineCap="Round"
+                                              RenderTransformOrigin="0.5,0.5"
                                               SnapsToDevicePixels="False"
                                               RenderOptions.EdgeMode="Unspecified"
-                                              Visibility="Collapsed" />
+                                              Visibility="Collapsed">
+                                            <Line.RenderTransform>
+                                                <ScaleTransform x:Name="slashScale" ScaleX="1.0" ScaleY="1.0" />
+                                            </Line.RenderTransform>
+                                        </Line>
                                     </Grid>
                                 </Grid>
                             </Border>
@@ -706,6 +858,23 @@
                                 <Setter TargetName="glow" Property="Fill" Value="{DynamicResource HeroGlowActiveBrush}" />
                                 <Setter TargetName="lens" Property="Background" Value="{DynamicResource HeroLensActiveBrush}" />
                                 <Setter TargetName="iconPath" Property="Fill" Value="{DynamicResource HeroIconActiveBrush}" />
+                                <Setter TargetName="heroRippleRing" Property="Stroke" Value="{DynamicResource AccentBrush}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleX" From="0.95" To="1.22" Duration="0:0:0.32">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleY" From="0.95" To="1.22" Duration="0:0:0.32">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="heroRippleRing" Storyboard.TargetProperty="Opacity">
+                                                <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0.45" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.32" Value="0.0" KeySpline="0.16,1,0.3,1" />
+                                            </DoubleAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
                             </Trigger>
 
                             <!-- Standard Balanced UI Red Muted State (White Icon & Slash matching App Logo) -->
@@ -730,19 +899,48 @@
                                     </Setter.Value>
                                 </Setter>
                                 <Setter TargetName="iconPath" Property="Fill" Value="#FFFFFF" />
+                                <Setter TargetName="heroRippleRing" Property="Stroke" Value="#EF4444" />
                                 <Setter TargetName="slashBg" Property="Visibility" Value="Visible" />
                                 <Setter TargetName="slash" Property="Visibility" Value="Visible" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="slashScale" Storyboard.TargetProperty="ScaleX" From="0.2" To="1.0" Duration="0:0:0.20">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="slashScale" Storyboard.TargetProperty="ScaleY" From="0.2" To="1.0" Duration="0:0:0.20">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="slashBgScale" Storyboard.TargetProperty="ScaleX" From="0.2" To="1.0" Duration="0:0:0.20">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="slashBgScale" Storyboard.TargetProperty="ScaleY" From="0.2" To="1.0" Duration="0:0:0.20">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleX" From="0.95" To="1.22" Duration="0:0:0.32">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleY" From="0.95" To="1.22" Duration="0:0:0.32">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="heroRippleRing" Storyboard.TargetProperty="Opacity">
+                                                <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0.55" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.32" Value="0.0" KeySpline="0.16,1,0.3,1" />
+                                            </DoubleAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
                             </Trigger>
 
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="1.03" Duration="0:0:0.15">
-                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="1.035" Duration="0:0:0.16">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="1.03" Duration="0:0:0.15">
-                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="1.035" Duration="0:0:0.16">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -751,10 +949,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="1.00" Duration="0:0:0.18">
-                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="1.00" Duration="0:0:0.18">
-                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -765,11 +963,11 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="0.94" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleX" To="0.93" Duration="0:0:0.08">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="0.94" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleY" To="0.93" Duration="0:0:0.08">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -777,16 +975,12 @@
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX">
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.14" Value="1.08" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.26" Value="0.97" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.38" Value="1.00" />
-                                            </DoubleAnimationUsingKeyFrames>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY">
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.14" Value="1.08" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.26" Value="0.97" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.38" Value="1.00" />
-                                            </DoubleAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleX" To="1.00" Duration="0:0:0.26">
+                                                <DoubleAnimation.EasingFunction><BackEase Amplitude="0.30" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleY" To="1.00" Duration="0:0:0.26">
+                                                <DoubleAnimation.EasingFunction><BackEase Amplitude="0.30" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -826,9 +1020,9 @@
                         <Setter Property="FontSize" Value="11.5" />
                         <Setter Property="Padding" Value="10,7" />
                         <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled" />
-                        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
-                        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
-                        <Setter Property="SnapsToDevicePixels" Value="True" />
+                        <Setter Property="TextOptions.TextFormattingMode" Value="{DynamicResource PopupTextFormattingMode}" />
+                        <Setter Property="TextOptions.TextRenderingMode" Value="{DynamicResource PopupTextRenderingMode}" />
+                        <Setter Property="SnapsToDevicePixels" Value="False" />
                         <Setter Property="UseLayoutRounding" Value="True" />
                         <Setter Property="Template">
                             <Setter.Value>
@@ -936,9 +1130,9 @@
                                                             <DoubleAnimation Storyboard.TargetName="arrowRot"
                                                                              Storyboard.TargetProperty="Angle"
                                                                              To="180"
-                                                                             Duration="0:0:0.18">
+                                                                             Duration="0:0:0.20">
                                                                 <DoubleAnimation.EasingFunction>
-                                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                                 </DoubleAnimation.EasingFunction>
                                                             </DoubleAnimation>
                                                         </Storyboard>
@@ -950,9 +1144,9 @@
                                                             <DoubleAnimation Storyboard.TargetName="arrowRot"
                                                                              Storyboard.TargetProperty="Angle"
                                                                              To="0"
-                                                                             Duration="0:0:0.18">
+                                                                             Duration="0:0:0.20">
                                                                 <DoubleAnimation.EasingFunction>
-                                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
                                                                 </DoubleAnimation.EasingFunction>
                                                             </DoubleAnimation>
                                                         </Storyboard>
@@ -968,82 +1162,65 @@
                                    AllowsTransparency="True"
                                    Focusable="False"
                                    Placement="Bottom"
-                                   PopupAnimation="Fade"
-                                   TextOptions.TextFormattingMode="Display"
-                                   TextOptions.TextRenderingMode="ClearType"
+                                   PopupAnimation="None"
+                                   TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                                   TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}"
                                    RenderOptions.ClearTypeHint="Enabled"
-                                   SnapsToDevicePixels="True"
+                                   SnapsToDevicePixels="False"
                                    UseLayoutRounding="True">
                                 <Border x:Name="dropDownBorder"
                                         MinWidth="{Binding ActualWidth, ElementName=toggle}"
                                         MaxWidth="{Binding ActualWidth, ElementName=toggle}"
                                         MaxHeight="220"
-                                        LayoutTransform="{StaticResource WindowContentScaleTransform}"
-                                        Background="{DynamicResource InputBgBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="10"
-                                        Padding="4"
+                                        Background="Transparent"
+                                        BorderThickness="0"
                                         Margin="0,4,0,8"
                                         RenderTransformOrigin="0.5,0"
-                                        TextOptions.TextFormattingMode="Display"
-                                        TextOptions.TextRenderingMode="ClearType"
+                                        TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                                        TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}"
                                         RenderOptions.ClearTypeHint="Enabled"
-                                        SnapsToDevicePixels="True"
+                                        SnapsToDevicePixels="False"
                                         UseLayoutRounding="True">
                                     <Border.RenderTransform>
                                         <TransformGroup>
-                                            <ScaleTransform ScaleX="1" ScaleY="1" />
-                                            <TranslateTransform Y="0" />
+                                            <ScaleTransform x:Name="dropDownScale" ScaleX="1" ScaleY="1" />
+                                            <TranslateTransform x:Name="dropDownTranslate" Y="0" />
                                         </TransformGroup>
                                     </Border.RenderTransform>
-                                    <Border.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                     From="0.0" To="1.0"
-                                                                     Duration="0:0:0.18">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <CubicEase EasingMode="EaseOut" />
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)"
-                                                                     From="-6" To="0"
-                                                                     Duration="0:0:0.18">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <CubicEase EasingMode="EaseOut" />
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)"
-                                                                     From="0.96" To="1.0"
-                                                                     Duration="0:0:0.18">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <CubicEase EasingMode="EaseOut" />
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Border.Triggers>
-                                    <Border.Effect>
-                                        <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.55" Color="Black" />
-                                    </Border.Effect>
-                                    <ScrollViewer SnapsToDevicePixels="True"
-                                                  UseLayoutRounding="True"
-                                                  RenderOptions.ClearTypeHint="Enabled"
-                                                  TextOptions.TextFormattingMode="Display"
-                                                  TextOptions.TextRenderingMode="ClearType"
-                                                  HorizontalScrollBarVisibility="Disabled"
-                                                  VerticalScrollBarVisibility="Auto">
-                                        <StackPanel IsItemsHost="True"
-                                                    KeyboardNavigation.DirectionalNavigation="Cycle"
-                                                    SnapsToDevicePixels="True"
-                                                    UseLayoutRounding="True"
-                                                    RenderOptions.ClearTypeHint="Enabled"
-                                                    TextOptions.TextFormattingMode="Display"
-                                                    TextOptions.TextRenderingMode="ClearType" />
-                                    </ScrollViewer>
+                                    <Grid>
+                                        <!-- Sibling shadow layer prevents DropShadowEffect from rasterizing dropdown text -->
+                                        <Border Background="{DynamicResource InputBgBrush}"
+                                                CornerRadius="10"
+                                                IsHitTestVisible="False">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.55" Color="Black" />
+                                            </Border.Effect>
+                                        </Border>
+                                        <Border Background="{DynamicResource InputBgBrush}"
+                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Padding="4"
+                                                RenderOptions.ClearTypeHint="Enabled"
+                                                TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                                                TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}">
+                                            <ScrollViewer SnapsToDevicePixels="False"
+                                                          UseLayoutRounding="True"
+                                                          RenderOptions.ClearTypeHint="Enabled"
+                                                          TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                                                          TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}"
+                                                          HorizontalScrollBarVisibility="Disabled"
+                                                          VerticalScrollBarVisibility="Auto">
+                                                <StackPanel IsItemsHost="True"
+                                                            KeyboardNavigation.DirectionalNavigation="Cycle"
+                                                            SnapsToDevicePixels="False"
+                                                            UseLayoutRounding="True"
+                                                            RenderOptions.ClearTypeHint="Enabled"
+                                                            TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                                                            TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}" />
+                                            </ScrollViewer>
+                                        </Border>
+                                    </Grid>
                                 </Border>
                             </Popup>
                         </Grid>
@@ -1072,7 +1249,11 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
+                                Padding="{TemplateBinding Padding}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="btnScale" ScaleX="1.0" ScaleY="1.0" />
+                            </Border.RenderTransform>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -1080,13 +1261,39 @@
                                 <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                 <Setter TargetName="border" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
                             </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleX" To="0.965" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleY" To="0.965" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.14">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.14">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <!-- Monochrome Segmented Pill Button Style (OSD Position Selector) -->
+        <!-- Monochrome Segmented Pill Button Style (OSD Position Selector with Gliding Pill Indicator) -->
         <Style x:Key="SegmentedPillButtonStyle" TargetType="Button">
             <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
@@ -1112,7 +1319,7 @@
                                 <Setter Property="Foreground" Value="{DynamicResource TextWhiteBrush}" />
                             </Trigger>
                             <Trigger Property="Tag" Value="Selected">
-                                <Setter TargetName="segBorder" Property="Background" Value="{DynamicResource MenuBadgeActiveBgBrush}" />
+                                <Setter TargetName="segBorder" Property="Background" Value="Transparent" />
                                 <Setter Property="Foreground" Value="{DynamicResource MenuBadgeActiveTextBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -1142,8 +1349,12 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="6"
                                 Padding="{TemplateBinding Padding}"
+                                RenderTransformOrigin="0.5,0.5"
                                 SnapsToDevicePixels="False"
                                 RenderOptions.EdgeMode="Unspecified">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="dangerBtnScale" ScaleX="1.0" ScaleY="1.0" />
+                            </Border.RenderTransform>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -1152,6 +1363,30 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="{DynamicResource DangerBtnPressedBgBrush}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleX" To="0.965" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleY" To="0.965" Duration="0:0:0.07">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.14">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.14">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1238,7 +1473,7 @@
             RenderOptions.EdgeMode="Unspecified"
             RenderTransformOrigin="0.5,0.5">
         <Border.RenderTransform>
-            <TransformGroup x:Name="rootTransformGroup">
+            <TransformGroup>
                 <ScaleTransform x:Name="rootScaleTransform" ScaleX="1.0" ScaleY="1.0" />
                 <TranslateTransform x:Name="rootTranslateTransform" X="0.0" Y="0.0" />
             </TransformGroup>
@@ -1308,8 +1543,7 @@
                                      Visibility="Collapsed"
                                      SnapsToDevicePixels="False"
                                      RenderOptions.EdgeMode="Unspecified" />
-                            <Path x:Name="pathAppMenuChevron"
-                                  Data="M 0,0 L 3.5,3.5 L 7,0"
+                            <Path Data="M 0,0 L 3.5,3.5 L 7,0"
                                   Stroke="{DynamicResource TextGrayBrush}"
                                   StrokeThickness="1.5"
                                   StrokeStartLineCap="Round"
@@ -1336,21 +1570,22 @@
                            AllowsTransparency="True"
                            StaysOpen="True"
                            PopupAnimation="None"
-                           TextOptions.TextFormattingMode="Display"
-                           TextOptions.TextRenderingMode="ClearType"
+                           TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                           TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}"
                            RenderOptions.ClearTypeHint="Enabled"
-                           SnapsToDevicePixels="True"
+                           SnapsToDevicePixels="False"
                            UseLayoutRounding="True">
                         <Border x:Name="borderAppMenu"
-                                LayoutTransform="{StaticResource WindowContentScaleTransform}"
-                                Background="{DynamicResource InputBgBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="10"
-                                Padding="4,6"
+                                Background="Transparent"
+                                BorderThickness="0"
                                 MinWidth="226"
                                 Margin="18,10,18,22"
                                 RenderTransformOrigin="0.5,0.0"
+                                TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                                TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}"
+                                RenderOptions.ClearTypeHint="Enabled"
+                                SnapsToDevicePixels="False"
+                                UseLayoutRounding="True"
                                 TextElement.FontFamily="Segoe UI Variable Text, Segoe UI Variable Display, Segoe UI, sans-serif">
                             <Border.RenderTransform>
                                 <TransformGroup>
@@ -1358,10 +1593,24 @@
                                     <TranslateTransform x:Name="appMenuTranslate" Y="0" />
                                 </TransformGroup>
                             </Border.RenderTransform>
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#000000" />
-                            </Border.Effect>
-                            <StackPanel>
+                            <Grid>
+                                <!-- Sibling shadow layer prevents DropShadowEffect from rasterizing menu text -->
+                                <Border Background="{DynamicResource InputBgBrush}"
+                                        CornerRadius="10"
+                                        IsHitTestVisible="False">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#000000" />
+                                    </Border.Effect>
+                                </Border>
+                                <Border Background="{DynamicResource InputBgBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="4,6"
+                                        RenderOptions.ClearTypeHint="Enabled"
+                                        TextOptions.TextFormattingMode="{DynamicResource PopupTextFormattingMode}"
+                                        TextOptions.TextRenderingMode="{DynamicResource PopupTextRenderingMode}">
+                                    <StackPanel>
                                 <!-- Option 0A: Startup Mic State -->
                                 <Button x:Name="btnMenuStartupState"
                                         Style="{StaticResource AppDropdownItemButtonStyle}"
@@ -1517,8 +1766,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <Path x:Name="pathMenuUpdateIcon"
-                                              Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                                        <Path Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
                                               Fill="{DynamicResource TextGrayBrush}"
                                               Stretch="Uniform"
                                               Width="12" Height="12"
@@ -1614,12 +1862,11 @@
                                                    Margin="4,0,0,0" />
                                     </Grid>
                                 </Border>
-                            </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Border>
                     </Popup>
-
-                    <!-- Hidden legacy Image for backward compat -->
-                    <Image x:Name="imgAppIcon" Width="0" Height="0" Visibility="Collapsed" />
 
                     <!-- Right: Quick Theme Button + Windows 11 Caption Controls -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
@@ -1935,515 +2182,71 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- GROUP 2: Behaviors & System Settings (iOS Inset Squircle Group) -->
-                    <Border Background="{DynamicResource CardBgBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="16"
-                            Padding="12,10"
-                            SnapsToDevicePixels="False"
-                            RenderOptions.EdgeMode="Unspecified"
-                            Margin="0,0,0,10">
-                        <StackPanel>
-                            <!-- Row 1: On-Screen Display (OSD) -->
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                    <!-- Settings Popup Toggle (Interactive Rotating Gear Button) -->
+                    <Button x:Name="btnSettingsToggle"
+                            Style="{StaticResource SettingsToggleCardButtonStyle}"
+                            ToolTip="Open or close Settings (OSD, sound effects, startup &amp; data)"
+                            Margin="0,0,0,6"
+                            Click="BtnSettingsToggle_Click">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                                <Border Grid.Column="0"
-                                        Width="28" Height="28"
-                                        CornerRadius="7"
-                                        Background="{DynamicResource SquircleBgBrush}"
-                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,0,9,0"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        VerticalAlignment="Center">
-                                    <Path Data="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                                          Stroke="{DynamicResource SquircleIconBrush}"
-                                          StrokeThickness="1.5"
-                                          Stretch="Uniform"
-                                          Width="13" Height="13"
-                                          SnapsToDevicePixels="False"
-                                          RenderOptions.EdgeMode="Unspecified"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                                </Border>
+                            <!-- Monochrome Squircle Tile with Rotating Settings Gear -->
+                            <Border Grid.Column="0"
+                                    Width="28" Height="28"
+                                    CornerRadius="7"
+                                    Background="{DynamicResource SquircleBgBrush}"
+                                    BorderBrush="{DynamicResource SquircleBorderBrush}"
+                                    BorderThickness="1"
+                                    Margin="0,0,9,0"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified"
+                                    VerticalAlignment="Center">
+                                <Path Data="M19.14,12.94 C19.18,12.64 19.2,12.33 19.2,12 C19.2,11.67 19.18,11.36 19.14,11.06 L21.16,9.48 C21.34,9.34 21.39,9.08 21.28,8.87 L19.36,5.55 C19.24,5.34 18.99,5.26 18.77,5.34 L16.38,6.3 C15.88,5.92 15.34,5.6 14.75,5.36 L14.39,2.82 C14.36,2.58 14.16,2.4 13.92,2.4 L10.08,2.4 C9.84,2.4 9.64,2.58 9.61,2.82 L9.25,5.36 C8.66,5.6 8.12,5.92 7.62,6.3 L5.23,5.34 C5.01,5.26 4.76,5.34 4.64,5.55 L2.72,8.87 C2.61,9.08 2.66,9.34 2.84,9.48 L4.86,11.06 C4.82,11.36 4.8,11.67 4.8,12 C4.8,12.33 4.82,12.64 4.86,12.94 L2.84,14.52 C2.66,14.66 2.61,14.92 2.72,15.13 L4.64,18.45 C4.76,18.66 5.01,18.74 5.23,18.66 L7.62,17.7 C8.12,18.08 8.66,18.4 9.25,18.64 L9.61,21.18 C9.64,21.42 9.84,21.6 10.08,21.6 L13.92,21.6 C14.16,21.6 14.36,21.42 14.39,21.18 L14.75,18.64 C15.34,18.4 15.88,18.08 16.38,17.7 L18.77,18.66 C18.99,18.74 19.24,18.66 19.36,18.45 L21.28,15.13 C21.39,14.92 21.34,14.66 21.16,14.52 L19.14,12.94 Z M12,15.4 C10.12,15.4 8.6,13.88 8.6,12 C8.6,10.12 10.12,8.6 12,8.6 C13.88,8.6 15.4,10.12 15.4,12 C15.4,13.88 13.88,15.4 12,15.4 Z"
+                                      Fill="{DynamicResource SquircleIconBrush}"
+                                      Stretch="Uniform"
+                                      Width="14" Height="14"
+                                      SnapsToDevicePixels="False"
+                                      RenderOptions.EdgeMode="Unspecified"
+                                      RenderTransformOrigin="0.5,0.5"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center">
+                                    <Path.RenderTransform>
+                                        <RotateTransform x:Name="settingsGearRot" Angle="0" />
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="On-Screen Display (OSD)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
-                                    <TextBlock Text="Visual HUD popup when toggled" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
-                                </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Settings" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
+                                <TextBlock Text="OSD, sound effects, startup &amp; data" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
+                            </StackPanel>
 
-                                <!-- Chunky Liquid Toggle Switch -->
-                                <CheckBox x:Name="cbEnableOsd"
-                                          Grid.Column="2"
-                                          Style="{StaticResource ToggleSwitchStyle}"
-                                          VerticalAlignment="Center"
-                                          Checked="CbEnableOsd_Checked"
-                                          Unchecked="CbEnableOsd_Unchecked" />
-                            </Grid>
-
-                            <!-- High-Contrast OSD Duration Slider & Placement Sub-Rows -->
-                            <Grid x:Name="panelOsdDuration" Margin="37,0,0,8">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Duration" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <Slider x:Name="sliderOsdDuration"
-                                        Grid.Row="0"
-                                        Grid.Column="1"
-                                        Style="{StaticResource ModernSliderStyle}"
-                                        Minimum="0.1" Maximum="30.0"
-                                        TickFrequency="0.1"
-                                        IsSnapToTickEnabled="True"
-                                        VerticalAlignment="Center"
-                                        ValueChanged="SliderOsdDuration_ValueChanged" />
-                                <Border x:Name="borderOsdDurationKeycap"
-                                        Grid.Row="0"
-                                        Grid.Column="2"
-                                        Width="58" Height="24"
-                                        Background="{DynamicResource KeycapBgBrush}"
-                                        BorderBrush="{DynamicResource KeycapBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Margin="8,0,0,0"
-                                        Cursor="IBeam"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        VerticalAlignment="Center">
-                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="txtOsdDuration"
-                                                 Grid.Column="0"
-                                                 Width="34"
-                                                 MinWidth="32"
-                                                 Text="0.3"
-                                                 Background="Transparent"
-                                                 Foreground="{DynamicResource TextWhiteBrush}"
-                                                 CaretBrush="{DynamicResource TextWhiteBrush}"
-                                                 BorderThickness="0"
-                                                 FontSize="10.5"
-                                                 FontWeight="Bold"
-                                                 TextAlignment="Right"
-                                                 VerticalAlignment="Center"
-                                                 Padding="0"
-                                                 LostFocus="TxtOsdDuration_LostFocus"
-                                                 KeyDown="TxtOsdDuration_KeyDown"
-                                                 TextChanged="TxtOsdDuration_TextChanged" />
-                                        <TextBlock Grid.Column="1"
-                                                   Text="s"
-                                                   Foreground="{DynamicResource TextGrayBrush}"
-                                                   FontSize="10"
-                                                   FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"
-                                                   Margin="2,0,0,0" />
-                                    </Grid>
-                                </Border>
-
-                                <!-- Row 1: OSD Screen Position Segmented Pill Selector -->
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Position" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,6,8,0" />
-                                <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                                        Height="26"
-                                        Margin="0,6,0,0"
-                                        Padding="2"
-                                        Background="{DynamicResource KeycapBgBrush}"
-                                        BorderBrush="{DynamicResource KeycapBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        VerticalAlignment="Center">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="2" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="2" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Button x:Name="btnOsdPosCenter"
-                                                Grid.Column="0"
-                                                Content="Center"
-                                                Tag="Selected"
-                                                Style="{StaticResource SegmentedPillButtonStyle}"
-                                                ToolTip="Show OSD at the center of the active display"
-                                                Click="BtnOsdPosCenter_Click" />
-                                        <Button x:Name="btnOsdPosBottom"
-                                                Grid.Column="2"
-                                                Content="Bottom"
-                                                Style="{StaticResource SegmentedPillButtonStyle}"
-                                                ToolTip="Show OSD above the taskbar (clears game crosshairs)"
-                                                Click="BtnOsdPosBottom_Click" />
-                                        <Button x:Name="btnOsdPosTop"
-                                                Grid.Column="4"
-                                                Content="Top"
-                                                Style="{StaticResource SegmentedPillButtonStyle}"
-                                                ToolTip="Show OSD near the top of the active display"
-                                                Click="BtnOsdPosTop_Click" />
-                                    </Grid>
-                                </Border>
-                            </Grid>
-
-                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
-
-                            <!-- Row 2: Audio Feedback (Chime) -->
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0"
-                                        Width="28" Height="28"
-                                        CornerRadius="7"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        Background="{DynamicResource SquircleBgBrush}"
-                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,0,9,0"
-                                        VerticalAlignment="Center">
-                                    <Path Data="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                                          Stroke="{DynamicResource SquircleIconBrush}"
-                                          StrokeThickness="1.4"
-                                          Stretch="Uniform"
-                                          SnapsToDevicePixels="False"
-                                          RenderOptions.EdgeMode="Unspecified"
-                                          Width="13" Height="13"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Sound Effects (Audio Chime)" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
-                                    <TextBlock Text="Play acoustic sound on mute / unmute" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
-                                </StackPanel>
-
-                                <CheckBox x:Name="cbSoundFeedback"
-                                          Grid.Column="2"
-                                          Style="{StaticResource ToggleSwitchStyle}"
-                                          VerticalAlignment="Center"
-                                          Checked="CbSoundFeedback_Checked"
-                                          Unchecked="CbSoundFeedback_Unchecked" />
-                            </Grid>
-
-                            <!-- High-Contrast Sound Volume / Loudness Slider -->
-                            <Grid x:Name="panelSoundVolume" Margin="37,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Volume" Foreground="{DynamicResource TextGrayBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <Slider x:Name="sliderSoundVolume"
-                                        Grid.Column="1"
-                                        Style="{StaticResource ModernSliderStyle}"
-                                        Minimum="0" Maximum="100"
-                                        TickFrequency="1"
-                                        IsSnapToTickEnabled="True"
-                                        VerticalAlignment="Center"
-                                        ValueChanged="SliderSoundVolume_ValueChanged" />
-                                <Border x:Name="borderSoundVolumeKeycap"
-                                        Grid.Column="2"
-                                        Width="58" Height="24"
-                                        Background="{DynamicResource KeycapBgBrush}"
-                                        BorderBrush="{DynamicResource KeycapBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        Margin="8,0,0,0"
-                                        Cursor="IBeam"
-                                        VerticalAlignment="Center">
-                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="txtSoundVolume"
-                                                 Grid.Column="0"
-                                                 Width="34"
-                                                 MinWidth="32"
-                                                 Text="100"
-                                                 Background="Transparent"
-                                                 Foreground="{DynamicResource TextWhiteBrush}"
-                                                 CaretBrush="{DynamicResource TextWhiteBrush}"
-                                                 BorderThickness="0"
-                                                 FontSize="10.5"
-                                                 FontWeight="Bold"
-                                                 TextAlignment="Right"
-                                                 VerticalAlignment="Center"
-                                                 Padding="0"
-                                                 LostFocus="TxtSoundVolume_LostFocus"
-                                                 KeyDown="TxtSoundVolume_KeyDown"
-                                                 TextChanged="TxtSoundVolume_TextChanged" />
-                                        <TextBlock Grid.Column="1"
-                                                   Text=" %"
-                                                   Foreground="{DynamicResource TextGrayBrush}"
-                                                   FontSize="10"
-                                                   FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"
-                                                   Margin="1,0,0,0" />
-                                    </Grid>
-                                </Border>
-                            </Grid>
-
-                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
-
-                            <!-- Row 3: Run on Windows Startup -->
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0"
-                                        Width="28" Height="28"
-                                        CornerRadius="7"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        Background="{DynamicResource SquircleBgBrush}"
-                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,0,9,0"
-                                        VerticalAlignment="Center">
-                                    <Path Data="M13 10V3L4 14h7v7l9-11h-7z"
-                                          Fill="{DynamicResource SquircleIconBrush}"
-                                          Stretch="Uniform"
-                                          SnapsToDevicePixels="False"
-                                          RenderOptions.EdgeMode="Unspecified"
-                                          Width="12" Height="13"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Run on Windows Startup" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
-                                    <TextBlock Text="Launch automatically with Windows" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
-                                </StackPanel>
-
-                                <CheckBox x:Name="cbStartup"
-                                          Grid.Column="2"
-                                          Style="{StaticResource ToggleSwitchStyle}"
-                                          VerticalAlignment="Center"
-                                          Checked="CbStartup_Checked"
-                                          Unchecked="CbStartup_Unchecked" />
-                            </Grid>
-
-                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
-
-                            <!-- Row 4: Start Minimized -->
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0"
-                                        Width="28" Height="28"
-                                        CornerRadius="7"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        Background="{DynamicResource SquircleBgBrush}"
-                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,0,9,0"
-                                        VerticalAlignment="Center">
-                                    <Path Data="M19 13l-7 7-7-7m14-8l-7 7-7-7"
-                                          Stroke="{DynamicResource SquircleIconBrush}"
-                                          StrokeThickness="1.5"
-                                          Stretch="Uniform"
-                                          SnapsToDevicePixels="False"
-                                          RenderOptions.EdgeMode="Unspecified"
-                                          Width="12" Height="12"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Start Minimized" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
-                                    <TextBlock Text="Always hide main window to tray" Foreground="{DynamicResource TextGrayBrush}" FontSize="9.5" FontWeight="SemiBold" />
-                                </StackPanel>
-
-                                <CheckBox x:Name="cbStartMinimized"
-                                          Grid.Column="2"
-                                          Style="{StaticResource ToggleSwitchStyle}"
-                                          VerticalAlignment="Center"
-                                          Checked="CbStartMinimized_Checked"
-                                          Unchecked="CbStartMinimized_Unchecked" />
-                            </Grid>
-
-                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,2,0,8" />
-
-                            <!-- Row 5: Run as Administrator -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0"
-                                        Width="28" Height="28"
-                                        CornerRadius="7"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        Background="{DynamicResource SquircleBgBrush}"
-                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,0,9,0"
-                                        VerticalAlignment="Center">
-                                    <Path Data="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                                          Stroke="{DynamicResource SquircleIconBrush}"
-                                          StrokeThickness="1.4"
-                                          Stretch="Uniform"
-                                          SnapsToDevicePixels="False"
-                                          RenderOptions.EdgeMode="Unspecified"
-                                          Width="13" Height="13"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
-                                    <TextBlock Text="Run as Administrator" Foreground="{DynamicResource TextWhiteBrush}" FontSize="12" FontWeight="Bold" />
-                                    <TextBlock Text="Enables hotkeys over anti-cheat and elevated windows"
-                                               Foreground="{DynamicResource TextGrayBrush}"
-                                               FontSize="9.5"
-                                               FontWeight="SemiBold"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-
-                                <CheckBox x:Name="cbRunAsAdmin"
-                                          Grid.Column="2"
-                                          Style="{StaticResource ToggleSwitchStyle}"
-                                          VerticalAlignment="Center"
-                                          Checked="CbRunAsAdmin_Checked"
-                                          Unchecked="CbRunAsAdmin_Unchecked" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+                            <Path Grid.Column="2"
+                                  Data="M 0,0 L 4,4 L 0,8"
+                                  Stroke="{DynamicResource TextGrayBrush}"
+                                  StrokeThickness="1.6"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  VerticalAlignment="Center"
+                                  Margin="8,0,4,0"
+                                  SnapsToDevicePixels="False"
+                                  RenderOptions.EdgeMode="Unspecified"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform x:Name="settingsChevronRot" Angle="0" />
+                                </Path.RenderTransform>
+                            </Path>
+                        </Grid>
+                    </Button>
 
                     <!-- Hidden legacy checkbox to preserve settings binding -->
                     <CheckBox x:Name="cbLightMode" Visibility="Collapsed" />
-
-                    <!-- GROUP 3: Settings Location & Data (iOS Inset Squircle Group) -->
-                    <Border Background="{DynamicResource CardBgBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="16"
-                            Padding="12,10"
-                            SnapsToDevicePixels="False"
-                            RenderOptions.EdgeMode="Unspecified"
-                            Margin="0,0,0,10">
-                        <StackPanel>
-                            <!-- Row 1: Header with Label and Icon -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Standard 28x28 Squircle Tile -->
-                                <Border Grid.Column="0"
-                                        Width="28" Height="28"
-                                        CornerRadius="7"
-                                        SnapsToDevicePixels="False"
-                                        RenderOptions.EdgeMode="Unspecified"
-                                        Background="{DynamicResource SquircleBgBrush}"
-                                        BorderBrush="{DynamicResource SquircleBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,0,9,0"
-                                        VerticalAlignment="Center">
-                                    <Path Data="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"
-                                          Fill="{DynamicResource SquircleIconBrush}"
-                                          Stretch="Uniform"
-                                          SnapsToDevicePixels="False"
-                                          RenderOptions.EdgeMode="Unspecified"
-                                          Width="13" Height="11"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Settings Location"
-                                               Foreground="{DynamicResource TextWhiteBrush}"
-                                               FontSize="12"
-                                               FontWeight="Bold" />
-                                    <TextBlock Text="Configuration file and data directory"
-                                               Foreground="{DynamicResource TextGrayBrush}"
-                                               FontSize="9.5"
-                                               FontWeight="SemiBold" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Row 2: 3 Action Buttons in an evenly spaced horizontal row under the text -->
-                            <Grid Margin="0,10,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" x:Name="btnOpenFolder" Content="Open"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Height="26" FontSize="10.5" HorizontalAlignment="Stretch"
-                                        Click="BtnOpenDataFolder_Click" />
-                                <Button Grid.Column="2" x:Name="btnChangeFolder" Content="Change"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Height="26" FontSize="10.5" HorizontalAlignment="Stretch"
-                                        Click="BtnChangeDataFolder_Click" />
-                                <Button Grid.Column="4" x:Name="btnResetData" Content="Reset"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Height="26" FontSize="10.5" HorizontalAlignment="Stretch"
-                                        Click="BtnResetSettings_Click" />
-                            </Grid>
-
-                            <!-- Clean Separator -->
-                            <Separator Background="{DynamicResource DividerBrush}" Margin="0,10,0,8" />
-
-                            <!-- Row 2: Inset Glass Pill for Full Path Display -->
-                            <Border Background="{DynamicResource InputBgBrush}"
-                                    BorderBrush="{DynamicResource BorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="8"
-                                    SnapsToDevicePixels="False"
-                                    RenderOptions.EdgeMode="Unspecified"
-                                    Padding="10,6">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="tbStoragePath"
-                                               Text="%APPDATA%\MicMute"
-                                               Foreground="{DynamicResource TextGrayBrush}"
-                                               FontSize="10"
-                                               FontFamily="Consolas, SF Mono, Cascadia Mono, Segoe UI Mono, monospace"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis"
-                                               VerticalAlignment="Center"
-                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-                    </Border>
 
                     <!-- Live Update Progress Indicator Banner (Visible while checking / downloading / installing) -->
                     <Border x:Name="borderUpdateBanner"
@@ -2477,8 +2280,7 @@
                                         BorderThickness="1"
                                         Margin="0,0,9,0"
                                         VerticalAlignment="Center">
-                                    <Path x:Name="pathUpdateBannerIcon"
-                                          Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                                    <Path Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
                                           Fill="{DynamicResource SquircleIconBrush}"
                                           Stretch="Uniform"
                                           Width="12" Height="12"
@@ -2610,10 +2412,8 @@
                     SnapsToDevicePixels="False"
                     RenderOptions.EdgeMode="Unspecified">
                 <Border x:Name="borderModalCard"
-                        Background="{DynamicResource ModalCardBgBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="16"
+                        Background="Transparent"
+                        BorderThickness="0"
                         Width="324"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
@@ -2623,53 +2423,67 @@
                     <Border.RenderTransform>
                         <ScaleTransform x:Name="modalCardScale" ScaleX="0.96" ScaleY="0.96" />
                     </Border.RenderTransform>
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="22" ShadowDepth="6" Direction="270" Opacity="0.40" Color="#000000" />
-                    </Border.Effect>
                     <Grid>
-                        <!-- Subtle Top Specular Hairline -->
-                        <Border Height="1"
-                                VerticalAlignment="Top"
-                                Margin="14,0,14,0"
-                                Background="{DynamicResource ModalTopHighlightBrush}"
-                                IsHitTestVisible="False" />
-                        <StackPanel Margin="18,16">
-                            <TextBlock x:Name="tbModalTitle"
-                                       Text="Confirm Action"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       FontSize="14"
-                                       FontWeight="Bold"
-                                       Margin="0,0,0,6" />
-                            <TextBlock x:Name="tbModalMessage"
-                                       Text="Are you sure?"
-                                       Foreground="{DynamicResource TextGrayBrush}"
-                                       FontSize="11.5"
-                                       FontWeight="SemiBold"
-                                       TextWrapping="Wrap"
-                                       LineHeight="17"
-                                       Margin="0,0,0,16" />
+                        <!-- Sibling shadow layer prevents DropShadowEffect from rasterizing modal text -->
+                        <Border Background="{DynamicResource ModalCardBgBrush}"
+                                CornerRadius="16"
+                                IsHitTestVisible="False">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="22" ShadowDepth="6" Direction="270" Opacity="0.40" Color="#000000" />
+                            </Border.Effect>
+                        </Border>
+                        <Border Background="{DynamicResource ModalCardBgBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="16"
+                                SnapsToDevicePixels="False"
+                                RenderOptions.EdgeMode="Unspecified">
                             <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Button x:Name="btnModalCancel"
-                                        Grid.Column="0"
-                                        Height="32"
-                                        Content="Cancel"
-                                        FontSize="11.5"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Click="BtnModalCancel_Click" />
-                                <Button x:Name="btnModalConfirm"
-                                        Grid.Column="2"
-                                        Height="32"
-                                        Content="Confirm"
-                                        FontSize="11.5"
-                                        Style="{StaticResource SecondaryActionButtonStyle}"
-                                        Click="BtnModalConfirm_Click" />
+                                <!-- Subtle Top Specular Hairline -->
+                                <Border Height="1"
+                                        VerticalAlignment="Top"
+                                        Margin="14,0,14,0"
+                                        Background="{DynamicResource ModalTopHighlightBrush}"
+                                        IsHitTestVisible="False" />
+                                <StackPanel Margin="18,16">
+                                    <TextBlock x:Name="tbModalTitle"
+                                               Text="Confirm Action"
+                                               Foreground="{DynamicResource TextWhiteBrush}"
+                                               FontSize="14"
+                                               FontWeight="Bold"
+                                               Margin="0,0,0,6" />
+                                    <TextBlock x:Name="tbModalMessage"
+                                               Text="Are you sure?"
+                                               Foreground="{DynamicResource TextGrayBrush}"
+                                               FontSize="11.5"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"
+                                               LineHeight="17"
+                                               Margin="0,0,0,16" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="btnModalCancel"
+                                                Grid.Column="0"
+                                                Height="32"
+                                                Content="Cancel"
+                                                FontSize="11.5"
+                                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                                Click="BtnModalCancel_Click" />
+                                        <Button x:Name="btnModalConfirm"
+                                                Grid.Column="2"
+                                                Height="32"
+                                                Content="Confirm"
+                                                FontSize="11.5"
+                                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                                Click="BtnModalConfirm_Click" />
+                                    </Grid>
+                                </StackPanel>
                             </Grid>
-                        </StackPanel>
+                        </Border>
                     </Grid>
                 </Border>
             </Border>

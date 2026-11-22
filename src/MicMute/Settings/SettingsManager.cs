@@ -27,10 +27,10 @@ public static class SettingsManager
     public static AppSettings Load() => _store.Load();
     public static void Save(AppSettings settings) => _store.Save(settings);
     public static void Flush() => _store.Flush();
+    public static void Dispose() => _store.Dispose();
     public static string GetDataFolderPath() => _store.GetDataFolderPath();
     public static string GetSettingsFilePath() => _store.GetSettingsFilePath();
     public static void SetCustomDataFolder(string path) => _store.SetCustomDataFolder(path);
-    public static void SetPortableMode(bool enabled) => _store.SetPortableMode(enabled);
     public static void ResetAllSettings() => _store.ResetAllSettings();
     public static void OpenDataFolderInExplorer() => _store.OpenDataFolderInExplorer();
 }

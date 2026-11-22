@@ -60,16 +60,17 @@ public static class UpdateManager
 {
     public const string RepositoryOwner = "youssefhazem3-dot";
     public const string RepositoryName = "MicMute";
-    public const string LatestReleaseApiUrl = "https://api.github.com/repos/youssefhazem3-dot/MicMute/releases/latest";
-    public const string ReleasesPageUrl = "https://github.com/youssefhazem3-dot/MicMute/releases/latest";
+    public const string LatestReleaseApiUrl = $"https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases/latest";
+    public const string ReleasesPageUrl = $"https://github.com/{RepositoryOwner}/{RepositoryName}/releases/latest";
     private const long StandaloneSizeThresholdBytes = 15L * 1024L * 1024L;
 
     private static readonly HttpClient SharedHttpClient = CreateHttpClient();
 
     private static HttpClient CreateHttpClient()
     {
-        var handler = new HttpClientHandler
+        var handler = new SocketsHttpHandler
         {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
         };
         var client = new HttpClient(handler)
@@ -603,7 +604,7 @@ public static class UpdateManager
                 launchArgs += $" --updated-from \"{(!string.IsNullOrWhiteSpace(previousVersion) ? previousVersion : "previous")}\"";
             }
 
-            Process.Start(new ProcessStartInfo
+            using Process? relaunched = Process.Start(new ProcessStartInfo
             {
                 FileName = targetExePath,
                 Arguments = launchArgs,

@@ -48,6 +48,7 @@ public partial class OsdWindow : Window
 
     internal Border borderPanel = null!;
     internal ScaleTransform? panelScaleTransform;
+    internal TranslateTransform? panelTranslateTransform;
     internal Grid pathActive = null!;
     internal Grid pathMuted = null!;
     internal TextBlock tbStatus = null!;
@@ -59,6 +60,7 @@ public partial class OsdWindow : Window
     private bool _contentLoaded;
     private bool _lightMode;
     private bool _isMuted;
+    private HwndSource? _hwndSource;
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
@@ -146,6 +148,7 @@ public partial class OsdWindow : Window
 
                     borderPanel = (Border)root.FindName("borderPanel");
                     panelScaleTransform = root.FindName("panelScaleTransform") as ScaleTransform;
+                    panelTranslateTransform = root.FindName("panelTranslateTransform") as TranslateTransform;
                     pathActive = (Grid)root.FindName("pathActive");
                     pathMuted = (Grid)root.FindName("pathMuted");
                     tbStatus = (TextBlock)root.FindName("tbStatus");
@@ -177,8 +180,24 @@ public partial class OsdWindow : Window
         SetWindowLong(handle, GWL_EXSTYLE, new IntPtr(exStyle));
         SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 
-        HwndSource? source = HwndSource.FromHwnd(handle);
-        source?.AddHook(WndProc);
+        _hwndSource = HwndSource.FromHwnd(handle);
+        _hwndSource?.AddHook(WndProc);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_hwndSource != null)
+        {
+            _hwndSource.RemoveHook(WndProc);
+            _hwndSource = null;
+        }
+        BeginAnimation(OpacityProperty, null);
+        ResetOverlayAnimations();
+        if (ReferenceEquals(_instance, this))
+        {
+            _instance = null;
+        }
+        base.OnClosed(e);
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -228,8 +247,7 @@ public partial class OsdWindow : Window
         int sequenceId = Interlocked.Increment(ref _activeSequenceId);
 
         CancellationTokenSource? previousCts = _cts;
-        var currentCts = new CancellationTokenSource();
-        _cts = currentCts;
+        _cts = null;
         try
         {
             previousCts?.Cancel();
@@ -241,15 +259,15 @@ public partial class OsdWindow : Window
             _instance = new OsdWindow();
         }
 
-        bool wasVisible = _instance.IsVisible && _instance.Opacity > 0.05;
+        bool wasVisible = _instance.IsVisible && _instance.Opacity > 0.05 && (_instance.borderPanel?.Opacity ?? 1.0) > 0.05;
         bool wasMuted = _instance._isMuted;
 
         // Cancel any pending opacity animation and restore full window visibility immediately
         _instance.BeginAnimation(OpacityProperty, null);
-        _instance.Opacity = 0.95;
+        _instance.Opacity = 0.96;
 
         AppSettings settings = SettingsManager.Load();
-        _instance.ApplyTheme(settings.LightMode);
+        _instance.ApplyThemeCore(settings.LightMode, refreshState: false);
         _instance.UpdateState(isMuted);
 
         if (!wasVisible)
@@ -263,8 +281,13 @@ public partial class OsdWindow : Window
             {
                 _instance.panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
                 _instance.panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                _instance.panelScaleTransform.ScaleX = 0.94;
-                _instance.panelScaleTransform.ScaleY = 0.94;
+                _instance.panelScaleTransform.ScaleX = 0.88;
+                _instance.panelScaleTransform.ScaleY = 0.88;
+            }
+            if (_instance.panelTranslateTransform != null)
+            {
+                _instance.panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+                _instance.panelTranslateTransform.Y = 10.0;
             }
         }
         else
@@ -283,16 +306,18 @@ public partial class OsdWindow : Window
 
         if (!wasVisible)
         {
-            _instance.AnimatePanelEntrance();
+            _instance.AnimatePanelEntrance(sequenceId);
         }
         else if (wasMuted != isMuted)
         {
-            _instance.AnimatePanelScale(1.03, 1.0, 90, new CubicEase { EasingMode = EasingMode.EaseOut });
+            _instance.AnimatePanelPulse(sequenceId);
         }
 
         double safeDuration = double.IsFinite(durationSeconds)
             ? Math.Clamp(durationSeconds, UiBehavior.MinimumOsdDuration, UiBehavior.MaximumOsdDuration)
             : UiBehavior.MinimumOsdDuration;
+        var currentCts = new CancellationTokenSource();
+        _cts = currentCts;
         _ = _instance.BeginFadeSequenceAsync(safeDuration, sequenceId, currentCts);
     }
 
@@ -464,7 +489,9 @@ public partial class OsdWindow : Window
         if (_instance?.IsVisible == true) _instance.ApplyTheme(isLight);
     }
 
-    internal void ApplyTheme(bool isLight)
+    internal void ApplyTheme(bool isLight) => ApplyThemeCore(isLight, refreshState: true);
+
+    private void ApplyThemeCore(bool isLight, bool refreshState)
     {
         _lightMode = isLight;
         activeGlyph.Fill = isLight ? BrushLightActiveText : BrushActiveText;
@@ -474,21 +501,52 @@ public partial class OsdWindow : Window
         {
             muteSlashBg.Stroke = isLight ? BrushLightSlashMask : BrushDarkSlashMask;
         }
-        UpdateState(_isMuted);
+        if (refreshState)
+        {
+            UpdateState(_isMuted);
+        }
     }
 
-    private void AnimatePanelEntrance()
+    private void AnimatePanelEntrance(int sequenceId)
     {
+        UiMotion.EnableTransientCache(borderPanel, this);
         if (borderPanel != null)
         {
             borderPanel.BeginAnimation(UIElement.OpacityProperty, null);
-            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(70))
+            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, UiMotion.Fast)
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = UiMotion.Decelerate
             };
             borderPanel.BeginAnimation(UIElement.OpacityProperty, fadeIn);
         }
-        AnimatePanelScale(0.94, 1.0, 85, new CubicEase { EasingMode = EasingMode.EaseOut });
+        if (panelTranslateTransform != null)
+        {
+            panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            DoubleAnimation slideIn = new DoubleAnimation(10.0, 0.0, UiMotion.Fast)
+            {
+                EasingFunction = UiMotion.Decelerate
+            };
+            panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, slideIn);
+        }
+        AnimatePanelScale(0.88, 1.0, 190, UiMotion.SpringGentle, () =>
+        {
+            if (sequenceId == _activeSequenceId)
+            {
+                UiMotion.ClearTransientCache(borderPanel);
+            }
+        });
+    }
+
+    private void AnimatePanelPulse(int sequenceId)
+    {
+        UiMotion.EnableTransientCache(borderPanel, this);
+        AnimatePanelScale(0.94, 1.0, 170, UiMotion.SpringGentle, () =>
+        {
+            if (sequenceId == _activeSequenceId)
+            {
+                UiMotion.ClearTransientCache(borderPanel);
+            }
+        });
     }
 
     private void SnapPanelOpacity()
@@ -500,21 +558,30 @@ public partial class OsdWindow : Window
         }
     }
 
-    private void AnimatePanelScale(double fromScale, double toScale, double durationMs, IEasingFunction easing)
+    private void AnimatePanelScale(double fromScale, double toScale, double durationMs, IEasingFunction easing, Action? onCompleted = null)
     {
-        if (panelScaleTransform == null) return;
+        if (panelScaleTransform == null)
+        {
+            onCompleted?.Invoke();
+            return;
+        }
         panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
 
         Duration duration = TimeSpan.FromMilliseconds(durationMs);
         DoubleAnimation animX = new DoubleAnimation(fromScale, toScale, duration) { EasingFunction = easing };
         DoubleAnimation animY = new DoubleAnimation(fromScale, toScale, duration) { EasingFunction = easing };
+        if (onCompleted != null)
+        {
+            animX.Completed += (_, _) => onCompleted();
+        }
         panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animX);
         panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animY);
     }
 
     private void ResetOverlayAnimations()
     {
+        UiMotion.ClearTransientCache(borderPanel);
         SnapPanelOpacity();
         if (panelScaleTransform != null)
         {
@@ -522,6 +589,11 @@ public partial class OsdWindow : Window
             panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
             panelScaleTransform.ScaleX = 1.0;
             panelScaleTransform.ScaleY = 1.0;
+        }
+        if (panelTranslateTransform != null)
+        {
+            panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            panelTranslateTransform.Y = 0.0;
         }
     }
 
@@ -588,10 +660,15 @@ public partial class OsdWindow : Window
                 return;
             }
 
-            DoubleAnimation fadeOut = new DoubleAnimation(0.95, 0.0, TimeSpan.FromSeconds(0.20));
+            UiMotion.EnableTransientCache(borderPanel, this);
+            double currentPanelOpacity = borderPanel?.Opacity ?? 1.0;
+            DoubleAnimation fadeOut = new DoubleAnimation(currentPanelOpacity, 0.0, UiMotion.OsdExit)
+            {
+                EasingFunction = UiMotion.Accelerate
+            };
             fadeOut.Completed += delegate
             {
-                if (!token.IsCancellationRequested && sequenceId == _activeSequenceId)
+                if (sequenceId == _activeSequenceId)
                 {
                     BeginAnimation(OpacityProperty, null);
                     ResetOverlayAnimations();
@@ -599,8 +676,22 @@ public partial class OsdWindow : Window
                     Hide();
                 }
             };
-            AnimatePanelScale(panelScaleTransform?.ScaleX ?? 1.0, 0.96, 200, new CubicEase { EasingMode = EasingMode.EaseIn });
-            BeginAnimation(OpacityProperty, fadeOut);
+            AnimatePanelScale(panelScaleTransform?.ScaleX ?? 1.0, 0.94, UiMotion.OsdExit.TimeSpan.TotalMilliseconds, UiMotion.Accelerate);
+            if (panelTranslateTransform != null)
+            {
+                panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(panelTranslateTransform.Y, 6.0, UiMotion.OsdExit)
+                {
+                    EasingFunction = UiMotion.Accelerate
+                });
+            }
+            if (borderPanel != null)
+            {
+                borderPanel.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            }
+            else
+            {
+                BeginAnimation(OpacityProperty, fadeOut);
+            }
         }
         catch (OperationCanceledException)
         {

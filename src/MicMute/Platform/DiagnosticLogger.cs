@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -24,7 +23,6 @@ public static class DiagnosticLogger
 
     private const int ATTACH_PARENT_PROCESS = -1;
     private const int STD_OUTPUT_HANDLE = -11;
-    private const int STD_ERROR_HANDLE = -12;
 
     public static bool IsEnabled => _isEnabled;
 
@@ -36,12 +34,6 @@ public static class DiagnosticLogger
             EnsureConsole();
             PrintBanner();
         }
-    }
-
-    public static void EnableConsole()
-    {
-        _isEnabled = true;
-        EnsureConsole();
     }
 
     private static void EnsureConsole()

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 
@@ -12,9 +13,12 @@ internal sealed class LatestRefreshCoordinator<T> : IDisposable
     private readonly Action<T> _apply;
     private readonly Action<Exception>? _onFailure;
     private readonly TimeSpan _retryDelay;
+    private readonly CancellationTokenSource _disposeCts = new();
     private long _requestedVersion;
     private bool _running;
-    private bool _disposed;
+    private int _disposed;
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     public LatestRefreshCoordinator(Func<Task<T>> load, Action<T> apply,
         TimeSpan retryDelay, Action<Exception>? onFailure = null, Dispatcher? dispatcher = null)
@@ -28,7 +32,7 @@ internal sealed class LatestRefreshCoordinator<T> : IDisposable
 
     public void Request()
     {
-        if (_disposed || _dispatcher.HasShutdownStarted) return;
+        if (IsDisposed || _dispatcher.HasShutdownStarted) return;
         if (!_dispatcher.CheckAccess())
         {
             try { _dispatcher.BeginInvoke(new Action(Request)); }
@@ -57,7 +61,7 @@ internal sealed class LatestRefreshCoordinator<T> : IDisposable
 
     private void Complete(long version, int attempt, T? result, Exception? failure)
     {
-        if (_disposed) { _running = false; return; }
+        if (IsDisposed) { _running = false; return; }
         if (version != _requestedVersion)
         {
             _ = LoadAsync(_requestedVersion, attempt: 0);
@@ -77,12 +81,24 @@ internal sealed class LatestRefreshCoordinator<T> : IDisposable
 
     private async Task RetryAfterDelay(long version)
     {
-        await Task.Delay(_retryDelay).ConfigureAwait(false);
+        try
+        {
+            await Task.Delay(_retryDelay, _disposeCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
         try
         {
             await _dispatcher.InvokeAsync(() =>
             {
-                if (_disposed) { _running = false; return; }
+                if (IsDisposed) { _running = false; return; }
                 _ = LoadAsync(_requestedVersion, version == _requestedVersion ? 1 : 0);
             });
         }
@@ -91,7 +107,9 @@ internal sealed class LatestRefreshCoordinator<T> : IDisposable
 
     public void Dispose()
     {
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _requestedVersion++;
+        try { _disposeCts.Cancel(); } catch { }
+        try { _disposeCts.Dispose(); } catch { }
     }
 }
