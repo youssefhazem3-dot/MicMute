@@ -12,15 +12,16 @@ namespace MicMute;
 internal static class UiMotion
 {
     internal static readonly Duration Fast = new(TimeSpan.FromMilliseconds(160));
+    internal static readonly Duration OsdEnter = new(TimeSpan.FromMilliseconds(175));
     internal static readonly Duration Standard = new(TimeSpan.FromMilliseconds(220));
-    internal static readonly Duration Emphasized = new(TimeSpan.FromMilliseconds(260));
-    internal static readonly Duration Exit = new(TimeSpan.FromMilliseconds(120));
-    internal static readonly Duration OsdExit = new(TimeSpan.FromMilliseconds(180));
+    internal static readonly Duration Emphasized = new(TimeSpan.FromMilliseconds(250));
+    internal static readonly Duration Exit = new(TimeSpan.FromMilliseconds(125));
+    internal static readonly Duration OsdExit = new(TimeSpan.FromMilliseconds(155));
 
-    /// <summary>Silky fast-response exponential deceleration (Fluent 2 / Apple HIG feel).</summary>
+    /// <summary>Balanced exponential deceleration with smooth initial ramp and clean settle (no subpixel tail crawl).</summary>
     internal static readonly IEasingFunction Decelerate = CreateFrozen(new ExponentialEase
     {
-        Exponent = 4.5,
+        Exponent = 3.2,
         EasingMode = EasingMode.EaseOut
     });
 
@@ -30,10 +31,10 @@ internal static class UiMotion
         EasingMode = EasingMode.EaseIn
     });
 
-    /// <summary>Subtle tactile spring overshoot for hero feedback and OSD pop-in.</summary>
+    /// <summary>Subtle tactile spring overshoot for micro-interactions.</summary>
     internal static readonly IEasingFunction SpringGentle = CreateFrozen(new BackEase
     {
-        Amplitude = 0.25,
+        Amplitude = 0.18,
         EasingMode = EasingMode.EaseOut
     });
 
@@ -46,36 +47,51 @@ internal static class UiMotion
         return freezable;
     }
 
-    /// <summary>
-    /// Temporarily caches an animated container into a DPI-matched GPU bitmap so AllowsTransparency
-    /// windows and DropShadowEffect subtrees animate without per-frame shader re-rasterization.
-    /// Always pair with <see cref="ClearTransientCache"/> when the animation finishes.
-    /// </summary>
-    internal static void EnableTransientCache(UIElement? element, Visual? dpiReference = null)
+    private static double GetDpiScale(UIElement element, Visual? dpiReference)
     {
-        if (element == null) return;
-        double scale = 1.0;
         try
         {
-            Visual? target = dpiReference ?? element;
+            Visual target = dpiReference ?? element;
             DpiScale dpi = VisualTreeHelper.GetDpi(target);
-            scale = Math.Clamp(Math.Max(dpi.DpiScaleX, dpi.DpiScaleY), 1.0, 2.5);
+            return Math.Clamp(Math.Max(dpi.DpiScaleX, dpi.DpiScaleY), 1.0, 2.5);
         }
         catch
         {
-            scale = 1.0;
+            return 1.0;
         }
+    }
 
-        if (element.CacheMode is BitmapCache existing && Math.Abs(existing.RenderAtScale - scale) < 0.05)
+    /// <summary>
+    /// Attaches a persistent DPI-matched GPU BitmapCache (with EnableClearType=false so layered
+    /// AllowsTransparency surfaces never fall back to software alpha-ClearType or snap glyph weights).
+    /// Ideal for static shadow layers and the circular OSD panel.
+    /// </summary>
+    internal static void EnablePersistentCache(UIElement? element, Visual? dpiReference = null)
+    {
+        if (element == null) return;
+        double scale = GetDpiScale(element, dpiReference);
+
+        if (element.CacheMode is BitmapCache existing
+            && !existing.EnableClearType
+            && Math.Abs(existing.RenderAtScale - scale) < 0.05)
         {
             return;
         }
 
         element.CacheMode = new BitmapCache(scale)
         {
-            EnableClearType = true,
+            EnableClearType = false,
             SnapsToDevicePixels = false
         };
+    }
+
+    /// <summary>
+    /// Temporarily caches an animated whole-window container into an alpha-safe, DPI-matched GPU bitmap
+    /// during whole-window transitions. Pair with <see cref="ClearTransientCache"/> when finished.
+    /// </summary>
+    internal static void EnableTransientCache(UIElement? element, Visual? dpiReference = null)
+    {
+        EnablePersistentCache(element, dpiReference);
     }
 
     internal static void ClearTransientCache(UIElement? element)

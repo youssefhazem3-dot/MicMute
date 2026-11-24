@@ -76,6 +76,7 @@ static class UiCases
         test(nameof(SimplifiedMainWindowAndSettingsPopupWithRotatingGear), SimplifiedMainWindowAndSettingsPopupWithRotatingGear);
         test(nameof(ModernMotionCurvesGlidingPillAndZeroLinearKeyframes), ModernMotionCurvesGlidingPillAndZeroLinearKeyframes);
         test(nameof(MemoryLeakCleanupAndResourceLifecycle), MemoryLeakCleanupAndResourceLifecycle);
+        test(nameof(JitterFreeAnimationsAndCenterOriginOsd), JitterFreeAnimationsAndCenterOriginOsd);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -2814,16 +2815,16 @@ static class UiCases
         Check.True(narrowPlaced.Left >= narrowWa.Left && narrowPlaced.Left + narrowPlaced.Width <= narrowWa.Left + narrowWa.Width + 0.5,
             "Narrow fallback must stay cleanly inside work area");
 
-        // 3. Verify version bump tracking (1.0.7)
-        Check.Equal("1.0.7", UpdateManager.GetCurrentVersionDisplay(), "App version must reflect +0.0.1 bump to 1.0.7");
+        // 3. Verify version bump tracking (1.0.8)
+        Check.Equal("1.0.8", UpdateManager.GetCurrentVersionDisplay(), "App version must reflect +0.0.1 bump to 1.0.8");
 
         // 4. Runtime verification of Settings toggle, gear rotation, SettingsWindow open/close, theme sync & lifecycle
         using var audio = new AudioController();
         var window = new MainWindow(audio);
         try
         {
-            Check.Equal("v1.0.7", window.tbTitleVersion?.Text, "Title bar must show v1.0.7");
-            Check.Equal("Version 1.0.7", window.tbMenuVersion?.Text, "App menu must show Version 1.0.7");
+            Check.Equal("v1.0.8", window.tbTitleVersion?.Text, "Title bar must show v1.0.8");
+            Check.Equal("Version 1.0.8", window.tbMenuVersion?.Text, "App menu must show Version 1.0.8");
             Check.True(window.btnSettingsToggle != null, "btnSettingsToggle must be bound");
             Check.True(window.settingsGearRot != null, "settingsGearRot must be bound");
             Check.True(window._settingsWindow != null, "SettingsPopupWindow must be initialized");
@@ -2983,6 +2984,95 @@ static class UiCases
         finally
         {
             window.Close();
+        }
+    }
+
+    private static void JitterFreeAnimationsAndCenterOriginOsd()
+    {
+        // 1. Alpha-safe GPU BitmapCache (EnableClearType == false so layered windows never trigger alpha-ClearType software fallback)
+        var dummyBorder = new System.Windows.Controls.Border();
+        UiMotion.EnableTransientCache(dummyBorder);
+        var transientCache = dummyBorder.CacheMode as System.Windows.Media.BitmapCache;
+        Check.True(transientCache != null && !transientCache.EnableClearType,
+            "UiMotion.EnableTransientCache must disable EnableClearType on layered transparent surfaces");
+        UiMotion.ClearTransientCache(dummyBorder);
+
+        // 2. Unclipped whole-window transition bounds math
+        double settingsHorizontalInset = (412.0 * (1.0 - SettingsWindow.OpenTransitionScale)) / 2.0;
+        Check.True(SettingsWindow.OpenTransitionDeltaX < settingsHorizontalInset,
+            $"SettingsWindow OpenTransitionDeltaX ({SettingsWindow.OpenTransitionDeltaX}) must stay strictly inside scale inset ({settingsHorizontalInset:F2})");
+        Check.True(SettingsWindow.ExitTransitionDeltaX < settingsHorizontalInset,
+            $"SettingsWindow ExitTransitionDeltaX ({SettingsWindow.ExitTransitionDeltaX}) must stay strictly inside scale inset ({settingsHorizontalInset:F2})");
+
+        double mainVerticalInset = (400.0 * (1.0 - MainWindow.WindowTransitionScale)) / 2.0;
+        Check.True(MainWindow.WindowTransitionDeltaY < mainVerticalInset,
+            $"MainWindow WindowTransitionDeltaY ({MainWindow.WindowTransitionDeltaY}) must stay strictly inside scale inset ({mainVerticalInset:F2})");
+
+        // 3. Zero per-frame DropShadowEffects on interactive controls & GPU-cached sibling shadows on popups/modals
+        using var mainStream = typeof(MainWindow).Assembly.GetManifestResourceStream("MicMute.MainWindow.xaml");
+        using var mainReader = new System.IO.StreamReader(mainStream!);
+        string mainXaml = mainReader.ReadToEnd();
+        int dropShadowCount = System.Text.RegularExpressions.Regex.Matches(mainXaml, @"<DropShadowEffect\b").Count;
+        Check.Equal(3, dropShadowCount,
+            $"MainWindow.xaml should only retain the 3 GPU-cached static sibling popup/modal DropShadowEffects (actual: {dropShadowCount})");
+        int shadowCacheCount = System.Text.RegularExpressions.Regex.Matches(mainXaml, @"<BitmapCache EnableClearType=""False""").Count;
+        Check.Equal(3, shadowCacheCount,
+            "All 3 sibling shadow layers in MainWindow.xaml must carry persistent GPU BitmapCache");
+
+        // 4. Frozen shared muted brushes on MainWindow
+        using var audio = new AudioController();
+        var window = new MainWindow(audio);
+        try
+        {
+            window.SetLightMode(false);
+            var mutedLens = window.Resources["HeroLensMutedBrush"] as System.Windows.Media.Brush;
+            var mutedGlow = window.Resources["HeroGlowMutedBrush"] as System.Windows.Media.Brush;
+            Check.True(mutedLens != null && mutedLens.IsFrozen, "HeroLensMutedBrush must be shared and frozen");
+            Check.True(mutedGlow != null && mutedGlow.IsFrozen, "HeroGlowMutedBrush must be shared and frozen");
+            Check.True(window.dotGlowHalo != null, "dotGlowHalo vector halo must be bound without DropShadowEffect");
+        }
+        finally
+        {
+            window.Close();
+        }
+
+        // 5. OSD pure center-origin smooth decelerate (zero vertical Y popup offset across entrance, pulse, and exit)
+        try
+        {
+            OsdWindow.HideOsd();
+            OsdWindow.ShowOsd(true, 0.12);
+
+            var instField = typeof(OsdWindow).GetField("_instance",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var osd = instField?.GetValue(null) as OsdWindow;
+            Check.True(osd != null, "OsdWindow instance must exist after ShowOsd");
+            Check.Equal(new System.Windows.Point(0.5, 0.5), osd!.borderPanel.RenderTransformOrigin,
+                "OSD borderPanel must expand from exact center (0.5, 0.5)");
+            Check.True(osd.borderPanel.CacheMode is System.Windows.Media.BitmapCache osdCache && !osdCache.EnableClearType,
+                "OSD borderPanel must keep a persistent alpha-safe BitmapCache so DropShadowEffect never re-runs per frame");
+            Check.Equal(0.0, osd.panelTranslateTransform!.X, "OSD entrance X translation must stay locked at 0");
+            Check.Equal(0.0, osd.panelTranslateTransform.Y, "OSD entrance Y translation must stay locked at 0 (not sliding from below)");
+            Check.True(osd.panelScaleTransform!.ScaleX <= 1.001, "OSD smooth decelerate entrance must not overshoot above 1.0");
+
+            // Rapid toggle pulse while visible keeps Y == 0 and keeps persistent cache intact
+            OsdWindow.ShowOsd(false, 0.12);
+            Check.Equal(0.0, osd.panelTranslateTransform.X, "OSD pulse X translation must stay locked at 0");
+            Check.Equal(0.0, osd.panelTranslateTransform.Y, "OSD pulse Y translation must stay locked at 0");
+            Check.True(osd.borderPanel.CacheMode is System.Windows.Media.BitmapCache,
+                "OSD borderPanel must not tear down BitmapCache during pulse");
+
+            // Pump dispatcher past 0.12s duration so exit fade begins and verify exit stays centered (Y == 0)
+            var deadline = DateTime.UtcNow.AddMilliseconds(220);
+            while (DateTime.UtcNow < deadline)
+            {
+                osd.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
+                System.Threading.Thread.Sleep(15);
+            }
+            Check.Equal(0.0, osd.panelTranslateTransform.Y, "OSD exit Y translation must stay locked at 0 (no downward drop)");
+        }
+        finally
+        {
+            OsdWindow.CloseOsd();
         }
     }
 }

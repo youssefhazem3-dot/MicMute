@@ -9,6 +9,7 @@ using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace MicMute;
 
@@ -35,8 +36,13 @@ public partial class SettingsWindow : Window
     private int _openedSideDirection = 1; // +1 = opened to right of owner, -1 = opened to left
     private int _selectedOsdPosIndex;
     private int _themeTransitionVersion;
+    private int _openAnimVersion;
     private Action? _pendingModalConfirmAction;
     private int _modalSequenceId;
+
+    internal const double OpenTransitionScale = 0.96;
+    internal const double OpenTransitionDeltaX = 6.0;
+    internal const double ExitTransitionDeltaX = 5.0;
 
     internal Grid? settingsScaleHost;
     internal ScaleTransform? settingsLayoutScaleTransform;
@@ -289,6 +295,18 @@ public partial class SettingsWindow : Window
         throw new InvalidDataException("SettingsWindow.xaml is missing required controls.");
     }
 
+    internal void WarmUpHandle()
+    {
+        if (_allowForceClose) return;
+        try
+        {
+            new WindowInteropHelper(this).EnsureHandle();
+        }
+        catch
+        {
+        }
+    }
+
     internal void SyncThemeResources(ResourceDictionary sharedResources)
     {
         if (sharedResources != null)
@@ -321,6 +339,15 @@ public partial class SettingsWindow : Window
         catch { }
     }
 
+    internal void PrepareThemeCrossfadeIfVisible()
+    {
+        if (!IsLoaded || !IsVisible || settingsThemeOverlay == null || settingsThemeOverlay.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+        UpdateLayout();
+    }
+
     internal void PlayThemeCrossfadeIfVisible()
     {
         if (!IsLoaded || !IsVisible || settingsThemeOverlay == null || settingsThemeOverlay.Visibility != Visibility.Visible)
@@ -328,7 +355,6 @@ public partial class SettingsWindow : Window
             return;
         }
         int version = ++_themeTransitionVersion;
-        UpdateLayout();
         DoubleAnimation fadeOut = new DoubleAnimation(1.0, 0.0, UiMotion.Standard)
         {
             EasingFunction = UiMotion.Decelerate
@@ -508,6 +534,7 @@ public partial class SettingsWindow : Window
 
         if (immediate || !IsLoaded || settingsRootBorder == null)
         {
+            _openAnimVersion++;
             _isClosingAnimationRunning = false;
             ClearThemeOverlay();
             ResetOpenTransforms();
@@ -522,6 +549,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        int version = ++_openAnimVersion;
         _isClosingAnimationRunning = true;
         if (wasOpen) OpenStateChanged?.Invoke(false);
 
@@ -531,7 +559,7 @@ public partial class SettingsWindow : Window
         DoubleAnimation fadeOut = new DoubleAnimation(settingsRootBorder.Opacity, 0.0, dur) { EasingFunction = ease };
         fadeOut.Completed += (_, _) =>
         {
-            if (_isClosingAnimationRunning && !IsSettingsOpen)
+            if (version == _openAnimVersion && _isClosingAnimationRunning && !IsSettingsOpen)
             {
                 _isClosingAnimationRunning = false;
                 ClearThemeOverlay();
@@ -542,18 +570,20 @@ public partial class SettingsWindow : Window
         settingsRootBorder.BeginAnimation(UIElement.OpacityProperty, fadeOut);
         if (settingsOpenScale != null)
         {
-            settingsOpenScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(settingsOpenScale.ScaleX, 0.96, dur) { EasingFunction = ease });
-            settingsOpenScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(settingsOpenScale.ScaleY, 0.96, dur) { EasingFunction = ease });
+            settingsOpenScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(settingsOpenScale.ScaleX, OpenTransitionScale, dur) { EasingFunction = ease });
+            settingsOpenScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(settingsOpenScale.ScaleY, OpenTransitionScale, dur) { EasingFunction = ease });
         }
         if (settingsOpenTranslate != null)
         {
-            double exitX = -10.0 * _openedSideDirection;
+            // 5px exit offset stays strictly within the 8.24px 0.96x scale inset so rounded corners never clip
+            double exitX = -ExitTransitionDeltaX * _openedSideDirection;
             settingsOpenTranslate.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(settingsOpenTranslate.X, exitX, dur) { EasingFunction = ease });
         }
     }
 
     internal void ForceClose()
     {
+        _openAnimVersion++;
         _allowForceClose = true;
         _isClosingAnimationRunning = false;
         IsSettingsOpen = false;
@@ -569,6 +599,7 @@ public partial class SettingsWindow : Window
     {
         if (settingsRootBorder == null) return;
 
+        int version = ++_openAnimVersion;
         settingsRootBorder.BeginAnimation(UIElement.OpacityProperty, null);
         if (!IsLoaded)
         {
@@ -576,30 +607,17 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        // 6px start offset stays strictly inside the 8.24px horizontal inset at 0.96x scale (zero HWND border clipping)
+        double startX = -OpenTransitionDeltaX * _openedSideDirection;
+
         UiMotion.EnableTransientCache(settingsRootBorder, this);
-        Duration dur = UiMotion.Standard;
-        IEasingFunction ease = UiMotion.Decelerate;
-        double startX = -14.0 * _openedSideDirection;
-
         settingsRootBorder.Opacity = 0.0;
-        DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, dur) { EasingFunction = ease };
-        fadeIn.Completed += (_, _) =>
-        {
-            if (IsSettingsOpen && !_isClosingAnimationRunning)
-            {
-                ResetOpenTransforms();
-            }
-        };
-        settingsRootBorder.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-
         if (settingsOpenScale != null)
         {
             settingsOpenScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
             settingsOpenScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            settingsOpenScale.ScaleX = 0.96;
-            settingsOpenScale.ScaleY = 0.96;
-            settingsOpenScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.96, 1.0, dur) { EasingFunction = ease });
-            settingsOpenScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.96, 1.0, dur) { EasingFunction = ease });
+            settingsOpenScale.ScaleX = OpenTransitionScale;
+            settingsOpenScale.ScaleY = OpenTransitionScale;
         }
         if (settingsOpenTranslate != null)
         {
@@ -607,8 +625,39 @@ public partial class SettingsWindow : Window
             settingsOpenTranslate.BeginAnimation(TranslateTransform.YProperty, null);
             settingsOpenTranslate.X = startX;
             settingsOpenTranslate.Y = 0.0;
-            settingsOpenTranslate.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(startX, 0.0, dur) { EasingFunction = ease });
         }
+
+        // Start animation clocks right after the initial invisible render/cache-upload pass completes so Frame 0 never skips
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            if (_allowForceClose || version != _openAnimVersion || !IsSettingsOpen || _isClosingAnimationRunning || !IsVisible || settingsRootBorder == null)
+            {
+                return;
+            }
+
+            Duration dur = UiMotion.Standard;
+            IEasingFunction ease = UiMotion.Decelerate;
+
+            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, dur) { EasingFunction = ease };
+            fadeIn.Completed += (_, _) =>
+            {
+                if (version == _openAnimVersion && IsSettingsOpen && !_isClosingAnimationRunning)
+                {
+                    ResetOpenTransforms();
+                }
+            };
+            settingsRootBorder.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+
+            if (settingsOpenScale != null)
+            {
+                settingsOpenScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(OpenTransitionScale, 1.0, dur) { EasingFunction = ease });
+                settingsOpenScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(OpenTransitionScale, 1.0, dur) { EasingFunction = ease });
+            }
+            if (settingsOpenTranslate != null)
+            {
+                settingsOpenTranslate.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(startX, 0.0, dur) { EasingFunction = ease });
+            }
+        }));
     }
 
     private void ResetOpenTransforms()
@@ -666,14 +715,12 @@ public partial class SettingsWindow : Window
 
         if (IsLoaded && IsVisible)
         {
-            UiMotion.EnableTransientCache(borderSettingsModalCard, this);
             borderSettingsModalOverlay.Opacity = 0.0;
             DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate };
             fadeIn.Completed += (_, _) =>
             {
                 if (seq == _modalSequenceId)
                 {
-                    UiMotion.ClearTransientCache(borderSettingsModalCard);
                     borderSettingsModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
                     borderSettingsModalOverlay.Opacity = 1.0;
                     if (settingsModalCardScale != null)
@@ -690,10 +737,10 @@ public partial class SettingsWindow : Window
             {
                 settingsModalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
                 settingsModalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                settingsModalCardScale.ScaleX = 0.94;
-                settingsModalCardScale.ScaleY = 0.94;
-                settingsModalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.94, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
-                settingsModalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.94, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
+                settingsModalCardScale.ScaleX = 0.95;
+                settingsModalCardScale.ScaleY = 0.95;
+                settingsModalCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.95, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
+                settingsModalCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.95, 1.0, UiMotion.Fast) { EasingFunction = UiMotion.Decelerate });
             }
         }
         else
@@ -723,7 +770,6 @@ public partial class SettingsWindow : Window
         int seq = ++_modalSequenceId;
         if (immediate || !IsLoaded || !IsVisible)
         {
-            UiMotion.ClearTransientCache(borderSettingsModalCard);
             borderSettingsModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
             borderSettingsModalOverlay.Opacity = 0.0;
             borderSettingsModalOverlay.Visibility = Visibility.Collapsed;
@@ -737,7 +783,6 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        UiMotion.EnableTransientCache(borderSettingsModalCard, this);
         DoubleAnimation fadeOut = new DoubleAnimation(borderSettingsModalOverlay.Opacity, 0.0, UiMotion.Exit)
         {
             EasingFunction = UiMotion.Accelerate
@@ -746,7 +791,6 @@ public partial class SettingsWindow : Window
         {
             if (seq == _modalSequenceId)
             {
-                UiMotion.ClearTransientCache(borderSettingsModalCard);
                 borderSettingsModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
                 borderSettingsModalOverlay.Opacity = 0.0;
                 borderSettingsModalOverlay.Visibility = Visibility.Collapsed;

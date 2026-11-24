@@ -159,6 +159,7 @@ public partial class OsdWindow : Window
                     if (borderPanel != null)
                     {
                         osdShadow = borderPanel.Effect as DropShadowEffect;
+                        UiMotion.EnablePersistentCache(borderPanel, this);
                     }
 
                     var content = root.Content;
@@ -169,6 +170,12 @@ public partial class OsdWindow : Window
                 }
             }
         }
+    }
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        UiMotion.EnablePersistentCache(borderPanel, this);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -193,6 +200,7 @@ public partial class OsdWindow : Window
         }
         BeginAnimation(OpacityProperty, null);
         ResetOverlayAnimations();
+        UiMotion.ClearTransientCache(borderPanel);
         if (ReferenceEquals(_instance, this))
         {
             _instance = null;
@@ -224,8 +232,10 @@ public partial class OsdWindow : Window
             {
                 _instance = new OsdWindow();
                 new WindowInteropHelper(_instance).EnsureHandle();
+                UiMotion.EnablePersistentCache(_instance.borderPanel, _instance);
                 _instance.Opacity = 0;
                 _instance.Show();
+                _instance.UpdateLayout();
                 _instance.Hide();
             }
         }
@@ -261,14 +271,25 @@ public partial class OsdWindow : Window
 
         bool wasVisible = _instance.IsVisible && _instance.Opacity > 0.05 && (_instance.borderPanel?.Opacity ?? 1.0) > 0.05;
         bool wasMuted = _instance._isMuted;
+        double livePanelOpacity = _instance.borderPanel?.Opacity ?? 1.0;
 
-        // Cancel any pending opacity animation and restore full window visibility immediately
+        // Cancel any pending window opacity animation and restore full window visibility immediately
         _instance.BeginAnimation(OpacityProperty, null);
         _instance.Opacity = 0.96;
 
         AppSettings settings = SettingsManager.Load();
         _instance.ApplyThemeCore(settings.LightMode, refreshState: false);
         _instance.UpdateState(isMuted);
+        UiMotion.EnablePersistentCache(_instance.borderPanel, _instance);
+
+        // Lock translation strictly at center (0, 0) so the OSD never slides from below
+        if (_instance.panelTranslateTransform != null)
+        {
+            _instance.panelTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+            _instance.panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            _instance.panelTranslateTransform.X = 0.0;
+            _instance.panelTranslateTransform.Y = 0.0;
+        }
 
         if (!wasVisible)
         {
@@ -281,36 +302,48 @@ public partial class OsdWindow : Window
             {
                 _instance.panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
                 _instance.panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                _instance.panelScaleTransform.ScaleX = 0.88;
-                _instance.panelScaleTransform.ScaleY = 0.88;
-            }
-            if (_instance.panelTranslateTransform != null)
-            {
-                _instance.panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-                _instance.panelTranslateTransform.Y = 10.0;
+                _instance.panelScaleTransform.ScaleX = 0.86;
+                _instance.panelScaleTransform.ScaleY = 0.86;
             }
         }
-        else
+        else if (_instance.borderPanel != null)
         {
-            _instance.ResetOverlayAnimations();
+            if (livePanelOpacity < 0.98)
+            {
+                DoubleAnimation restoreFade = new DoubleAnimation(livePanelOpacity, 1.0, UiMotion.Exit)
+                {
+                    EasingFunction = UiMotion.Decelerate
+                };
+                _instance.borderPanel.BeginAnimation(UIElement.OpacityProperty, restoreFade);
+            }
+            else
+            {
+                _instance.SnapPanelOpacity();
+            }
         }
 
         IntPtr handle = new WindowInteropHelper(_instance).EnsureHandle();
 
-        _instance.PositionOnActiveScreenCore(handle, settings.OsdPosition);
+        bool wasWindowVisible = _instance.IsVisible;
+        _instance.PositionOnActiveScreenCore(handle, settings.OsdPosition, showNative: wasWindowVisible);
 
-        if (!_instance.IsVisible)
+        if (!wasWindowVisible)
         {
             _instance.Show();
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
         }
 
         if (!wasVisible)
         {
-            _instance.AnimatePanelEntrance(sequenceId);
+            _instance.AnimatePanelEntrance(sequenceId, deferClockStart: !wasWindowVisible);
         }
-        else if (wasMuted != isMuted)
+        else if (wasMuted != isMuted || livePanelOpacity < 0.98)
         {
-            _instance.AnimatePanelPulse(sequenceId);
+            _instance.AnimatePanelPulse();
+        }
+        else if (_instance.panelScaleTransform != null && Math.Abs(_instance.panelScaleTransform.ScaleX - 1.0) > 0.002)
+        {
+            _instance.AnimatePanelScale(_instance.panelScaleTransform.ScaleX, 1.0, 140, UiMotion.Decelerate);
         }
 
         double safeDuration = double.IsFinite(durationSeconds)
@@ -384,10 +417,11 @@ public partial class OsdWindow : Window
     }
 
     private void PositionOnActiveScreen(IntPtr handle)
-        => PositionOnActiveScreenCore(handle, SettingsManager.Load().OsdPosition);
+        => PositionOnActiveScreenCore(handle, SettingsManager.Load().OsdPosition, showNative: IsVisible);
 
-    private void PositionOnActiveScreenCore(IntPtr handle, string? osdPosition)
+    private void PositionOnActiveScreenCore(IntPtr handle, string? osdPosition, bool showNative = true)
     {
+        uint showFlag = showNative ? SWP_SHOWWINDOW : 0u;
         try
         {
             System.Windows.Forms.Screen? screen = null;
@@ -441,11 +475,11 @@ public partial class OsdWindow : Window
             this.Left = target.Left / scaleX;
             this.Top = target.Top / scaleY;
 
-            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+            SetWindowPos(handle, HWND_TOPMOST, target.Left, target.Top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | showFlag);
         }
         catch
         {
-            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | showFlag);
         }
     }
 
@@ -507,46 +541,56 @@ public partial class OsdWindow : Window
         }
     }
 
-    private void AnimatePanelEntrance(int sequenceId)
+    private void AnimatePanelEntrance(int sequenceId, bool deferClockStart)
     {
-        UiMotion.EnableTransientCache(borderPanel, this);
-        if (borderPanel != null)
+        void StartEntranceClocks()
         {
-            borderPanel.BeginAnimation(UIElement.OpacityProperty, null);
-            DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, UiMotion.Fast)
+            if (sequenceId != _activeSequenceId || !IsVisible)
             {
-                EasingFunction = UiMotion.Decelerate
-            };
-            borderPanel.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-        }
-        if (panelTranslateTransform != null)
-        {
-            panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-            DoubleAnimation slideIn = new DoubleAnimation(10.0, 0.0, UiMotion.Fast)
-            {
-                EasingFunction = UiMotion.Decelerate
-            };
-            panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, slideIn);
-        }
-        AnimatePanelScale(0.88, 1.0, 190, UiMotion.SpringGentle, () =>
-        {
-            if (sequenceId == _activeSequenceId)
-            {
-                UiMotion.ClearTransientCache(borderPanel);
+                return;
             }
-        });
+            if (borderPanel != null)
+            {
+                borderPanel.BeginAnimation(UIElement.OpacityProperty, null);
+                DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, UiMotion.Fast)
+                {
+                    EasingFunction = UiMotion.Decelerate
+                };
+                borderPanel.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            }
+            // Clean smooth decelerate expansion directly from center (0.5, 0.5) with zero overshoot or vertical offset
+            AnimatePanelScale(0.86, 1.0, UiMotion.OsdEnter.TimeSpan.TotalMilliseconds, UiMotion.Decelerate);
+        }
+
+        if (deferClockStart)
+        {
+            // Allow the newly shown layered HWND + DropShadowEffect BitmapCache refresh to complete while Opacity == 0
+            // before stamping t=0 on the entrance clocks so Frame 0 never stutters over GPU-heavy games.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(StartEntranceClocks));
+        }
+        else
+        {
+            StartEntranceClocks();
+        }
     }
 
-    private void AnimatePanelPulse(int sequenceId)
+    private void AnimatePanelPulse()
     {
-        UiMotion.EnableTransientCache(borderPanel, this);
-        AnimatePanelScale(0.94, 1.0, 170, UiMotion.SpringGentle, () =>
-        {
-            if (sequenceId == _activeSequenceId)
-            {
-                UiMotion.ClearTransientCache(borderPanel);
-            }
-        });
+        if (panelScaleTransform == null) return;
+        double startScale = Math.Clamp(panelScaleTransform.ScaleX, 0.86, 1.04);
+
+        var pulseX = new DoubleAnimationUsingKeyFrames();
+        pulseX.KeyFrames.Add(new SplineDoubleKeyFrame(startScale, KeyTime.FromTimeSpan(TimeSpan.Zero), new KeySpline(0.22, 1.0, 0.36, 1.0)));
+        pulseX.KeyFrames.Add(new SplineDoubleKeyFrame(0.95, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(45)), new KeySpline(0.22, 1.0, 0.36, 1.0)));
+        pulseX.KeyFrames.Add(new SplineDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), new KeySpline(0.22, 1.0, 0.36, 1.0)));
+
+        var pulseY = new DoubleAnimationUsingKeyFrames();
+        pulseY.KeyFrames.Add(new SplineDoubleKeyFrame(startScale, KeyTime.FromTimeSpan(TimeSpan.Zero), new KeySpline(0.22, 1.0, 0.36, 1.0)));
+        pulseY.KeyFrames.Add(new SplineDoubleKeyFrame(0.95, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(45)), new KeySpline(0.22, 1.0, 0.36, 1.0)));
+        pulseY.KeyFrames.Add(new SplineDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), new KeySpline(0.22, 1.0, 0.36, 1.0)));
+
+        panelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, pulseX);
+        panelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, pulseY);
     }
 
     private void SnapPanelOpacity()
@@ -581,7 +625,6 @@ public partial class OsdWindow : Window
 
     private void ResetOverlayAnimations()
     {
-        UiMotion.ClearTransientCache(borderPanel);
         SnapPanelOpacity();
         if (panelScaleTransform != null)
         {
@@ -592,7 +635,9 @@ public partial class OsdWindow : Window
         }
         if (panelTranslateTransform != null)
         {
+            panelTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
             panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            panelTranslateTransform.X = 0.0;
             panelTranslateTransform.Y = 0.0;
         }
     }
@@ -636,7 +681,6 @@ public partial class OsdWindow : Window
         try
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
-            SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 
             DateTime endTime = DateTime.UtcNow.AddSeconds(durationSeconds);
             while (DateTime.UtcNow < endTime)
@@ -648,11 +692,20 @@ public partial class OsdWindow : Window
                     return;
                 }
 
-                SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
                 TimeSpan remaining = endTime - DateTime.UtcNow;
                 if (remaining <= TimeSpan.Zero) break;
                 TimeSpan chunk = remaining < TimeSpan.FromMilliseconds(500) ? remaining : TimeSpan.FromMilliseconds(500);
                 await Task.Delay(chunk, token);
+
+                if (token.IsCancellationRequested || sequenceId != _activeSequenceId)
+                {
+                    return;
+                }
+
+                if (DateTime.UtcNow < endTime)
+                {
+                    SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+                }
             }
 
             if (token.IsCancellationRequested || sequenceId != _activeSequenceId)
@@ -660,7 +713,6 @@ public partial class OsdWindow : Window
                 return;
             }
 
-            UiMotion.EnableTransientCache(borderPanel, this);
             double currentPanelOpacity = borderPanel?.Opacity ?? 1.0;
             DoubleAnimation fadeOut = new DoubleAnimation(currentPanelOpacity, 0.0, UiMotion.OsdExit)
             {
@@ -676,13 +728,13 @@ public partial class OsdWindow : Window
                     Hide();
                 }
             };
-            AnimatePanelScale(panelScaleTransform?.ScaleX ?? 1.0, 0.94, UiMotion.OsdExit.TimeSpan.TotalMilliseconds, UiMotion.Accelerate);
+            AnimatePanelScale(panelScaleTransform?.ScaleX ?? 1.0, 0.90, UiMotion.OsdExit.TimeSpan.TotalMilliseconds, UiMotion.Accelerate);
             if (panelTranslateTransform != null)
             {
-                panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(panelTranslateTransform.Y, 6.0, UiMotion.OsdExit)
-                {
-                    EasingFunction = UiMotion.Accelerate
-                });
+                panelTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+                panelTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+                panelTranslateTransform.X = 0.0;
+                panelTranslateTransform.Y = 0.0;
             }
             if (borderPanel != null)
             {

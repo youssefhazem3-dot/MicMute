@@ -86,6 +86,17 @@
             <GradientStop Color="#00FFFFFF" Offset="1.0" />
         </RadialGradientBrush>
         <SolidColorBrush x:Key="HeroIconActiveBrush" Color="#18181B" />
+        <RadialGradientBrush x:Key="HeroLensMutedBrush" Center="0.35,0.25" GradientOrigin="0.35,0.25" RadiusX="0.65" RadiusY="0.65">
+            <GradientStop Color="#FFF87171" Offset="0.0" />
+            <GradientStop Color="#FFEF4444" Offset="0.40" />
+            <GradientStop Color="#FFDC2626" Offset="0.75" />
+            <GradientStop Color="#FFB91C1C" Offset="1.0" />
+        </RadialGradientBrush>
+        <RadialGradientBrush x:Key="HeroGlowMutedBrush" Center="0.5,0.40" GradientOrigin="0.5,0.30" RadiusX="0.5" RadiusY="0.5">
+            <GradientStop Color="#40EF4444" Offset="0.0" />
+            <GradientStop Color="#15EF4444" Offset="0.5" />
+            <GradientStop Color="#00EF4444" Offset="1.0" />
+        </RadialGradientBrush>
 
         <!-- Monochrome Squircle Icon Tiles -->
         <SolidColorBrush x:Key="SquircleBgBrush" Color="#14FFFFFF" />
@@ -302,7 +313,6 @@
             <Setter Property="Padding" Value="12,10" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="ClickMode" Value="Press" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
@@ -336,10 +346,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleX" To="0.985" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleY" To="0.985" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -348,10 +358,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.15">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="cardScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.15">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -369,7 +379,20 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
-                        <Grid Width="52" Height="30" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
+                        <Grid Width="52" Height="30" ClipToBounds="False" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
+                            <!-- GPU-Composited Ambient Glow Ring (zero pixel shader cost) -->
+                            <Border x:Name="glow"
+                                    Width="56" Height="34"
+                                    Margin="-2,-1,-2,-3"
+                                    CornerRadius="17"
+                                    Background="{DynamicResource AccentHoverBrush}"
+                                    BorderBrush="{DynamicResource AccentBrush}"
+                                    BorderThickness="1.5"
+                                    Opacity="0"
+                                    IsHitTestVisible="False"
+                                    SnapsToDevicePixels="False"
+                                    RenderOptions.EdgeMode="Unspecified" />
+
                             <!-- Liquid Glass Track & Recessed Trench -->
                             <Border x:Name="track"
                                     Width="52" Height="30"
@@ -379,9 +402,6 @@
                                     CornerRadius="15"
                                     SnapsToDevicePixels="False"
                                     RenderOptions.EdgeMode="Unspecified">
-                                <Border.Effect>
-                                    <DropShadowEffect x:Name="glow" BlurRadius="7" ShadowDepth="2" Direction="270" Opacity="0" Color="{DynamicResource AccentColor}" />
-                                </Border.Effect>
                                 <!-- Trench Depth & Refraction Overlay (Physical Overhead Lighting) -->
                                 <Grid SnapsToDevicePixels="False">
                                     <Border Height="8" VerticalAlignment="Top" CornerRadius="14,14,0,0" Opacity="0.30" SnapsToDevicePixels="False">
@@ -403,38 +423,53 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Crystal Droplet Knob with Hardware-Accelerated Fluid Motion -->
-                            <Border x:Name="knob"
-                                    Width="24" Height="24"
-                                    CornerRadius="12"
-                                    Background="{DynamicResource ToggleKnobBrush}"
-                                    BorderBrush="{DynamicResource ToggleKnobBorderBrush}"
-                                    BorderThickness="0.8"
-                                    HorizontalAlignment="Left"
-                                    Margin="3,3,0,3"
-                                    SnapsToDevicePixels="False"
-                                    RenderOptions.EdgeMode="Unspecified"
-                                    Cursor="Hand">
-                                <Border.RenderTransform>
+                            <!-- Crystal Droplet Knob with Hardware-Accelerated Fluid Motion (zero pixel shader) -->
+                            <Grid Width="24" Height="24"
+                                  HorizontalAlignment="Left"
+                                  Margin="3,3,0,3"
+                                  ClipToBounds="False"
+                                  SnapsToDevicePixels="False"
+                                  RenderOptions.EdgeMode="Unspecified">
+                                <Grid.RenderTransform>
                                     <TransformGroup>
                                         <ScaleTransform x:Name="knobSquishScale" ScaleX="1.0" ScaleY="1.0" CenterX="12" CenterY="12" />
                                         <ScaleTransform x:Name="knobHoverScale" ScaleX="1.0" ScaleY="1.0" CenterX="12" CenterY="12" />
                                         <TranslateTransform x:Name="knobTrans" X="0" />
                                     </TransformGroup>
-                                </Border.RenderTransform>
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="4" ShadowDepth="1.8" Direction="270" Opacity="0.30" Color="Black" />
-                                </Border.Effect>
-                                <!-- Overhead Specular Crescent Highlight -->
-                                <Border Height="5" Margin="4,1.5,4,0" VerticalAlignment="Top" CornerRadius="2.5">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#F0FFFFFF" Offset="0.0" />
-                                            <GradientStop Color="#00FFFFFF" Offset="1.0" />
-                                        </LinearGradientBrush>
-                                    </Border.Background>
+                                </Grid.RenderTransform>
+                                <Ellipse Width="30" Height="30"
+                                         Margin="-3,-1.2,-3,-4.8"
+                                         IsHitTestVisible="False"
+                                         SnapsToDevicePixels="False"
+                                         RenderOptions.EdgeMode="Unspecified">
+                                    <Ellipse.Fill>
+                                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                            <GradientStop Color="#44000000" Offset="0.58" />
+                                            <GradientStop Color="#1B000000" Offset="0.82" />
+                                            <GradientStop Color="#00000000" Offset="1.0" />
+                                        </RadialGradientBrush>
+                                    </Ellipse.Fill>
+                                </Ellipse>
+                                <Border x:Name="knob"
+                                        Width="24" Height="24"
+                                        CornerRadius="12"
+                                        Background="{DynamicResource ToggleKnobBrush}"
+                                        BorderBrush="{DynamicResource ToggleKnobBorderBrush}"
+                                        BorderThickness="0.8"
+                                        SnapsToDevicePixels="False"
+                                        RenderOptions.EdgeMode="Unspecified"
+                                        Cursor="Hand">
+                                    <!-- Overhead Specular Crescent Highlight -->
+                                    <Border Height="5" Margin="4,1.5,4,0" VerticalAlignment="Top" CornerRadius="2.5">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#F0FFFFFF" Offset="0.0" />
+                                                <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
                                 </Border>
-                            </Border>
+                            </Grid>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
@@ -448,21 +483,21 @@
                                             <DoubleAnimation Storyboard.TargetName="knobTrans"
                                                              Storyboard.TargetProperty="X"
                                                              To="22"
-                                                             Duration="0:0:0.22">
+                                                             Duration="0:0:0.21">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobSquishScale" Storyboard.TargetProperty="ScaleX">
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.08" Value="1.14" KeySpline="0.16,1,0.3,1" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" KeySpline="0.16,1,0.3,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.08" Value="1.12" KeySpline="0.22,1,0.36,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.21" Value="1.00" KeySpline="0.22,1,0.36,1" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimation Storyboard.TargetName="glow"
                                                              Storyboard.TargetProperty="Opacity"
                                                              To="0.22"
-                                                             Duration="0:0:0.20">
+                                                             Duration="0:0:0.19">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
@@ -474,21 +509,21 @@
                                             <DoubleAnimation Storyboard.TargetName="knobTrans"
                                                              Storyboard.TargetProperty="X"
                                                              To="0"
-                                                             Duration="0:0:0.22">
+                                                             Duration="0:0:0.21">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="knobSquishScale" Storyboard.TargetProperty="ScaleX">
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.08" Value="1.14" KeySpline="0.16,1,0.3,1" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.22" Value="1.00" KeySpline="0.16,1,0.3,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.08" Value="1.12" KeySpline="0.22,1,0.36,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.21" Value="1.00" KeySpline="0.22,1,0.36,1" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimation Storyboard.TargetName="glow"
                                                              Storyboard.TargetProperty="Opacity"
                                                              To="0"
                                                              Duration="0:0:0.18">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
@@ -506,7 +541,7 @@
                                                              To="1.09"
                                                              Duration="0:0:0.14">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="knobHoverScale"
@@ -514,7 +549,7 @@
                                                              To="1.09"
                                                              Duration="0:0:0.14">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
@@ -528,7 +563,7 @@
                                                              To="1.00"
                                                              Duration="0:0:0.16">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="knobHoverScale"
@@ -536,7 +571,7 @@
                                                              To="1.00"
                                                              Duration="0:0:0.16">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <ExponentialEase Exponent="4.5" EasingMode="EaseOut" />
+                                                    <ExponentialEase Exponent="3.2" EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
@@ -605,38 +640,53 @@
                                     <Thumb Width="22" Height="24">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Grid Background="Transparent" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
-                                                     <!-- Crystal Bead Thumb with GPU ScaleTransform (zero layout thrash) -->
-                                                    <Border x:Name="thumbCircle"
-                                                            Width="18" Height="18"
-                                                            CornerRadius="9"
-                                                            Background="{DynamicResource SliderThumbBgBrush}"
-                                                            BorderBrush="{DynamicResource SliderThumbBorderBrush}"
-                                                            BorderThickness="2"
-                                                            HorizontalAlignment="Center"
-                                                            VerticalAlignment="Center"
-                                                            RenderTransformOrigin="0.5,0.5"
-                                                            SnapsToDevicePixels="False"
-                                                            RenderOptions.EdgeMode="Unspecified">
-                                                        <Border.RenderTransform>
+                                                <Grid Background="Transparent" ClipToBounds="False" SnapsToDevicePixels="False" RenderOptions.EdgeMode="Unspecified">
+                                                    <!-- Crystal Bead Thumb with GPU ScaleTransform and Radial Contact Shadow (zero shader/layout thrash) -->
+                                                    <Grid Width="18" Height="18"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          ClipToBounds="False"
+                                                          RenderTransformOrigin="0.5,0.5"
+                                                          SnapsToDevicePixels="False"
+                                                          RenderOptions.EdgeMode="Unspecified">
+                                                        <Grid.RenderTransform>
                                                             <TransformGroup>
                                                                 <ScaleTransform x:Name="thumbHoverScale" ScaleX="1.0" ScaleY="1.0" />
                                                                 <ScaleTransform x:Name="thumbDragScale" ScaleX="1.0" ScaleY="1.0" />
                                                             </TransformGroup>
-                                                        </Border.RenderTransform>
-                                                        <Border.Effect>
-                                                            <DropShadowEffect BlurRadius="6" ShadowDepth="1.5" Opacity="0.3" Color="Black" />
-                                                        </Border.Effect>
-                                                        <!-- Top Specular Crescent Highlight -->
-                                                        <Border Height="4" Margin="3,1,3,0" VerticalAlignment="Top" CornerRadius="2" SnapsToDevicePixels="False">
-                                                            <Border.Background>
-                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                                    <GradientStop Color="#E0FFFFFF" Offset="0.0" />
-                                                                    <GradientStop Color="#00FFFFFF" Offset="1.0" />
-                                                                </LinearGradientBrush>
-                                                            </Border.Background>
+                                                        </Grid.RenderTransform>
+                                                        <Ellipse Width="26" Height="26"
+                                                                 Margin="-4,-2.5,-4,-5.5"
+                                                                 IsHitTestVisible="False"
+                                                                 SnapsToDevicePixels="False"
+                                                                 RenderOptions.EdgeMode="Unspecified">
+                                                            <Ellipse.Fill>
+                                                                <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                                                    <GradientStop Color="#46000000" Offset="0.52" />
+                                                                    <GradientStop Color="#1C000000" Offset="0.78" />
+                                                                    <GradientStop Color="#00000000" Offset="1.0" />
+                                                                </RadialGradientBrush>
+                                                            </Ellipse.Fill>
+                                                        </Ellipse>
+                                                        <Border x:Name="thumbCircle"
+                                                                Width="18" Height="18"
+                                                                CornerRadius="9"
+                                                                Background="{DynamicResource SliderThumbBgBrush}"
+                                                                BorderBrush="{DynamicResource SliderThumbBorderBrush}"
+                                                                BorderThickness="2"
+                                                                SnapsToDevicePixels="False"
+                                                                RenderOptions.EdgeMode="Unspecified">
+                                                            <!-- Top Specular Crescent Highlight -->
+                                                            <Border Height="4" Margin="3,1,3,0" VerticalAlignment="Top" CornerRadius="2" SnapsToDevicePixels="False">
+                                                                <Border.Background>
+                                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                        <GradientStop Color="#E0FFFFFF" Offset="0.0" />
+                                                                        <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                                                    </LinearGradientBrush>
+                                                                </Border.Background>
+                                                            </Border>
                                                         </Border>
-                                                    </Border>
+                                                    </Grid>
                                                 </Grid>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
@@ -645,10 +695,10 @@
                                                             <BeginStoryboard>
                                                                 <Storyboard>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleX" To="1.14" Duration="0:0:0.14">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleY" To="1.14" Duration="0:0:0.14">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                 </Storyboard>
                                                             </BeginStoryboard>
@@ -657,10 +707,10 @@
                                                             <BeginStoryboard>
                                                                 <Storyboard>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.16">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbHoverScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.16">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                 </Storyboard>
                                                             </BeginStoryboard>
@@ -671,10 +721,10 @@
                                                             <BeginStoryboard>
                                                                 <Storyboard>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleX" To="0.93" Duration="0:0:0.08">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleY" To="0.93" Duration="0:0:0.08">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                 </Storyboard>
                                                             </BeginStoryboard>
@@ -683,10 +733,10 @@
                                                             <BeginStoryboard>
                                                                 <Storyboard>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.15">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                     <DoubleAnimation Storyboard.TargetName="thumbDragScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.15">
-                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                                        <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                                                     </DoubleAnimation>
                                                                 </Storyboard>
                                                             </BeginStoryboard>
@@ -758,18 +808,28 @@
                                 </Ellipse.Fill>
                             </Ellipse>
 
-                            <!-- Outer Jewel-Cut Glass Bevel Ring (Physically Grounded Downward Contact Shadow) -->
+                            <!-- GPU Radial Contact Shadow & Outer Jewel-Cut Glass Bevel Ring (zero pixel shader) -->
+                            <Ellipse Width="106" Height="106"
+                                     Margin="-5,-1,-5,-9"
+                                     IsHitTestVisible="False"
+                                     SnapsToDevicePixels="False"
+                                     RenderOptions.EdgeMode="Unspecified">
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                        <GradientStop Color="#58000000" Offset="0.72" />
+                                        <GradientStop Color="#2C000000" Offset="0.85" />
+                                        <GradientStop Color="#0C000000" Offset="0.94" />
+                                        <GradientStop Color="#00000000" Offset="1.0" />
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
                             <Border Width="86" Height="86"
                                     CornerRadius="43"
                                     BorderBrush="{DynamicResource JewelRingBorderBrush}"
                                     BorderThickness="1.5"
                                     Background="{DynamicResource JewelRingBgBrush}"
                                     SnapsToDevicePixels="False"
-                                    RenderOptions.EdgeMode="Unspecified">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.38" Color="Black" />
-                                </Border.Effect>
-                            </Border>
+                                    RenderOptions.EdgeMode="Unspecified" />
 
                             <!-- Inner Fluid Refraction Lens Core -->
                             <Border x:Name="lens"
@@ -806,17 +866,21 @@
 
                                     <!-- Razor-Sharp Vector Microphone Cutout Matching App Logo (app.ico) -->
                                     <Grid Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" SnapsToDevicePixels="False">
+                                        <Path Fill="#2C000000"
+                                              Stretch="Uniform"
+                                              Width="32" Height="32"
+                                              Margin="0,1.2,0,-1.2"
+                                              IsHitTestVisible="False"
+                                              SnapsToDevicePixels="False"
+                                              RenderOptions.EdgeMode="Unspecified"
+                                              Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z" />
                                         <Path x:Name="iconPath"
                                               Fill="{DynamicResource HeroIconActiveBrush}"
                                               Stretch="Uniform"
                                               Width="32" Height="32"
                                               SnapsToDevicePixels="False"
                                               RenderOptions.EdgeMode="Unspecified"
-                                              Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z">
-                                            <Path.Effect>
-                                                <DropShadowEffect BlurRadius="4" ShadowDepth="1.2" Direction="270" Opacity="0.22" Color="Black" />
-                                            </Path.Effect>
-                                        </Path>
+                                              Data="F1M12,14.6207084655762L11.859619140625,14.9596195220947C11.7419919967651,15.0772457122803,11.5794925689697,15.1499996185303,11.3999996185303,15.1499996185303L10.6802673339844,15.1499996185303 11.0701627731323,17.0822620391846 12.2169790267944,18.7830219268799 13.9177379608154,19.929838180542 16,20.3500003814697 18.0822620391846,19.929838180542 19.7830219268799,18.7830219268799 20.929838180542,17.0822620391846 21.3197326660156,15.1499996185303 20.6000003814697,15.1499996185303C20.4205074310303,15.1499996185303,20.2580070495605,15.0772457122803,20.140380859375,14.9596195220947L20,14.6207094192505 20,15C20,17.2091388702393,18.2091388702393,19,16,19C13.7908611297607,19,12,17.2091388702393,12,15L12,14.6207084655762z M16,4C18.2091388702393,4,20,5.79086112976074,20,8L20,14.3792915344238 20.140380859375,14.0403804779053C20.2580070495605,13.9227542877197,20.4205074310303,13.8500003814697,20.6000003814697,13.8500003814697L21.3500003814697,13.8500003814697 21.3500003814697,13C21.3500003814697,12.6410150527954 21.6410140991211,12.3500003814697 22,12.3500003814697 22.3589859008789,12.3500003814697 22.6499996185303,12.6410150527954 22.6499996185303,13L22.6499996185303,13.8707113265991 23.0596199035645,14.0403804779053C23.17724609375,14.1580076217651 23.25,14.3205070495605 23.25,14.5 23.25,14.6794929504395 23.17724609375,14.8419923782349 23.0596199035645,14.9596195220947L22.6215019226074,15.1410932540894 22.1271438598633,17.588680267334 20.7022609710693,19.7022609710693 18.588680267334,21.1271438598633 16.7000007629395,21.5086154937744 16.7000007629395,24.8500003814697 19.5,24.8500003814697C19.8589859008789,24.8500003814697 20.1499996185303,25.1410140991211 20.1499996185303,25.5 20.1499996185303,25.8589859008789 19.8589859008789,26.1499996185303 19.5,26.1499996185303L12.5,26.1499996185303C12.1410150527954,26.1499996185303 11.8500003814697,25.8589859008789 11.8500003814697,25.5 11.8500003814697,25.1410140991211 12.1410150527954,24.8500003814697 12.5,24.8500003814697L15.3000001907349,24.8500003814697 15.3000001907349,21.5086154937744 13.4113206863403,21.1271438598633 11.297739982605,19.7022609710693 9.87285709381104,17.588680267334 9.37849807739258,15.1410932540894 8.94038009643555,14.9596195220947C8.82275390625,14.8419923782349 8.75,14.6794929504395 8.75,14.5 8.75,14.3205070495605 8.82275390625,14.1580076217651 8.94038009643555,14.0403804779053L9.35000038146973,13.8707113265991 9.35000038146973,13C9.35000038146973,12.6410150527954 9.64101505279541,12.3500003814697 10,12.3500003814697 10.3589849472046,12.3500003814697 10.6499996185303,12.6410150527954 10.6499996185303,13L10.6499996185303,13.8500003814697 11.3999996185303,13.8500003814697C11.5794925689697,13.8500003814697,11.7419919967651,13.9227542877197,11.859619140625,14.0403804779053L12,14.3792915344238 12,8C12,5.79086112976074,13.7908611297607,4,16,4z" />
                                         <!-- Clean Diagonal Slash Line for Muted State Matching App Logo (app.ico) -->
                                         <Line x:Name="slashBg"
                                               X1="3" Y1="3" X2="29" Y2="29"
@@ -862,42 +926,25 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleX" From="0.95" To="1.22" Duration="0:0:0.32">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleX" From="0.95" To="1.22" Duration="0:0:0.30">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleY" From="0.95" To="1.22" Duration="0:0:0.32">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleY" From="0.95" To="1.22" Duration="0:0:0.30">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="heroRippleRing" Storyboard.TargetProperty="Opacity">
                                                 <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0.45" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.32" Value="0.0" KeySpline="0.16,1,0.3,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.30" Value="0.0" KeySpline="0.22,1,0.36,1" />
                                             </DoubleAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                             </Trigger>
 
-                            <!-- Standard Balanced UI Red Muted State (White Icon & Slash matching App Logo) -->
+                            <!-- Standard Balanced UI Red Muted State (White Icon & Slash matching App Logo, frozen shared brushes) -->
                             <Trigger Property="Tag" Value="Muted">
-                                <Setter TargetName="lens" Property="Background">
-                                    <Setter.Value>
-                                        <RadialGradientBrush Center="0.35,0.25" GradientOrigin="0.35,0.25" RadiusX="0.65" RadiusY="0.65">
-                                            <GradientStop Color="#FFF87171" Offset="0.0" />
-                                            <GradientStop Color="#FFEF4444" Offset="0.40" />
-                                            <GradientStop Color="#FFDC2626" Offset="0.75" />
-                                            <GradientStop Color="#FFB91C1C" Offset="1.0" />
-                                        </RadialGradientBrush>
-                                    </Setter.Value>
-                                </Setter>
-                                <Setter TargetName="glow" Property="Fill">
-                                    <Setter.Value>
-                                        <RadialGradientBrush Center="0.5,0.40" GradientOrigin="0.5,0.30" RadiusX="0.5" RadiusY="0.5">
-                                            <GradientStop Color="#40EF4444" Offset="0.0" />
-                                            <GradientStop Color="#15EF4444" Offset="0.5" />
-                                            <GradientStop Color="#00EF4444" Offset="1.0" />
-                                        </RadialGradientBrush>
-                                    </Setter.Value>
-                                </Setter>
+                                <Setter TargetName="lens" Property="Background" Value="{DynamicResource HeroLensMutedBrush}" />
+                                <Setter TargetName="glow" Property="Fill" Value="{DynamicResource HeroGlowMutedBrush}" />
                                 <Setter TargetName="iconPath" Property="Fill" Value="#FFFFFF" />
                                 <Setter TargetName="heroRippleRing" Property="Stroke" Value="#EF4444" />
                                 <Setter TargetName="slashBg" Property="Visibility" Value="Visible" />
@@ -905,27 +952,27 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="slashScale" Storyboard.TargetProperty="ScaleX" From="0.2" To="1.0" Duration="0:0:0.20">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="slashScale" Storyboard.TargetProperty="ScaleX" From="0.2" To="1.0" Duration="0:0:0.19">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="slashScale" Storyboard.TargetProperty="ScaleY" From="0.2" To="1.0" Duration="0:0:0.20">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="slashScale" Storyboard.TargetProperty="ScaleY" From="0.2" To="1.0" Duration="0:0:0.19">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="slashBgScale" Storyboard.TargetProperty="ScaleX" From="0.2" To="1.0" Duration="0:0:0.20">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="slashBgScale" Storyboard.TargetProperty="ScaleX" From="0.2" To="1.0" Duration="0:0:0.19">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="slashBgScale" Storyboard.TargetProperty="ScaleY" From="0.2" To="1.0" Duration="0:0:0.20">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="slashBgScale" Storyboard.TargetProperty="ScaleY" From="0.2" To="1.0" Duration="0:0:0.19">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleX" From="0.95" To="1.22" Duration="0:0:0.32">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleX" From="0.95" To="1.22" Duration="0:0:0.30">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleY" From="0.95" To="1.22" Duration="0:0:0.32">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="heroRippleScale" Storyboard.TargetProperty="ScaleY" From="0.95" To="1.22" Duration="0:0:0.30">
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="heroRippleRing" Storyboard.TargetProperty="Opacity">
                                                 <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0.55" />
-                                                <SplineDoubleKeyFrame KeyTime="0:0:0.32" Value="0.0" KeySpline="0.16,1,0.3,1" />
+                                                <SplineDoubleKeyFrame KeyTime="0:0:0.30" Value="0.0" KeySpline="0.22,1,0.36,1" />
                                             </DoubleAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -937,10 +984,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="1.035" Duration="0:0:0.16">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="1.035" Duration="0:0:0.16">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -949,10 +996,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleX" To="1.00" Duration="0:0:0.18">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="gridScale" Storyboard.TargetProperty="ScaleY" To="1.00" Duration="0:0:0.18">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -964,10 +1011,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleX" To="0.93" Duration="0:0:0.08">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleY" To="0.93" Duration="0:0:0.08">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -975,11 +1022,11 @@
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleX" To="1.00" Duration="0:0:0.26">
-                                                <DoubleAnimation.EasingFunction><BackEase Amplitude="0.30" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleX" To="1.00" Duration="0:0:0.21">
+                                                <DoubleAnimation.EasingFunction><BackEase Amplitude="0.18" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleY" To="1.00" Duration="0:0:0.26">
-                                                <DoubleAnimation.EasingFunction><BackEase Amplitude="0.30" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            <DoubleAnimation Storyboard.TargetName="pressScale" Storyboard.TargetProperty="ScaleY" To="1.00" Duration="0:0:0.21">
+                                                <DoubleAnimation.EasingFunction><BackEase Amplitude="0.18" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -1188,10 +1235,13 @@
                                         </TransformGroup>
                                     </Border.RenderTransform>
                                     <Grid>
-                                        <!-- Sibling shadow layer prevents DropShadowEffect from rasterizing dropdown text -->
+                                        <!-- Sibling shadow layer cached on GPU prevents DropShadowEffect from re-running or rasterizing dropdown text -->
                                         <Border Background="{DynamicResource InputBgBrush}"
                                                 CornerRadius="10"
                                                 IsHitTestVisible="False">
+                                            <Border.CacheMode>
+                                                <BitmapCache EnableClearType="False" RenderAtScale="1.5" />
+                                            </Border.CacheMode>
                                             <Border.Effect>
                                                 <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.55" Color="Black" />
                                             </Border.Effect>
@@ -1266,10 +1316,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleX" To="0.965" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleY" To="0.965" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -1278,10 +1328,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.14">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="btnScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.14">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -1367,10 +1417,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleX" To="0.965" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleY" To="0.965" Duration="0:0:0.07">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -1379,10 +1429,10 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleX" To="1.0" Duration="0:0:0.14">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                             <DoubleAnimation Storyboard.TargetName="dangerBtnScale" Storyboard.TargetProperty="ScaleY" To="1.0" Duration="0:0:0.14">
-                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="4.5" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                <DoubleAnimation.EasingFunction><ExponentialEase Exponent="3.2" EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
@@ -1594,10 +1644,13 @@
                                 </TransformGroup>
                             </Border.RenderTransform>
                             <Grid>
-                                <!-- Sibling shadow layer prevents DropShadowEffect from rasterizing menu text -->
+                                <!-- Sibling shadow layer cached on GPU prevents DropShadowEffect from re-running or rasterizing menu text -->
                                 <Border Background="{DynamicResource InputBgBrush}"
                                         CornerRadius="10"
                                         IsHitTestVisible="False">
+                                    <Border.CacheMode>
+                                        <BitmapCache EnableClearType="False" RenderAtScale="1.5" />
+                                    </Border.CacheMode>
                                     <Border.Effect>
                                         <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#000000" />
                                     </Border.Effect>
@@ -1928,17 +1981,29 @@
                                 RenderOptions.EdgeMode="Unspecified"
                                 Margin="0,6,0,0">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Ellipse x:Name="dotStatus"
-                                         Width="7" Height="7"
-                                         Fill="{DynamicResource StatusDotBrush}"
-                                         Margin="0,0,6,0"
-                                         SnapsToDevicePixels="False"
-                                         RenderOptions.EdgeMode="Unspecified"
-                                         VerticalAlignment="Center">
-                                    <Ellipse.Effect>
-                                        <DropShadowEffect x:Name="dotGlow" BlurRadius="6" ShadowDepth="0" Color="{DynamicResource AccentColor}" Opacity="0.8" />
-                                    </Ellipse.Effect>
-                                </Ellipse>
+                                <Grid Width="7" Height="7" Margin="0,0,6,0" VerticalAlignment="Center" ClipToBounds="False" SnapsToDevicePixels="False">
+                                    <Ellipse x:Name="dotGlowHalo"
+                                             Width="17" Height="17"
+                                             Margin="-5"
+                                             Fill="{DynamicResource StatusDotBrush}"
+                                             Opacity="0.35"
+                                             IsHitTestVisible="False"
+                                             SnapsToDevicePixels="False"
+                                             RenderOptions.EdgeMode="Unspecified">
+                                        <Ellipse.OpacityMask>
+                                            <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                                <GradientStop Color="#FFFFFFFF" Offset="0.15" />
+                                                <GradientStop Color="#55FFFFFF" Offset="0.55" />
+                                                <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                            </RadialGradientBrush>
+                                        </Ellipse.OpacityMask>
+                                    </Ellipse>
+                                    <Ellipse x:Name="dotStatus"
+                                             Width="7" Height="7"
+                                             Fill="{DynamicResource StatusDotBrush}"
+                                             SnapsToDevicePixels="False"
+                                             RenderOptions.EdgeMode="Unspecified" />
+                                </Grid>
                                 <TextBlock x:Name="tbStatusText"
                                            Text="MICROPHONE LIVE"
                                            Foreground="{DynamicResource StatusCapsuleTextBrush}"
@@ -2424,10 +2489,13 @@
                         <ScaleTransform x:Name="modalCardScale" ScaleX="0.96" ScaleY="0.96" />
                     </Border.RenderTransform>
                     <Grid>
-                        <!-- Sibling shadow layer prevents DropShadowEffect from rasterizing modal text -->
+                        <!-- Sibling shadow layer cached on GPU prevents DropShadowEffect from re-running or rasterizing modal text -->
                         <Border Background="{DynamicResource ModalCardBgBrush}"
                                 CornerRadius="16"
                                 IsHitTestVisible="False">
+                            <Border.CacheMode>
+                                <BitmapCache EnableClearType="False" RenderAtScale="1.5" />
+                            </Border.CacheMode>
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="22" ShadowDepth="6" Direction="270" Opacity="0.40" Color="#000000" />
                             </Border.Effect>
