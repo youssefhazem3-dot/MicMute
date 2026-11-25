@@ -101,6 +101,7 @@ Or download the official **`.NET Desktop Runtime 8.0 (x64)`** installer directly
 - **Privacy & Portable Mode**
   - Pure WASAPI endpoint mute toggling — never accesses or records microphone audio.
   - Stores settings in `%APPDATA%\MicMute\settings.json` by default, or switch to **Portable Mode** by placing an empty `portable.flag` file next to `MicMute.exe`.
+  - Release provenance and signing details are documented in [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
 
 ---
 

@@ -18,6 +18,7 @@
     <StartupObject>MicMute.App</StartupObject>
     <RootNamespace>MicMute</RootNamespace>
     <AssemblyName>MicMute</AssemblyName>
+    <Deterministic>true</Deterministic>
 
     <PublishSingleFile Condition="'$(PublishSingleFile)' == ''">false</PublishSingleFile>
     <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>

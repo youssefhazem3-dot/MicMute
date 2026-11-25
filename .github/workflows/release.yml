@@ -47,8 +47,9 @@ jobs:
             $content = Get-Content -LiteralPath $infoPath -Raw
             $content = [regex]::Replace($content, 'AssemblyVersion\("[^"]+"\)', "AssemblyVersion(`"$asmVer`")")
             $content = [regex]::Replace($content, 'AssemblyFileVersion\("[^"]+"\)', "AssemblyFileVersion(`"$asmVer`")")
+            $content = [regex]::Replace($content, 'AssemblyInformationalVersion\("[^"]+"\)', "AssemblyInformationalVersion(`"$cleanVer`")")
             Set-Content -LiteralPath $infoPath -Value $content -NoNewline
-            Write-Host "Stamped AssemblyVersion & AssemblyFileVersion = $asmVer (from tag $tag)"
+            Write-Host "Stamped AssemblyVersion & AssemblyFileVersion = $asmVer, Informational = $cleanVer (from tag $tag)"
           }
 
       - name: Build & Run All Tests
@@ -56,18 +57,17 @@ jobs:
           dotnet build MicMute.sln -c Release --nologo
           dotnet run --project tests/MicMute.Tests/MicMute.Tests.csproj -c Release --no-build
 
-      - name: Publish Lightweight & Standalone Packages
+      - name: Publish Lightweight & Standalone Binaries
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path release-out -Force | Out-Null
 
-          # 1. Lightweight build (~1.35 MB single-file, requires .NET 8 Desktop Runtime x64)
+          # 1. Lightweight build (~1.4 MB single-file, requires .NET 8 Desktop Runtime x64)
           dotnet publish src/MicMute/MicMute.csproj -c Release -r win-x64 `
             --self-contained false `
             -p:PublishSingleFile=true `
             -p:DebugType=None -p:DebugSymbols=false `
             -o stage-light
-          Compress-Archive -Path stage-light/MicMute.exe -DestinationPath release-out/MicMute-win-x64.zip -CompressionLevel Optimal -Force
 
           # 2. Standalone build (self-contained single-file, zero prerequisites)
           dotnet publish src/MicMute/MicMute.csproj -c Release -r win-x64 `
@@ -77,9 +77,95 @@ jobs:
             -p:EnableCompressionInSingleFile=true `
             -p:DebugType=None -p:DebugSymbols=false `
             -o stage-standalone
-          Compress-Archive -Path stage-standalone/MicMute.exe -DestinationPath release-out/MicMute-win-x64-standalone.zip -CompressionLevel Optimal -Force
 
-          # 3. Generate SHA-256 checksums
+      - name: Check SignPath Configuration
+        id: signpath_check
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORG_ID: ${{ secrets.SIGNPATH_ORG_ID }}
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:SIGNPATH_API_TOKEN) -and -not [string]::IsNullOrWhiteSpace($env:SIGNPATH_ORG_ID)) {
+            "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "SignPath code signing is configured and enabled."
+          } else {
+            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "SignPath secrets not configured; publishing unsigned release artifacts."
+          }
+
+      - name: Upload Unsigned Lightweight Artifact for SignPath
+        id: upload_unsigned_light
+        if: steps.signpath_check.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-micmute-light
+          path: stage-light/MicMute.exe
+          retention-days: 1
+
+      - name: Sign Lightweight Binary via SignPath
+        if: steps.signpath_check.outputs.enabled == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+          project-slug: micmute
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.upload_unsigned_light.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: stage-light-signed
+
+      - name: Upload Unsigned Standalone Artifact for SignPath
+        id: upload_unsigned_standalone
+        if: steps.signpath_check.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-micmute-standalone
+          path: stage-standalone/MicMute.exe
+          retention-days: 1
+
+      - name: Sign Standalone Binary via SignPath
+        if: steps.signpath_check.outputs.enabled == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+          project-slug: micmute
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.upload_unsigned_standalone.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: stage-standalone-signed
+
+      - name: Package Release Archives & SHA-256 Checksums
+        shell: pwsh
+        env:
+          SIGNPATH_ENABLED: ${{ steps.signpath_check.outputs.enabled }}
+        run: |
+          function Resolve-ReleaseExe([string]$signedDir, [string]$unsignedExe) {
+            if ($env:SIGNPATH_ENABLED -eq 'true') {
+              $signedExe = Get-ChildItem -Path $signedDir -Filter 'MicMute.exe' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $signedExe) {
+                $signedZip = Get-ChildItem -Path $signedDir -Filter '*.zip' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($signedZip) {
+                  $extractDir = Join-Path $signedDir 'extracted'
+                  Expand-Archive -LiteralPath $signedZip.FullName -DestinationPath $extractDir -Force
+                  $signedExe = Get-ChildItem -Path $extractDir -Filter 'MicMute.exe' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+                }
+              }
+              if (-not $signedExe) {
+                throw "SignPath signing was enabled, but no signed MicMute.exe was found in $signedDir."
+              }
+              return $signedExe.FullName
+            }
+            return $unsignedExe
+          }
+
+          $lightExe = Resolve-ReleaseExe 'stage-light-signed' 'stage-light/MicMute.exe'
+          $standaloneExe = Resolve-ReleaseExe 'stage-standalone-signed' 'stage-standalone/MicMute.exe'
+
+          Compress-Archive -Path $lightExe -DestinationPath release-out/MicMute-win-x64.zip -CompressionLevel Optimal -Force
+          Compress-Archive -Path $standaloneExe -DestinationPath release-out/MicMute-win-x64-standalone.zip -CompressionLevel Optimal -Force
+
+          # Generate SHA-256 checksums
           $checksums = Get-ChildItem release-out/*.zip | Sort-Object Name | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($_.Name)"

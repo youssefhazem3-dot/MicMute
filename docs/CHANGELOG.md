@@ -2,6 +2,17 @@
 
 Every change increments the app version by `+0.0.1` (`AssemblyVersion` & `AssemblyFileVersion` in `src/MicMute/AssemblyInfo.cs`).
 
+## v1.0.9 — 2026-11-25
+- **Antivirus False-Positive Mitigation & Startup Hardening:**
+  - Removed the hidden `schtasks.exe` CLI shell-out fallback from `StartupManager` (relying cleanly on the built-in Windows Task Scheduler 2.0 COM API `Schedule.Service`) to eliminate heuristic persistence triggers.
+  - Guarded `AdminManager.SetRunAsAdmin` with a read-only registry check before opening `AppCompatFlags\Layers` writable, eliminating unnecessary write-mode registry access on startup.
+  - Enabled `<Deterministic>true</Deterministic>` builds and added `AssemblyInformationalVersion`.
+  - Added [CODE_SIGNING_POLICY.md](../CODE_SIGNING_POLICY.md) and optional [SignPath Foundation](https://signpath.org/) code-signing workflow support in `.github/workflows/release.yml`.
+
+## v1.0.8 — 2026-11-24
+- **Animation Performance & OSD Polish:**
+  - Eliminated animation jitter and switched OSD transitions to smooth center-origin motion.
+
 ## v1.0.7 — 2026-11-22
 - **Memory, Handle & Animation Clock Leak Fixes:**
   - Closed the temporary parsed XAML `Window` in `SettingsWindow.InitializeComponent()` so it is no longer pinned in `Application.Current.Windows`.

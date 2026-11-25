@@ -62,6 +62,17 @@ public static class AdminManager
                 return true;
             }
 
+            // Check read-only first to avoid unnecessary writable registry access to AppCompatFlags\Layers on every startup.
+            using (var readKey = Registry.CurrentUser.OpenSubKey(AppCompatKey, writable: false))
+            {
+                string existingRead = readKey?.GetValue(exePath) as string ?? string.Empty;
+                bool hasFlag = existingRead.Contains("RUNASADMIN", StringComparison.OrdinalIgnoreCase);
+                if (enable == hasFlag)
+                {
+                    return true;
+                }
+            }
+
             using var key = Registry.CurrentUser.CreateSubKey(AppCompatKey, writable: true);
             if (key != null)
             {

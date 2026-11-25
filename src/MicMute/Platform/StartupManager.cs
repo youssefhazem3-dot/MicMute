@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
@@ -186,8 +185,8 @@ public static class StartupManager
         }
         catch (Exception ex)
         {
-            // Fall back to schtasks if COM registration fails
             DiagnosticLogger.LogError("CreateScheduledTask COM failed", ex);
+            return false;
         }
         finally
         {
@@ -203,27 +202,7 @@ public static class StartupManager
             ReleaseCom(scheduler);
         }
 
-        string schtasksPath = GetSchtasksPath();
-        var psi = new ProcessStartInfo
-        {
-            FileName = schtasksPath,
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardOutput = false,
-            RedirectStandardError = false
-        };
-        psi.ArgumentList.Add("/create");
-        psi.ArgumentList.Add("/tn");
-        psi.ArgumentList.Add(TaskName);
-        psi.ArgumentList.Add("/tr");
-        psi.ArgumentList.Add(exePath);
-        psi.ArgumentList.Add("/sc");
-        psi.ArgumentList.Add("onlogon");
-        psi.ArgumentList.Add("/rl");
-        psi.ArgumentList.Add("highest");
-        psi.ArgumentList.Add("/f");
-
-        return RunSchtasks(psi);
+        return false;
     }
 
     public static bool RemoveScheduledTask()
@@ -261,8 +240,8 @@ public static class StartupManager
         }
         catch (Exception ex)
         {
-            // Fall back if COM is unavailable
             DiagnosticLogger.LogError("RemoveScheduledTask COM failed", ex);
+            return false;
         }
         finally
         {
@@ -270,21 +249,7 @@ public static class StartupManager
             ReleaseCom(scheduler);
         }
 
-        string schtasksPath = GetSchtasksPath();
-        var psi = new ProcessStartInfo
-        {
-            FileName = schtasksPath,
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardOutput = false,
-            RedirectStandardError = false
-        };
-        psi.ArgumentList.Add("/delete");
-        psi.ArgumentList.Add("/tn");
-        psi.ArgumentList.Add(TaskName);
-        psi.ArgumentList.Add("/f");
-
-        return RunSchtasks(psi);
+        return false;
     }
 
     public static bool IsScheduledTaskConfigured() => IsScheduledTaskMatching(null);
@@ -339,7 +304,6 @@ public static class StartupManager
         }
         catch (Exception ex)
         {
-            // Non-COM environment fallback
             DiagnosticLogger.LogError("IsScheduledTaskConfigured COM failed", ex);
         }
         finally
@@ -353,53 +317,6 @@ public static class StartupManager
             ReleaseCom(scheduler);
         }
 
-        try
-        {
-            if (expectedExePath != null) return false;
-            string schtasksPath = GetSchtasksPath();
-            var psi = new ProcessStartInfo
-            {
-                FileName = schtasksPath,
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = false,
-                RedirectStandardError = false
-            };
-            psi.ArgumentList.Add("/query");
-            psi.ArgumentList.Add("/tn");
-            psi.ArgumentList.Add(TaskName);
-            return RunSchtasks(psi);
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLogger.LogError("IsScheduledTaskConfigured CLI fallback failed", ex);
-            return false;
-        }
-    }
-
-    private static string GetSchtasksPath()
-    {
-        string systemSchtasks = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "schtasks.exe");
-        return File.Exists(systemSchtasks) ? systemSchtasks : "schtasks.exe";
-    }
-
-    private static bool RunSchtasks(ProcessStartInfo psi)
-    {
-        try
-        {
-            using var process = Process.Start(psi);
-            if (process == null) return false;
-            if (!process.WaitForExit(5000))
-            {
-                try { process.Kill(); } catch { }
-                return false;
-            }
-            return process.ExitCode == 0;
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLogger.LogError("RunSchtasks failed", ex);
-            return false;
-        }
+        return false;
     }
 }
