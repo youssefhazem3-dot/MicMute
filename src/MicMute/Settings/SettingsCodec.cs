@@ -41,6 +41,10 @@ public static class SettingsCodec
 
             JsonElement root = document.RootElement;
             AppSettings defaults = new();
+            int soundVolume = GetInt(root, "SoundVolume", defaults.SoundVolume);
+            bool soundVolumeCustomized = TryGetProperty(root, "SoundVolumeCustomized", out _)
+                ? GetBoolean(root, "SoundVolumeCustomized", defaults.SoundVolumeCustomized)
+                : (TryGetProperty(root, "SoundVolume", out _) && Math.Clamp(soundVolume, 0, 100) != defaults.SoundVolume);
             return Normalize(new AppSettings
             {
                 SelectedDeviceId = GetString(root, "SelectedDeviceId", defaults.SelectedDeviceId),
@@ -56,7 +60,8 @@ public static class SettingsCodec
                 UsePortableMode = GetBoolean(root, "UsePortableMode", defaults.UsePortableMode),
                 RunAsAdmin = GetBoolean(root, "RunAsAdmin", defaults.RunAsAdmin),
                 PlaySoundFeedback = GetBoolean(root, "PlaySoundFeedback", defaults.PlaySoundFeedback),
-                SoundVolume = GetInt(root, "SoundVolume", defaults.SoundVolume),
+                SoundVolume = soundVolume,
+                SoundVolumeCustomized = soundVolumeCustomized,
                 HoldKeyMode = GetBoolean(root, "HoldKeyMode", defaults.HoldKeyMode),
                 SyncAllMicrophones = GetBoolean(root, "SyncAllMicrophones", defaults.SyncAllMicrophones),
                 LockMuteState = GetBoolean(root, "LockMuteState", defaults.LockMuteState),

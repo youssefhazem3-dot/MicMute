@@ -77,6 +77,7 @@ static class UiCases
         test(nameof(ModernMotionCurvesGlidingPillAndZeroLinearKeyframes), ModernMotionCurvesGlidingPillAndZeroLinearKeyframes);
         test(nameof(MemoryLeakCleanupAndResourceLifecycle), MemoryLeakCleanupAndResourceLifecycle);
         test(nameof(JitterFreeAnimationsAndCenterOriginOsd), JitterFreeAnimationsAndCenterOriginOsd);
+        test(nameof(SoundVolumeInitializesFromWindowsOutputUntilManuallyCustomized), SoundVolumeInitializesFromWindowsOutputUntilManuallyCustomized);
     }
 
     private static void ParsesDurationUsingCurrentCultureAndInvariantFallback()
@@ -2815,16 +2816,16 @@ static class UiCases
         Check.True(narrowPlaced.Left >= narrowWa.Left && narrowPlaced.Left + narrowPlaced.Width <= narrowWa.Left + narrowWa.Width + 0.5,
             "Narrow fallback must stay cleanly inside work area");
 
-        // 3. Verify version bump tracking (1.0.9)
-        Check.Equal("1.0.9", UpdateManager.GetCurrentVersionDisplay(), "App version must reflect +0.0.1 bump to 1.0.9");
+        // 3. Verify version bump tracking (1.0.10)
+        Check.Equal("1.0.10", UpdateManager.GetCurrentVersionDisplay(), "App version must reflect +0.0.1 bump to 1.0.10");
 
         // 4. Runtime verification of Settings toggle, gear rotation, SettingsWindow open/close, theme sync & lifecycle
         using var audio = new AudioController();
         var window = new MainWindow(audio);
         try
         {
-            Check.Equal("v1.0.9", window.tbTitleVersion?.Text, "Title bar must show v1.0.9");
-            Check.Equal("Version 1.0.9", window.tbMenuVersion?.Text, "App menu must show Version 1.0.9");
+            Check.Equal("v1.0.10", window.tbTitleVersion?.Text, "Title bar must show v1.0.10");
+            Check.Equal("Version 1.0.10", window.tbMenuVersion?.Text, "App menu must show Version 1.0.10");
             Check.True(window.btnSettingsToggle != null, "btnSettingsToggle must be bound");
             Check.True(window.settingsGearRot != null, "settingsGearRot must be bound");
             Check.True(window._settingsWindow != null, "SettingsPopupWindow must be initialized");
@@ -3073,6 +3074,111 @@ static class UiCases
         finally
         {
             OsdWindow.CloseOsd();
+        }
+    }
+
+    private sealed class StubOutputVolumeAudioController : AudioController
+    {
+        public int SimulatedOutputVolume { get; set; }
+
+        public StubOutputVolumeAudioController(int simulatedOutputVolume)
+        {
+            SimulatedOutputVolume = simulatedOutputVolume;
+        }
+
+        public override int GetDefaultOutputVolumePercent(int fallback = UiBehavior.DefaultSoundVolume)
+            => Math.Clamp(SimulatedOutputVolume, UiBehavior.MinimumSoundVolume, UiBehavior.MaximumSoundVolume);
+    }
+
+    private static void SoundVolumeInitializesFromWindowsOutputUntilManuallyCustomized()
+    {
+        string tempRoot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MicMute.SoundVolSync." + Guid.NewGuid().ToString("N"));
+        string defaultDir = System.IO.Path.Combine(tempRoot, "default");
+        string appDir = System.IO.Path.Combine(tempRoot, "app");
+        System.IO.Directory.CreateDirectory(defaultDir);
+        System.IO.Directory.CreateDirectory(appDir);
+        int originalAudioFeedbackVol = AudioFeedback.CurrentVolume;
+
+        using var testStore = new SettingsStore(defaultDir, appDir);
+        SettingsStore previousStore = SettingsManager.ReplaceStoreForTesting(testStore);
+        try
+        {
+            // 1. First launch (uncustomized): initializes from Windows output volume (55%)
+            using (var audio = new StubOutputVolumeAudioController(55))
+            {
+                var window = new MainWindow(audio);
+                try
+                {
+                    Check.Equal(55.0, window.sliderSoundVolume.Value, "First launch slider must match Windows output volume (55%)");
+                    Check.Equal("55", window.txtSoundVolume.Text, "First launch keycap text must match Windows output volume (55%)");
+                    Check.Equal(55, AudioFeedback.CurrentVolume, "AudioFeedback volume must initialize to Windows output volume (55%)");
+                    Check.True(!SettingsManager.Load().SoundVolumeCustomized, "Auto-sync must not mark SoundVolumeCustomized as true");
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+
+            // 2. Subsequent launch while still uncustomized tracks updated Windows volume (40%)
+            using (var audio = new StubOutputVolumeAudioController(40))
+            {
+                var window = new MainWindow(audio);
+                try
+                {
+                    Check.Equal(40.0, window.sliderSoundVolume.Value, "Uncustomized relaunch must pick up new Windows volume (40%)");
+                    Check.Equal("40", window.txtSoundVolume.Text);
+
+                    // User manually adjusts slider to 78% -> locks in custom preference
+                    window.sliderSoundVolume.Value = 78;
+                    Check.Equal(78, SettingsManager.Load().SoundVolume);
+                    Check.True(SettingsManager.Load().SoundVolumeCustomized, "Manual slider change must persist SoundVolumeCustomized = true");
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+
+            // 3. Subsequent launch after manual adjustment preserves user's 78% even when Windows is at 25%
+            using (var audio = new StubOutputVolumeAudioController(25))
+            {
+                var window = new MainWindow(audio);
+                try
+                {
+                    Check.Equal(78.0, window.sliderSoundVolume.Value, "Customized volume (78%) must be preserved across restarts");
+                    Check.Equal("78", window.txtSoundVolume.Text);
+                    Check.Equal(78, AudioFeedback.CurrentVolume);
+                    Check.True(SettingsManager.Load().SoundVolumeCustomized);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+
+            // 4. Reset Settings clears customization and re-syncs to current Windows output volume (62%)
+            SettingsManager.ResetAllSettings();
+            using (var audio = new StubOutputVolumeAudioController(62))
+            {
+                var window = new MainWindow(audio);
+                try
+                {
+                    Check.Equal(62.0, window.sliderSoundVolume.Value, "After Reset Settings, slider must re-sync to Windows output volume (62%)");
+                    Check.Equal("62", window.txtSoundVolume.Text);
+                    Check.True(!SettingsManager.Load().SoundVolumeCustomized);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+        }
+        finally
+        {
+            SettingsManager.ReplaceStoreForTesting(previousStore);
+            AudioFeedback.SetVolume(originalAudioFeedbackVol);
+            try { if (System.IO.Directory.Exists(tempRoot)) System.IO.Directory.Delete(tempRoot, recursive: true); } catch { }
         }
     }
 }

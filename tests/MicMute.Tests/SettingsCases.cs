@@ -248,13 +248,29 @@ public static class SettingsCases
 
     private static void SoundVolumeSettingsCodecSerializationAndClamping()
     {
-        // Default is 100
+        // Default is 100 and uncustomized (so first launch/reset follows Windows output volume)
         AppSettings defaults = new();
         Check.Equal(100, defaults.SoundVolume);
+        Check.True(!defaults.SoundVolumeCustomized, "Default SoundVolumeCustomized must be false");
 
-        // Deserialize with volume
+        // Legacy JSON with non-default SoundVolume infers customized = true
         AppSettings deserialized = SettingsCodec.Deserialize("{\"SoundVolume\":65}");
         Check.Equal(65, deserialized.SoundVolume);
+        Check.True(deserialized.SoundVolumeCustomized, "Legacy non-default SoundVolume must be preserved as customized");
+
+        // Legacy JSON with untouched default SoundVolume (100) stays uncustomized for smooth upgrade
+        AppSettings legacyDefault = SettingsCodec.Deserialize("{\"SoundVolume\":100}");
+        Check.Equal(100, legacyDefault.SoundVolume);
+        Check.True(!legacyDefault.SoundVolumeCustomized, "Legacy default SoundVolume (100) must remain uncustomized");
+
+        // Explicit SoundVolumeCustomized flag is honored even at 100% or non-100%
+        AppSettings explicit100 = SettingsCodec.Deserialize("{\"SoundVolume\":100,\"SoundVolumeCustomized\":true}");
+        Check.Equal(100, explicit100.SoundVolume);
+        Check.True(explicit100.SoundVolumeCustomized, "Explicitly customized 100% must remain customized");
+
+        AppSettings explicitSynced = SettingsCodec.Deserialize("{\"SoundVolume\":55,\"SoundVolumeCustomized\":false}");
+        Check.Equal(55, explicitSynced.SoundVolume);
+        Check.True(!explicitSynced.SoundVolumeCustomized, "Explicitly uncustomized synced volume must remain uncustomized");
 
         // Normalize clamps out of range
         AppSettings clampedLow = SettingsCodec.Normalize(new AppSettings { SoundVolume = -20 });
@@ -263,11 +279,12 @@ public static class SettingsCases
         AppSettings clampedHigh = SettingsCodec.Normalize(new AppSettings { SoundVolume = 150 });
         Check.Equal(100, clampedHigh.SoundVolume);
 
-        // Reset volume to 100% — no, roundtrip
-        AppSettings custom = new AppSettings { SoundVolume = 42 };
+        // Roundtrip
+        AppSettings custom = new AppSettings { SoundVolume = 42, SoundVolumeCustomized = true };
         string json = SettingsCodec.Serialize(custom);
         AppSettings roundtrip = SettingsCodec.Deserialize(json);
         Check.Equal(42, roundtrip.SoundVolume);
+        Check.True(roundtrip.SoundVolumeCustomized, "SoundVolumeCustomized must roundtrip");
     }
 
     private static void PowerModeSettingsSerializeDeserializeAndNormalize()

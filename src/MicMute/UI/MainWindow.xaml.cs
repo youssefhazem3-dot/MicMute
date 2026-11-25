@@ -44,6 +44,7 @@ public partial class MainWindow : Window
     private bool _hasInitialCentered;
     private double? _osdDurationBeforeEdit;
     private int? _soundVolumeBeforeEdit;
+    private bool? _soundVolumeCustomizedBeforeEdit;
     private int _themeTransitionVersion;
     private bool _holdToggledActive;
     private static readonly Regex XClassRegex = new(@"\s+x:Class=""[^""]+""", RegexOptions.Compiled);
@@ -729,7 +730,9 @@ public partial class MainWindow : Window
             };
             txtSoundVolume.GotFocus += (s, e) =>
             {
-                _soundVolumeBeforeEdit = SettingsManager.Load().SoundVolume;
+                AppSettings current = SettingsManager.Load();
+                _soundVolumeBeforeEdit = current.SoundVolume;
+                _soundVolumeCustomizedBeforeEdit = current.SoundVolumeCustomized;
             };
             txtSoundVolume.LostFocus += TxtSoundVolume_LostFocus;
             txtSoundVolume.KeyDown += TxtSoundVolume_KeyDown;
@@ -1179,18 +1182,32 @@ public partial class MainWindow : Window
             {
                 cbSoundFeedback.IsChecked = appSettings.PlaySoundFeedback;
             }
+            int effectiveSoundVolume = appSettings.SoundVolume;
+            if (!appSettings.SoundVolumeCustomized)
+            {
+                effectiveSoundVolume = _audioController.GetDefaultOutputVolumePercent(appSettings.SoundVolume);
+                if (effectiveSoundVolume != appSettings.SoundVolume)
+                {
+                    appSettings = appSettings with
+                    {
+                        SoundVolume = effectiveSoundVolume,
+                        SoundVolumeCustomized = false
+                    };
+                    SettingsManager.Save(appSettings);
+                }
+            }
             if (sliderSoundVolume != null)
             {
                 sliderSoundVolume.Minimum = UiBehavior.MinimumSoundVolume;
                 sliderSoundVolume.Maximum = UiBehavior.MaximumSoundVolume;
-                sliderSoundVolume.Value = appSettings.SoundVolume;
+                sliderSoundVolume.Value = effectiveSoundVolume;
             }
             if (txtSoundVolume != null)
             {
-                txtSoundVolume.Text = UiBehavior.FormatSoundVolume(appSettings.SoundVolume);
+                txtSoundVolume.Text = UiBehavior.FormatSoundVolume(effectiveSoundVolume);
             }
             UpdateSoundVolumeUiState(appSettings.PlaySoundFeedback);
-            AudioFeedback.SetVolume(appSettings.SoundVolume);
+            AudioFeedback.SetVolume(effectiveSoundVolume);
             SetLightMode(appSettings.LightMode);
             DisplayHotkey(appSettings.Hotkey, appSettings.HotkeyModifiers);
             UpdatePowerModeUi(appSettings);
@@ -4081,7 +4098,7 @@ public partial class MainWindow : Window
                 _isUpdatingSoundVolumeTextFromSlider = false;
             }
             AppSettings current = SettingsManager.Load();
-            if (current.SoundVolume != volume)
+            if (current.SoundVolume != volume || !current.SoundVolumeCustomized)
             {
                 if (_isPointerInteractingWithVolumeSlider)
                 {
@@ -4089,7 +4106,8 @@ public partial class MainWindow : Window
                 }
                 SettingsManager.Save(current with
                 {
-                    SoundVolume = volume
+                    SoundVolume = volume,
+                    SoundVolumeCustomized = true
                 });
             }
             _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(35), () => AudioFeedback.SetVolume(volume));
@@ -4098,7 +4116,7 @@ public partial class MainWindow : Window
 
     private void TxtSoundVolume_LostFocus(object sender, RoutedEventArgs e)
     {
-        CommitSoundVolumeText();
+        CommitSoundVolumeText(forceCustomize: false);
     }
 
     private void TxtSoundVolume_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -4106,14 +4124,20 @@ public partial class MainWindow : Window
         if (e.Key == Key.Enter)
         {
             e.Handled = true;
-            CommitSoundVolumeText();
+            CommitSoundVolumeText(forceCustomize: true);
             this.Focus();
         }
         else if (e.Key == Key.Escape)
         {
             e.Handled = true;
-            int restoreVal = _soundVolumeBeforeEdit ?? SettingsManager.Load().SoundVolume;
-            SettingsManager.Save(SettingsManager.Load() with { SoundVolume = restoreVal });
+            AppSettings current = SettingsManager.Load();
+            int restoreVal = _soundVolumeBeforeEdit ?? current.SoundVolume;
+            bool restoreCustomized = _soundVolumeCustomizedBeforeEdit ?? current.SoundVolumeCustomized;
+            SettingsManager.Save(current with
+            {
+                SoundVolume = restoreVal,
+                SoundVolumeCustomized = restoreCustomized
+            });
             _volumeAudioDebouncer.Cancel();
             AudioFeedback.SetVolume(restoreVal);
             _isUpdatingSoundVolumeTextFromSlider = true;
@@ -4121,6 +4145,7 @@ public partial class MainWindow : Window
             txtSoundVolume.Text = UiBehavior.FormatSoundVolume(restoreVal);
             _isUpdatingSoundVolumeTextFromSlider = false;
             _soundVolumeBeforeEdit = null;
+            _soundVolumeCustomizedBeforeEdit = null;
             this.Focus();
         }
     }
@@ -4131,13 +4156,16 @@ public partial class MainWindow : Window
         {
             if (_soundVolumeBeforeEdit == null)
             {
-                _soundVolumeBeforeEdit = SettingsManager.Load().SoundVolume;
+                AppSettings before = SettingsManager.Load();
+                _soundVolumeBeforeEdit = before.SoundVolume;
+                _soundVolumeCustomizedBeforeEdit = before.SoundVolumeCustomized;
             }
             if (UiBehavior.TryParseSoundVolume(txtSoundVolume.Text, out var result))
             {
                 SettingsManager.Save(SettingsManager.Load() with
                 {
-                    SoundVolume = result
+                    SoundVolume = result,
+                    SoundVolumeCustomized = true
                 });
                 _volumeAudioDebouncer.Schedule(TimeSpan.FromMilliseconds(35), () => AudioFeedback.SetVolume(result));
                 _isUpdatingSoundVolumeTextFromSlider = true;
@@ -4147,18 +4175,29 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CommitSoundVolumeText()
+    private void CommitSoundVolumeText(bool forceCustomize = false)
     {
+        int? previousVolume = _soundVolumeBeforeEdit;
+        bool? previousCustomized = _soundVolumeCustomizedBeforeEdit;
         _soundVolumeBeforeEdit = null;
+        _soundVolumeCustomizedBeforeEdit = null;
         string candidate = txtSoundVolume.Text.Trim().TrimEnd('%').Trim();
         if (int.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out int anyInt) ||
             int.TryParse(candidate, NumberStyles.Integer, CultureInfo.CurrentCulture, out anyInt))
         {
             int clamped = Math.Clamp(anyInt, UiBehavior.MinimumSoundVolume, UiBehavior.MaximumSoundVolume);
-            SettingsManager.Save(SettingsManager.Load() with
+            AppSettings current = SettingsManager.Load();
+            bool customized = forceCustomize
+                || (previousCustomized ?? current.SoundVolumeCustomized)
+                || clamped != (previousVolume ?? current.SoundVolume);
+            if (current.SoundVolume != clamped || current.SoundVolumeCustomized != customized)
             {
-                SoundVolume = clamped
-            });
+                SettingsManager.Save(current with
+                {
+                    SoundVolume = clamped,
+                    SoundVolumeCustomized = customized
+                });
+            }
             _volumeAudioDebouncer.Cancel();
             AudioFeedback.SetVolume(clamped);
             _isUpdatingSoundVolumeTextFromSlider = true;

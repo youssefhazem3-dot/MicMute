@@ -14,6 +14,7 @@ internal static class AudioCases
         test(nameof(OldNotificationCannotReplaceNewerMuteState), OldNotificationCannotReplaceNewerMuteState);
         test(nameof(ToggleMuteHandlesUninitializedOrStaleDeviceWithoutCrashing), ToggleMuteHandlesUninitializedOrStaleDeviceWithoutCrashing);
         test(nameof(SetTargetDeviceAsyncResolvesActiveMicrophoneAndAllowsToggleMute), SetTargetDeviceAsyncResolvesActiveMicrophoneAndAllowsToggleMute);
+        test(nameof(GetDefaultOutputVolumePercentIsReadOnlyWithinBoundsAndFallsBackWhenDisposed), GetDefaultOutputVolumePercentIsReadOnlyWithinBoundsAndFallsBackWhenDisposed);
     }
 
     private static void AudioWorkRunsSeriallyOnStaWithoutBlockingCaller()
@@ -107,5 +108,19 @@ internal static class AudioCases
                 "SetTargetDeviceAsync must resolve an active microphone");
             controller.ToggleMute();
         }
+    }
+
+    private static void GetDefaultOutputVolumePercentIsReadOnlyWithinBoundsAndFallsBackWhenDisposed()
+    {
+        var controller = new AudioController();
+        int first = controller.GetDefaultOutputVolumePercent(fallback: 73);
+        int second = controller.GetDefaultOutputVolumePercent(fallback: 73);
+        Check.True(first is >= 0 and <= 100, $"Output volume must be within [0, 100], got {first}");
+        Check.Equal(first, second, "Repeated read-only output volume reads must not mutate endpoint volume");
+
+        controller.Dispose();
+        Check.Equal(73, controller.GetDefaultOutputVolumePercent(fallback: 73), "Disposed controller must return safe fallback");
+        Check.Equal(100, controller.GetDefaultOutputVolumePercent(fallback: 150), "Fallback above 100 must clamp to 100");
+        Check.Equal(0, controller.GetDefaultOutputVolumePercent(fallback: -5), "Fallback below 0 must clamp to 0");
     }
 }

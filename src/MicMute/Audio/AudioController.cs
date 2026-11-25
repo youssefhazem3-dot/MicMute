@@ -84,6 +84,46 @@ public class AudioController : IMMNotificationClient, IDisposable
     public string CurrentDeviceName => Volatile.Read(ref _currentName);
     public string CurrentDeviceId => Volatile.Read(ref _currentId);
 
+    private static readonly Role[] RenderLookupRoles = { Role.Multimedia, Role.Console, Role.Communications };
+
+    public virtual int GetDefaultOutputVolumePercent(int fallback = UiBehavior.DefaultSoundVolume)
+    {
+        int safeFallback = Math.Clamp(fallback, UiBehavior.MinimumSoundVolume, UiBehavior.MaximumSoundVolume);
+        if (IsDisposed) return safeFallback;
+        try
+        {
+            return _workQueue.InvokeAsync(() =>
+            {
+                if (IsDisposed || _enumerator == null) return safeFallback;
+                return TryReadDefaultOutputVolumePercent(_enumerator) ?? safeFallback;
+            }).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            return safeFallback;
+        }
+    }
+
+    private static int? TryReadDefaultOutputVolumePercent(MMDeviceEnumerator enumerator)
+    {
+        foreach (Role role in RenderLookupRoles)
+        {
+            try
+            {
+                using MMDevice device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, role);
+                float scalar = device.AudioEndpointVolume.MasterVolumeLevelScalar;
+                if (float.IsFinite(scalar))
+                {
+                    return Math.Clamp((int)Math.Round(scalar * 100.0f), UiBehavior.MinimumSoundVolume, UiBehavior.MaximumSoundVolume);
+                }
+            }
+            catch
+            {
+            }
+        }
+        return null;
+    }
+
     public Task<List<AudioDevice>> GetCaptureDevicesAsync()
     {
         if (IsDisposed) return Task.FromResult(new List<AudioDevice>());
