@@ -2816,16 +2816,16 @@ static class UiCases
         Check.True(narrowPlaced.Left >= narrowWa.Left && narrowPlaced.Left + narrowPlaced.Width <= narrowWa.Left + narrowWa.Width + 0.5,
             "Narrow fallback must stay cleanly inside work area");
 
-        // 3. Verify version bump tracking (1.0.10)
-        Check.Equal("1.0.10", UpdateManager.GetCurrentVersionDisplay(), "App version must reflect +0.0.1 bump to 1.0.10");
+        // 3. Verify version bump tracking (1.0.11)
+        Check.Equal("1.0.11", UpdateManager.GetCurrentVersionDisplay(), "App version must reflect +0.0.1 bump to 1.0.11");
 
         // 4. Runtime verification of Settings toggle, gear rotation, SettingsWindow open/close, theme sync & lifecycle
         using var audio = new AudioController();
         var window = new MainWindow(audio);
         try
         {
-            Check.Equal("v1.0.10", window.tbTitleVersion?.Text, "Title bar must show v1.0.10");
-            Check.Equal("Version 1.0.10", window.tbMenuVersion?.Text, "App menu must show Version 1.0.10");
+            Check.Equal("v1.0.11", window.tbTitleVersion?.Text, "Title bar must show v1.0.11");
+            Check.Equal("Version 1.0.11", window.tbMenuVersion?.Text, "App menu must show Version 1.0.11");
             Check.True(window.btnSettingsToggle != null, "btnSettingsToggle must be bound");
             Check.True(window.settingsGearRot != null, "settingsGearRot must be bound");
             Check.True(window._settingsWindow != null, "SettingsPopupWindow must be initialized");

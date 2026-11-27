@@ -233,9 +233,7 @@ public class HotkeyManager : IDisposable
                 if (!isMouse)
                 {
                     bool hookMissing = Volatile.Read(ref _hookId) == IntPtr.Zero;
-                    bool hookSilent = now - Volatile.Read(ref _lastHookEventTick) > 10000;
-                    if ((hookMissing && now - lastHookRecoveryCheck > 2000) ||
-                        (hookSilent && now - lastHookRecoveryCheck > 10000))
+                    if (hookMissing && now - lastHookRecoveryCheck > 2000)
                     {
                         lastHookRecoveryCheck = now;
                         ScheduleHookRefresh();

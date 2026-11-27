@@ -2,6 +2,14 @@
 
 Every change increments the app version by `+0.0.1` (`AssemblyVersion` & `AssemblyFileVersion` in `src/MicMute/AssemblyInfo.cs`).
 
+## v1.0.11 — 2026-11-27
+- **Behavioral Antivirus False-Positive Fix:**
+  - Removed the idle 10-second `WH_KEYBOARD_LL` unhook/rehook loop in `HotkeyManager.PollLoop` so the app no longer repeatedly reinstalls global low-level keyboard hooks while idle. Dropped hooks still self-heal on demand when `WM_INPUT` raw keyboard traffic or physical polling detects a missed event, or if `_hookId` is missing.
+
+## v1.0.10 — 2026-11-26
+- **Audio Feedback Polish:**
+  - Initialized sound effect volume from the Windows output volume and updated mute/unmute chimes to warm marimba tones.
+
 ## v1.0.9 — 2026-11-25
 - **Antivirus False-Positive Mitigation & Startup Hardening:**
   - Removed the hidden `schtasks.exe` CLI shell-out fallback from `StartupManager` (relying cleanly on the built-in Windows Task Scheduler 2.0 COM API `Schedule.Service`) to eliminate heuristic persistence triggers.
